@@ -1,0 +1,2 @@
+echo "How are you today" | yakyak --debug -f wav -o how.wav
+aplay how.wav

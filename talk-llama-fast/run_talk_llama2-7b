@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./talk-llama -mw ../whisper.cpp/models/ggml-medium.en.bin -ml ../lmodels/en/llama-2-7b-chat.Q5_K_M.gguf -p "Paul" -bn "AMD" -t 6
