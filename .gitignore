@@ -1,0 +1,47 @@
+# Build artifacts
+build/
+*.o
+*.so
+*.a
+*.exe
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Models (too large for git)
+*.gguf
+*.bin
+*.safetensors
+models/
+ggml-*.bin
+
+# Data and audio
+*.wav
+*.mp3
+*.flac
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
