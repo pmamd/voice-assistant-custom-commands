@@ -4,6 +4,8 @@ build/
 *.so
 *.a
 *.exe
+*.dll
+*.dylib
 
 # Python
 __pycache__/
@@ -21,11 +23,14 @@ env/
 models/
 ggml-*.bin
 
-# Data and audio
+# Audio files
 *.wav
 *.mp3
 *.flac
+
+# Data
 data/
+wyoming-piper/data/
 
 # IDE
 .vscode/
@@ -41,7 +46,21 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*~
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+
+# Testing
+test_output/

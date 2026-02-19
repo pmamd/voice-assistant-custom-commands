@@ -1,26 +1,31 @@
-# Interruptible Voice Chatbot
+# Voice Assistant with Custom Commands
 
-An interruptible voice chatbot system combining Speech-to-Text (Whisper), LLM (LLaMA), and Text-to-Speech (Piper TTS) with the ability to interrupt speech and handle voice commands.
+A voice assistant system combining Speech-to-Text (Whisper), LLM (LLaMA), and Text-to-Speech (Piper TTS) with support for LLM-bypass custom commands.
 
-## Overview
+## Key Features
 
-This project integrates two modified components to create an interruptible voice assistant:
-
-- **talk-llama-fast**: Main chat application (Whisper STT + LLaMA LLM + TTS client)
-- **wyoming-piper**: TTS server with interruptibility support
-
-The key innovation is using socket-based communication between the chat client and TTS server, allowing the chat application to continue listening for voice input (like "stop") even while the TTS is generating speech.
+- **Speech-to-Text**: Real-time speech recognition using Whisper
+- **LLM Conversation**: Natural language processing using LLaMA
+- **Text-to-Speech**: High-quality speech synthesis using Piper
+- **Custom Commands**: Commands that bypass the LLM for instant execution
+  - **Interruptibility**: Say "stop" to interrupt the AI while speaking
+  - **Extensible**: Framework for adding more direct commands
 
 ## Architecture
+
+![Architecture Diagram](./architecture-diagram.svg)
+
+<details>
+<summary>View ASCII diagram</summary>
 
 ```
                     ┌──────────────┐
                     │  Microphone  │
                     └──────┬───────┘
-                           │ (audio input, including "stop")
+                           │ (audio input, including commands)
                            ▼
 ┌──────────────────────────────────────────────────────────┐
-│              talk-llama-fast (Main App)                  │
+│              talk-llama-custom (Main App)                │
 │                                                          │
 │  ┌──────────┐                ┌────────┐                 │
 │  │ Whisper  │───────────────▶│ LLaMA  │                 │
@@ -29,12 +34,12 @@ The key innovation is using socket-based communication between the chat client a
 │       │                           │                     │
 │       │                           ▼                     │
 │       │                      ┌────────┐                 │
-│       │   "stop" (bypasses   │  TTS   │◀────────────────┘
+│       │   commands (bypass   │  TTS   │◀────────────────┘
 │       └─────────────────────▶│ Client │                 │
 │                              └────┬───┘                 │
 │                                   │                     │
 │                                   │ HTTP POST           │
-│                                   │ {text: "stop", ...} │
+│                                   │ {text: "...", ...}  │
 └───────────────────────────────────┼─────────────────────┘
                                     │
                                     ▼
@@ -43,8 +48,8 @@ The key innovation is using socket-based communication between the chat client a
                          │   TTS Server             │
                          │                          │
                          │  ┌────────────────────┐  │
-                         │  │ Stop Detection     │  │
-                         │  │ (if "stop" in text)│  │
+                         │  │ Command Detection  │  │
+                         │  │ (e.g., "stop")     │  │
                          │  └─────────┬──────────┘  │
                          │            │             │
                          │            ▼             │
@@ -58,68 +63,52 @@ The key innovation is using socket-based communication between the chat client a
                          │  └────────────────────┘  │
                          └──────────────────────────┘
 ```
-
-## Features
-
-- **Speech-to-Text**: Real-time speech recognition using Whisper
-- **LLM Conversation**: Natural language understanding and generation using LLaMA
-- **Text-to-Speech**: High-quality speech synthesis using Piper
-- **Interruptible Output**: Say "stop" to interrupt the AI while it's speaking
-- **Voice Commands**: Ability to handle commands that bypass the LLM (future enhancement)
-- **Non-blocking Architecture**: Socket-based IPC allows simultaneous listening and speaking
+</details>
 
 ## Repository Structure
 
+This repository uses **git submodules** for upstream dependencies to keep only custom code in the main repo:
+
 ```
-interruptible-chatbot/
-├── talk-llama-fast/          # Modified Whisper + LLaMA chat client
-│   └── [custom-modifications branch with TTS bugfixes]
+voice-assistant-custom-commands/
+├── whisper.cpp/              # Submodule: Upstream Whisper STT engine
+├── custom/                   # Your custom code (< 50KB)
+│   └── talk-llama/
+│       ├── talk-llama.cpp    # Modified main application (1.2K lines)
+│       ├── tts-request.h     # TTS request helpers
+│       └── tts-socket.h      # TTS socket helpers
 ├── wyoming-piper/            # Modified Piper TTS server
-│   └── [custom-modifications branch with interruptibility]
-└── README.md                 # This file
+├── CMakeLists.txt            # Build configuration
+└── README.md
 ```
 
-## Modifications
+## What's Custom vs Upstream
 
-### talk-llama-fast
+### 🎯 Custom Code (This Repo)
+- **`custom/talk-llama/talk-llama.cpp`** - Main application with:
+  - TTS crash bugfixes (safe string handling, CURL error checking)
+  - Custom command routing
+  - Socket-based TTS communication
+- **`wyoming-piper/`** - Modified TTS server with:
+  - Stop command detection
+  - Direct audio playback (aplay)
+  - Interruptibility support
 
-**Base version**: `54da0a2a770ef602b9966171caeff53cc12f8054`
-**Branch**: `custom-modifications`
-
-**Changes**:
-- Fixed crash bugs in `send_tts_async()` function (examples/talk-llama/talk-llama.cpp)
-  - Added empty string validation before array access
-  - Safe string indexing with bounds checking
-  - NULL pointer checks for CURL initialization
-  - Memory leak fix for curl_slist headers
-  - Proper error handling and cleanup
-
-**Original upstream**: https://github.com/Mozer/talk-llama-fast
-
-### wyoming-piper
-
-**Base version**: `21f9966dcc60f59512f5e49ef831f8e30b0f3b77`
-**Branch**: `custom-modifications`
-
-**Changes**:
-- Added direct audio playback via `aplay` instead of streaming via Wyoming protocol
-- Added stop command detection (detects "stop" in short text inputs)
-- Added `get_aplay_process()` method to process manager
-- Bypassed Wyoming audio chunk streaming for lower latency
-- Auto-cleanup of temporary WAV files after playback
-- Debug logging infrastructure (commented out, available for troubleshooting)
-
-**Original upstream**: https://github.com/rhasspy/wyoming-piper
+### 📦 Upstream Dependencies (Submodules)
+- **`whisper.cpp`** - Whisper STT engine and GGML backend
+  - Locked at commit: `d207c688` (whisper.cpp v1.5.5 era)
+  - Includes: Whisper models, GGML tensor library, examples
+  - Source: https://github.com/ggerganov/whisper.cpp
+  - Contains llama.cpp integration in examples/talk-llama/
 
 ## Prerequisites
 
 ### System Requirements
-
-- Linux (tested on Ubuntu/Debian)
+- Linux (Ubuntu/Debian recommended) or Windows with WSL
 - Python 3.9+
-- C++ compiler (gcc/g++)
-- CMake
-- CUDA (optional, for GPU acceleration)
+- C++ compiler (gcc/g++ 8+)
+- CMake 3.12+
+- CUDA Toolkit 11.x+ (optional, for GPU acceleration)
 - Audio system with ALSA (`aplay` command)
 
 ### Dependencies
@@ -130,12 +119,12 @@ sudo apt-get update
 sudo apt-get install -y \
     build-essential \
     cmake \
+    git \
     libsdl2-dev \
     libcurl4-openssl-dev \
     alsa-utils \
     python3 \
-    python3-pip \
-    git
+    python3-pip
 
 # Optional: CUDA for GPU acceleration
 # Follow NVIDIA CUDA installation guide
@@ -143,226 +132,273 @@ sudo apt-get install -y \
 
 ## Setup
 
-### 1. Clone this repository
+### 1. Clone with Submodules
 
 ```bash
-git clone <your-repo-url> interruptible-chatbot
-cd interruptible-chatbot
+git clone --recursive https://github.com/pmamd/voice-assistant-custom-commands.git
+cd voice-assistant-custom-commands
 ```
 
-### 2. Build talk-llama-fast
-
+If you already cloned without `--recursive`:
 ```bash
-cd talk-llama-fast
-
-# For CPU-only build
-cmake -B build
-cmake --build build
-
-# For CUDA build (if you have NVIDIA GPU)
-cmake -B build -DWHISPER_CUDA=ON
-cmake --build build
+git submodule update --init --recursive
 ```
 
-Download Whisper and LLaMA models:
-```bash
-# Download Whisper model (e.g., base.en)
-bash ./models/download-ggml-model.sh base.en
+### 2. Build the Voice Assistant
 
-# Download LLaMA model
-# See talk-llama-fast/README.md for model download instructions
+```bash
+# CPU-only build
+cmake -B build -DWHISPER_SDL2=ON
+cmake --build build -j
+
+# GPU build (CUDA)
+cmake -B build -DWHISPER_SDL2=ON -DWHISPER_CUDA=ON
+cmake --build build -j
 ```
 
-### 3. Setup wyoming-piper
+The executable will be at: `build/bin/talk-llama-custom`
+
+### 3. Download Models
+
+**Whisper Model:**
+```bash
+cd whisper.cpp/models
+# English (150MB)
+bash download-ggml-model.sh base.en
+
+# Multilingual (150MB)
+bash download-ggml-model.sh base
+
+# Better quality (1.5GB)
+bash download-ggml-model.sh medium
+```
+
+**LLaMA Model:**
+Download a GGUF model (e.g., Mistral 7B):
+```bash
+# Example: Mistral 7B Instruct Q5_0 (~5GB)
+wget https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_0.gguf
+```
+
+### 4. Setup Wyoming-Piper TTS Server
 
 ```bash
-cd ../wyoming-piper
-
-# Install Python dependencies
+cd wyoming-piper
 pip install -r requirements.txt
-
-# The server will auto-download voice models on first use
 ```
 
 ## Usage
 
-### 1. Start the Wyoming-Piper TTS Server
+### 1. Start the TTS Server
 
 ```bash
 cd wyoming-piper
 python3 -m wyoming_piper \
-    --piper /path/to/piper/binary \
+    --piper /usr/bin/piper \
     --uri tcp://0.0.0.0:8020 \
     --voice en_US-lessac-medium
 ```
 
-**Note**: The first run will download the voice model automatically.
+The server will auto-download the voice model on first run.
 
-### 2. Run the Chat Application
+### 2. Run the Voice Assistant
 
 ```bash
-cd talk-llama-fast/build/bin
-./talk-llama \
-    -m /path/to/llama-model.gguf \
-    --model-whisper /path/to/whisper-base.en.bin \
+cd build/bin
+./talk-llama-custom \
+    -m /path/to/mistral-7b-instruct-v0.2.Q5_0.gguf \
+    --model-whisper ../../whisper.cpp/models/ggml-base.en.bin \
     --xtts-url http://localhost:8020/ \
-    --xtts-voice emma_1
+    --xtts-voice emma_1 \
+    -p "You are a helpful AI assistant."
 ```
 
 ### 3. Interact
 
-- Speak into your microphone
-- The AI will respond with speech
-- Say "stop" (or any short phrase containing "stop") to interrupt the AI mid-sentence
-- Press Ctrl+C to exit
+- **Speak** into your microphone
+- The AI will **respond** with speech
+- Say **"stop"** to interrupt the AI mid-sentence
+- Press **Ctrl+C** to exit
+
+## Custom Commands
+
+### Current Commands
+
+- **"stop"** - Interrupts AI speech output
+
+### Adding New Commands
+
+To add custom LLM-bypass commands:
+
+1. Edit `custom/talk-llama/talk-llama.cpp`
+2. Add detection logic in the speech processing loop
+3. Route to appropriate handler instead of LLaMA
+4. Optionally add server-side handling in `wyoming-piper/`
+
+Example command categories:
+- **Control commands**: stop, pause, resume, repeat
+- **System commands**: volume up/down, mute
+- **Quick queries**: what time, what date
+- **App control**: exit, restart, help
 
 ## Configuration
 
-### TTS Server Settings
+### Build Options
 
-- **Host**: `localhost` (127.0.0.1)
-- **Port**: `8020`
-- **Protocol**: HTTP POST to `/tts_to_audio/`
-- **Payload**: JSON with `text`, `language`, `speaker_wav`, `reply_part`
+```bash
+# Enable SDL2 (required for talk-llama)
+-DWHISPER_SDL2=ON
 
-### talk-llama Parameters
+# Enable CUDA acceleration
+-DWHISPER_CUDA=ON
 
-See `talk-llama --help` for full options. Key parameters:
+# Enable OpenBLAS
+-DWHISPER_OPENBLAS=ON
 
-- `--xtts-url`: TTS server URL (default: http://localhost:8020/)
-- `--xtts-voice`: Voice/speaker name
-- `-m`: Path to LLaMA model
-- `--model-whisper`: Path to Whisper model
-- `--language`: Language code (default: en)
+# Enable Core ML (macOS)
+-DWHISPER_COREML=ON
+```
+
+### Runtime Options
+
+See `./talk-llama-custom --help` for all options. Common ones:
+
+```bash
+# Model paths
+-m <path>              # LLaMA model path
+--model-whisper <path> # Whisper model path
+
+# TTS configuration
+--xtts-url <url>       # TTS server URL (default: http://localhost:8020/)
+--xtts-voice <name>    # Voice/speaker name
+
+# LLM parameters
+-p <prompt>            # System prompt
+-c <size>              # Context size (default: 2048)
+--temp <value>         # Temperature (default: 0.8)
+
+# Audio settings
+--language <lang>      # Language code (default: en)
+--vad-thold <value>    # Voice activity detection threshold
+```
 
 ## Development
 
-### Making Changes
-
-Both components are on the `custom-modifications` branch:
+### Updating Whisper.cpp
 
 ```bash
-# For talk-llama-fast
-cd talk-llama-fast
-git checkout custom-modifications
-# Make changes
-git add -A
-git commit -m "Description of changes"
-
-# For wyoming-piper
-cd ../wyoming-piper
-git checkout custom-modifications
-# Make changes
-git add -A
-git commit -m "Description of changes"
+cd whisper.cpp
+git fetch origin
+git checkout <new-commit-hash>
+cd ..
+git add whisper.cpp
+git commit -m "Update whisper.cpp to <version>"
 ```
 
-### Viewing Modifications
+### Modifying Custom Code
 
-To see what was changed from upstream:
+All your modifications should go in:
+- `custom/talk-llama/` - For main application changes
+- `wyoming-piper/` - For TTS server changes
 
 ```bash
-# talk-llama-fast changes
-cd talk-llama-fast
-git diff 54da0a2a770ef602b9966171caeff53cc12f8054 custom-modifications
+# After making changes
+cd custom/talk-llama
+# Edit talk-llama.cpp
+cd ../..
+cmake --build build -j
+```
 
-# wyoming-piper changes
-cd ../wyoming-piper
-git diff 21f9966dcc60f59512f5e49ef831f8e30b0f3b77 custom-modifications
+### Viewing Differences from Upstream
+
+```bash
+# See what's different from base whisper.cpp example
+cd whisper.cpp/examples/talk-llama
+diff -u talk-llama.cpp ../../../custom/talk-llama/talk-llama.cpp
 ```
 
 ## Troubleshooting
 
-### TTS Server Connection Issues
+### Submodule Issues
 
-1. Verify server is running:
+If whisper.cpp is empty after cloning:
+```bash
+git submodule update --init --recursive
+```
+
+### Build Errors
+
+Missing SDL2:
+```bash
+sudo apt-get install libsdl2-dev
+```
+
+Missing CURL:
+```bash
+sudo apt-get install libcurl4-openssl-dev
+```
+
+### TTS Connection Issues
+
+Test server connectivity:
 ```bash
 curl -X POST http://localhost:8020/tts_to_audio/ \
   -H "Content-Type: application/json" \
   -d '{"text":"hello world","language":"en","speaker_wav":"emma_1"}'
 ```
 
-2. Check firewall settings
-3. Ensure port 8020 is not in use by another application
-
 ### Audio Playback Issues
 
-1. Test ALSA:
+Test ALSA:
 ```bash
-aplay /usr/share/sounds/alsa/Front_Center.wav
+aplay -l                                    # List audio devices
+aplay /usr/share/sounds/alsa/Front_Center.wav  # Test playback
 ```
-
-2. Check audio device:
-```bash
-aplay -l
-```
-
-3. Set correct ALSA device in wyoming-piper if needed
-
-### Crashes in talk-llama
-
-The bugfixes applied should prevent most crashes. If crashes still occur:
-
-1. Check that you're on the `custom-modifications` branch
-2. Verify the bugfix patch was applied:
-```bash
-cd talk-llama-fast
-git log --oneline | head -5
-# Should show: "Fix TTS crash bugs in send_tts_async()"
-```
-
-### Stop Command Not Working
-
-1. Ensure wyoming-piper is on `custom-modifications` branch
-2. The stop command only works with short phrases (< 10 characters)
-3. Check server logs for "Saw STOP event" message
 
 ## Known Limitations
 
-1. **Stop command detection is basic**: Currently just checks if "stop" appears in text < 10 chars
-2. **Hardcoded aplay**: Audio playback uses system `aplay`, not cross-platform
-3. **No graceful interrupt**: aplay process waits for completion (interrupt logic commented out)
-4. **Local path dependency**: wyoming-piper has hardcoded path to local Wyoming library
-
-## Future Enhancements
-
-- [ ] Implement proper interrupt handling for aplay process
-- [ ] Add more sophisticated command word detection
-- [ ] Support custom wake words
-- [ ] Cross-platform audio playback
-- [ ] Voice activity detection during TTS playback
-- [ ] Multi-client support for TTS server
-- [ ] Configuration file support
-- [ ] Docker containerization
-
-## License
-
-This project combines components with different licenses:
-
-- **talk-llama-fast**: See [talk-llama-fast/LICENSE](talk-llama-fast/LICENSE)
-- **wyoming-piper**: MIT License (see [wyoming-piper/LICENSE](wyoming-piper/LICENSE))
-
-## Credits
-
-- **talk-llama-fast**: Original by [Mozer](https://github.com/Mozer) and contributors
-- **wyoming-piper**: Original by [Rhasspy](https://github.com/rhasspy) project
-- **Whisper**: OpenAI
-- **LLaMA**: Meta AI
-- **Piper TTS**: Rhasspy project
-- **Modifications**: Paul Mobbs (2024-2026)
+1. **Platform**: Linux/WSL only (uses aplay for audio)
+2. **Stop command**: Basic detection (just checks for "stop" in text < 10 chars)
+3. **TTS interruption**: Not fully implemented (aplay waits for completion)
+4. **Hardcoded paths**: Wyoming-piper has hardcoded local library path
 
 ## Contributing
 
-This is a personal project, but suggestions and improvements are welcome:
+Contributions welcome! Please:
 
-1. Fork this repository
+1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Submit a pull request with detailed description
+3. Make your changes (preferably in `custom/` directory)
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+- **Custom code** (custom/, wyoming-piper modifications): Your license here
+- **whisper.cpp**: MIT License - See whisper.cpp/LICENSE
+- **Whisper models**: OpenAI
+- **LLaMA models**: Meta AI (see individual model licenses)
+
+## Credits
+
+- **Whisper STT**: OpenAI
+- **whisper.cpp**: Georgi Gerganov and contributors
+- **LLaMA**: Meta AI
+- **Piper TTS**: Rhasspy project
+- **Wyoming Protocol**: Rhasspy project
+- **talk-llama-fast**: Original modifications by Mozer
+- **This project**: Paul Mobbs (2024-2026)
+
+## Links
+
+- **Upstream whisper.cpp**: https://github.com/ggerganov/whisper.cpp
+- **talk-llama-fast** (inspiration): https://github.com/Mozer/talk-llama-fast
+- **Wyoming-Piper**: https://github.com/rhasspy/wyoming-piper
+- **Piper TTS**: https://github.com/rhasspy/piper
 
 ## Support
 
 For issues:
-1. Check the Troubleshooting section above
-2. Review logs from both talk-llama and wyoming-piper
+1. Check the Troubleshooting section
+2. Review logs from both talk-llama-custom and wyoming-piper
 3. Open an issue with detailed error messages and steps to reproduce
