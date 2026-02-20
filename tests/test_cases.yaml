@@ -140,9 +140,9 @@ test_cases:
 config:
   # Audio generation settings
   audio_generator:
-    # Use built Piper from submodule (run ./scripts/build_piper.sh first)
-    # Or use system-installed: /home/paul/.local/bin/piper
-    piper_bin: "/home/paul/.local/bin/piper"  # Change to ../external/piper/.venv/bin/piper if using built version
+    # Note: Built Piper from submodule currently fails (espeak-ng build issue)
+    # Using system-installed Piper until build is fixed
+    piper_bin: "/home/paul/.local/bin/piper"
     model_dir: "../external/piper-voices"  # Download voice models here
     default_voice: "en_US-lessac-medium"
     output_dir: "./audio/inputs"
