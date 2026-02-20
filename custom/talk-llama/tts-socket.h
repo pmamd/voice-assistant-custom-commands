@@ -11,6 +11,10 @@
 // Port on which TTS Server is listenting
 #define TTS_SERVER_PORT 10200
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //Create a Socket for server communication
 short TTS_SocketCreate(void);
 
@@ -22,3 +26,7 @@ int TTS_SocketSend(int hSocket,char* Rqst,short lenRqst);
 
 //receive the data from the server
 int TTS_SocketReceive(int hSocket,char* Rsp,short RvcSize);
+
+#ifdef __cplusplus
+}
+#endif

@@ -11,6 +11,14 @@
 #define TTS_REQUEST_VERSION "version"
 #define TTS_REQUEST_VERSION_NUMBER "1.5.3"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Take in a string to be spoken and return a JSON encoded request for the TTS Server
 //NOTE: Returns a pointer to a string allocated by this function, you are required to free it after use.
 char *TTS_RequestEncode(const char *textToSpeak);
+
+#ifdef __cplusplus
+}
+#endif
