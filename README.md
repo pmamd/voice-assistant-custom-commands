@@ -72,34 +72,66 @@ This repository uses **git submodules** for upstream dependencies to keep only c
 ```
 voice-assistant-custom-commands/
 ├── whisper.cpp/              # Submodule: Upstream Whisper STT engine
-├── custom/                   # Your custom code (< 50KB)
-│   └── talk-llama/
-│       ├── talk-llama.cpp    # Modified main application (1.2K lines)
-│       ├── tts-request.h     # TTS request helpers
-│       └── tts-socket.h      # TTS socket helpers
-├── wyoming-piper/            # Modified Piper TTS server
+├── wyoming-piper/            # Submodule: Upstream Wyoming-Piper TTS server
+├── custom/                   # Your custom modifications
+│   ├── talk-llama/           # Modified talk-llama application
+│   │   ├── talk-llama.cpp    # Main application (TTS fixes, test mode)
+│   │   ├── llama.cpp         # Full LLaMA inference engine
+│   │   ├── llama.h           # LLaMA API header
+│   │   └── MODIFICATIONS.md  # Documentation of changes
+│   └── wyoming-piper/        # Modified Wyoming-Piper files
+│       ├── __main__.py       # Entry point (test mode support)
+│       ├── handler.py        # Event handler (stop cmd, test mode)
+│       └── MODIFICATIONS.md  # Documentation of changes
+├── tests/                    # Test harness
+│   ├── audio_generator.py    # Piper TTS test audio generator
+│   ├── audio_verifier.py     # Whisper STT output verifier
+│   ├── run_tests.py          # Test orchestrator
+│   ├── test_cases.yaml       # Test definitions
+│   └── README.md             # Test harness documentation
 ├── CMakeLists.txt            # Build configuration
-└── README.md
+└── README.md                 # This file
 ```
 
 ## What's Custom vs Upstream
 
 ### 🎯 Custom Code (This Repo)
-- **`custom/talk-llama/talk-llama.cpp`** - Main application with:
+
+**talk-llama modifications** (`custom/talk-llama/`):
+- **talk-llama.cpp** - Main application with:
   - TTS crash bugfixes (safe string handling, CURL error checking)
-  - Custom command routing
-  - Socket-based TTS communication
-- **`wyoming-piper/`** - Modified TTS server with:
-  - Stop command detection
-  - Direct audio playback (aplay)
-  - Interruptibility support
+  - Test mode support (`--test-input` for automated testing)
+  - Skip warmup transcription in test mode
+  - Debug output and proper cleanup
+- **llama.cpp/llama.h** - Full LLaMA inference engine from llama.cpp repo
+- See `custom/talk-llama/MODIFICATIONS.md` for details
+
+**Wyoming-Piper modifications** (`custom/wyoming-piper/`):
+- **__main__.py** - Added test mode arguments (`--test-mode`, `--test-output-dir`)
+- **handler.py** - Modified with:
+  - Stop command detection (bypasses TTS for "stop" utterances)
+  - Test mode logic (save audio to files instead of playing)
+  - Direct audio playback via aplay
+- See `custom/wyoming-piper/MODIFICATIONS.md` for details
+
+**Test harness** (`tests/`):
+- Complete end-to-end testing framework
+- Synthetic audio generation + verification
+- See `tests/README.md` for documentation
 
 ### 📦 Upstream Dependencies (Submodules)
-- **`whisper.cpp`** - Whisper STT engine and GGML backend
-  - Locked at commit: `d207c688` (whisper.cpp v1.5.5 era)
-  - Includes: Whisper models, GGML tensor library, examples
-  - Source: https://github.com/ggerganov/whisper.cpp
-  - Contains llama.cpp integration in examples/talk-llama/
+
+**whisper.cpp**:
+- Whisper STT engine and GGML backend
+- Locked at commit: `d207c688` (whisper.cpp v1.5.5 era)
+- Source: https://github.com/ggerganov/whisper.cpp
+- Includes: Whisper models, GGML tensor library, examples
+
+**wyoming-piper**:
+- Wyoming protocol TTS server with Piper
+- Locked at commit: `21f9966d`
+- Source: https://github.com/rhasspy/wyoming-piper
+- Custom modifications overlaid from `custom/wyoming-piper/`
 
 ## Prerequisites
 
@@ -183,8 +215,14 @@ wget https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/
 ### 4. Setup Wyoming-Piper TTS Server
 
 ```bash
+# Install base Wyoming-Piper from submodule
 cd wyoming-piper
-pip install -r requirements.txt
+pip install -e .
+
+# Overlay custom modifications
+cd ..
+cp custom/wyoming-piper/__main__.py wyoming-piper/wyoming_piper/
+cp custom/wyoming-piper/handler.py wyoming-piper/wyoming_piper/
 ```
 
 ## Usage
