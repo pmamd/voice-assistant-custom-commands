@@ -2703,7 +2703,8 @@ int run(int argc, const char **argv)
 								text_to_speak[text_len - 1] = ' '; // no splitting on mr.
 
 							// STOP on speech or hotkey for llama, every 2 tokens
-							if (new_tokens % 2 == 0)
+							// Skip VAD check in test mode as there's no audio device
+							if (!test_mode && new_tokens % 2 == 0)
 							{
 								// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
 								audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms

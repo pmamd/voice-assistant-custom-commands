@@ -15,13 +15,15 @@ class AudioVerifier:
     """Verify audio output using Whisper STT."""
 
     def __init__(self, whisper_bin: str = "./build/bin/main",
-                 model_path: str = "./models/ggml-base.en.bin"):
+                 model_path: str = "./models/ggml-base.en.bin",
+                 use_semantic: bool = True):
         """
         Initialize the audio verifier.
 
         Args:
             whisper_bin: Path to Whisper main executable
             model_path: Path to Whisper model file
+            use_semantic: Enable semantic similarity verification (requires sentence-transformers)
         """
         self.whisper_bin = Path(whisper_bin)
         self.model_path = Path(model_path)
@@ -32,6 +34,21 @@ class AudioVerifier:
             raise FileNotFoundError(f"Whisper model not found at {self.model_path}")
 
         logger.info(f"AudioVerifier initialized with Whisper at {self.whisper_bin}")
+
+        # Try to load semantic similarity model
+        self.semantic_model = None
+        if use_semantic:
+            try:
+                from sentence_transformers import SentenceTransformer
+                logger.info("Loading semantic similarity model (all-MiniLM-L6-v2)...")
+                self.semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
+                logger.info("✓ Semantic similarity enabled")
+            except ImportError:
+                logger.warning("sentence-transformers not available - using keyword matching only")
+                logger.warning("Install with: pip install sentence-transformers")
+            except Exception as e:
+                logger.warning(f"Failed to load semantic model: {e}")
+                logger.warning("Falling back to keyword matching")
 
     def _ensure_16khz(self, wav_file: Path) -> Path:
         """
@@ -257,19 +274,69 @@ class AudioVerifier:
 
         return passed, matched, actual_text, confidence
 
+    def verify_semantic(self, wav_file: Path, expected_text: str,
+                       threshold: float = 0.70) -> Tuple[bool, float, str, float]:
+        """
+        Verify transcription using semantic similarity.
+
+        Args:
+            wav_file: Audio file to verify
+            expected_text: Expected text content
+            threshold: Minimum semantic similarity score (0.0-1.0)
+
+        Returns:
+            Tuple of (passed, similarity, actual_text, confidence)
+        """
+        actual_text, confidence = self.transcribe(wav_file)
+
+        if self.semantic_model is None:
+            logger.warning("Semantic model not available, falling back to fuzzy match")
+            return self.verify_fuzzy(wav_file, expected_text, threshold)
+
+        try:
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            # Encode both texts
+            embeddings = self.semantic_model.encode([expected_text, actual_text])
+
+            # Calculate cosine similarity
+            similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+
+            passed = similarity >= threshold
+
+            if passed:
+                logger.info(f"Semantic match passed: {similarity:.3f} >= {threshold:.3f}")
+            else:
+                logger.warning(f"Semantic match failed: {similarity:.3f} < {threshold:.3f}")
+                logger.warning(f"  Expected: '{expected_text}'")
+                logger.warning(f"  Actual:   '{actual_text}'")
+
+            return passed, similarity, actual_text, confidence
+
+        except Exception as e:
+            logger.error(f"Semantic verification failed: {e}")
+            logger.warning("Falling back to fuzzy match")
+            return self.verify_fuzzy(wav_file, expected_text, threshold)
+
     def verify(self, wav_file: Path, expected_text: str = None,
               keywords: List[str] = None,
               fuzzy_threshold: float = 0.85,
-              min_confidence: float = 0.0) -> Dict:
+              min_confidence: float = 0.0,
+              min_keyword_matches: int = None,
+              semantic_threshold: float = 0.70,
+              use_semantic: bool = False) -> Dict:
         """
         Comprehensive verification with multiple strategies.
 
         Args:
             wav_file: Audio file to verify
-            expected_text: Expected full text (for fuzzy matching)
+            expected_text: Expected full text (for fuzzy/semantic matching)
             keywords: Keywords to check for
             fuzzy_threshold: Minimum similarity for fuzzy match
             min_confidence: Minimum confidence score
+            min_keyword_matches: Minimum number of keywords that must match (default: all)
+            semantic_threshold: Minimum semantic similarity score (0.0-1.0)
+            use_semantic: Use semantic similarity instead of fuzzy match
 
         Returns:
             Dictionary with verification results
@@ -284,8 +351,19 @@ class AudioVerifier:
             'tests': {}
         }
 
-        # Fuzzy text matching
-        if expected_text:
+        # Semantic similarity (preferred if available and requested)
+        if expected_text and use_semantic and self.semantic_model is not None:
+            passed, similarity, _, _ = self.verify_semantic(
+                wav_file, expected_text, semantic_threshold
+            )
+            results['tests']['semantic_match'] = {
+                'passed': passed,
+                'expected': expected_text,
+                'similarity': similarity,
+                'threshold': semantic_threshold
+            }
+        # Fuzzy text matching (fallback or when semantic not requested)
+        elif expected_text:
             passed, similarity, _, _ = self.verify_fuzzy(
                 wav_file, expected_text, fuzzy_threshold
             )
@@ -298,12 +376,15 @@ class AudioVerifier:
 
         # Keyword matching
         if keywords:
-            passed, matched, _, _ = self.verify_keywords(wav_file, keywords)
+            passed, matched, _, _ = self.verify_keywords(
+                wav_file, keywords, min_matches=min_keyword_matches
+            )
             results['tests']['keyword_match'] = {
                 'passed': passed,
                 'expected_keywords': keywords,
                 'matched_keywords': matched,
-                'match_count': f"{len(matched)}/{len(keywords)}"
+                'match_count': f"{len(matched)}/{len(keywords)}",
+                'min_required': min_keyword_matches if min_keyword_matches else len(keywords)
             }
 
         # Overall pass/fail

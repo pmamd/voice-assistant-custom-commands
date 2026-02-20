@@ -181,6 +181,40 @@ multiple definition of 'console::init(bool, bool)'
 
 ## Testing
 
+**IMPORTANT**: All tests must be run on the development machine (192.168.86.74), not on WSL. The dev machine has Piper TTS, models, and all required dependencies installed.
+
+### Running Tests on Dev Machine
+
+**From WSL**, use the Python venv with paramiko to execute commands on the dev machine:
+
+```bash
+# Activate venv (required for paramiko)
+source /tmp/build-venv/bin/activate
+
+# Use Python scripts with paramiko to run tests remotely
+# Example script structure:
+import paramiko
+
+hostname = "192.168.86.74"
+username = "paul"
+password = "amdisthebest"
+
+client = paramiko.SSHClient()
+client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+client.connect(hostname, username=username, password=password)
+
+# Execute test commands
+stdin, stdout, stderr = client.exec_command(
+    "cd ~/Projects/git/talk-llama-fast/tests && python3 run_tests.py --config test_cases.yaml --group smoke"
+)
+print(stdout.read().decode())
+client.close()
+```
+
+**Do NOT use direct SSH commands** - always use paramiko from the venv as shown above.
+
+### Manual Testing
+
 After building, test the executable:
 
 ```bash

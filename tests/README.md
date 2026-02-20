@@ -2,7 +2,7 @@
 
 Comprehensive end-to-end testing framework for the voice assistant audio pipeline (Whisper STT → LLaMA → Piper TTS).
 
-![Test Harness Architecture](https://raw.githubusercontent.com/pmamd/voice-assistant-custom-commands/master/test-harness-architecture.svg)
+![Test Harness Architecture](./test-harness-architecture.svg)
 
 ## Overview
 
