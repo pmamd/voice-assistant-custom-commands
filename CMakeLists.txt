@@ -28,6 +28,8 @@ if (WHISPER_SDL2)
         custom/talk-llama/llama.cpp
         custom/talk-llama/unicode.cpp
         custom/talk-llama/unicode-data.cpp
+        custom/talk-llama/tts-socket.c
+        custom/talk-llama/tts-request.c
     )
 
     # Include directories (order matters - local files before system)
