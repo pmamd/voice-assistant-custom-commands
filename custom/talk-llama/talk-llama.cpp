@@ -3025,7 +3025,14 @@ int run(int argc, const char **argv)
 
 				// In test mode, exit after processing one input
 				if (test_mode) {
-					fprintf(stderr, "\n%s: TEST MODE - processing complete, exiting\n", __func__);
+					fprintf(stderr, "\n%s: TEST MODE - processing complete, waiting for TTS threads\n", __func__);
+					// Wait for all TTS threads to complete
+					for (auto& t : threads) {
+						if (t.joinable()) {
+							t.join();
+						}
+					}
+					fprintf(stderr, "%s: TEST MODE - all TTS complete, exiting\n", __func__);
 					_exit(0);
 				}
 			}
