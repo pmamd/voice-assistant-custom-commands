@@ -178,6 +178,22 @@ git submodule update --init --recursive
 
 ### 2. Build the Voice Assistant
 
+**Easy build using Makefile (recommended):**
+```bash
+# Build everything (talk-llama + Piper TTS)
+make all
+
+# Or build just the main executable
+make talk-llama
+
+# Run test suite
+make test
+
+# See all options
+make help
+```
+
+**Manual build using CMake:**
 ```bash
 # CPU-only build
 cmake -B build -DWHISPER_SDL2=ON
