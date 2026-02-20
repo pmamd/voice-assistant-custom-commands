@@ -45,8 +45,8 @@
 #include <ctime>
 
 // For TTS communication
-#include "tts-socket.h"
-#include "tts-request.h"
+// #include "tts-socket.h"  // Not needed - using CURL instead
+// #include "tts-request.h"  // Not needed - using CURL instead
 
 // global
 std::string g_hotkey_pressed = "";
