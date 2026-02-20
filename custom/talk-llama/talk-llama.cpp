@@ -2707,7 +2707,7 @@ int run(int argc, const char **argv)
 							{
 								// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
 								audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
-								int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.vad_start_thold);
+								int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
 								if (!params.push_to_talk && vad_result == 1 || g_hotkey_pressed == "Ctrl+Space" || g_hotkey_pressed == "Alt") // speech started
 								{
@@ -2793,7 +2793,7 @@ int run(int argc, const char **argv)
 										if (!params.push_to_talk || params.push_to_talk && g_hotkey_pressed == "Alt")
 										{
 											audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
-											int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.vad_start_thold);
+											int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 											if (vad_result == 1) // speech started
 											{
 												llama_interrupted = 1;
