@@ -57,7 +57,8 @@ char *TTS_RequestEncode(const char *textToSpeak)
     }
 
     // 3) Postpend NEWLINE and payload to header
-    returnString = (char*)malloc(strlen(headerString) + strlen(payloadString) + 1);
+    // +2: one for newline, one for null terminator
+    returnString = (char*)malloc(strlen(headerString) + strlen(payloadString) + 2);
     strcpy(returnString, headerString);
     strcat(returnString, TTS_REQUEST_NEWLINE);
     strcat(returnString, payloadString);
