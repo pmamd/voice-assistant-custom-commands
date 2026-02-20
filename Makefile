@@ -2,8 +2,8 @@
 
 # Default target - builds everything
 all: submodules talk-llama
-	@echo "Building Piper TTS from submodule..."
-	@./scripts/build_piper.sh
+	@echo "Building Piper TTS from submodule (optional)..."
+	@./scripts/build_piper.sh || echo "Warning: Piper build failed. Use system-installed Piper instead."
 
 help:
 	@echo "Voice Assistant Build System"
