@@ -270,7 +270,7 @@ class TestHarness:
 
         # 2. Run voice assistant with test input
         logger.info(f"Running voice assistant with test input")
-        output_wav, assistant_stdout = await self._run_assistant(input_wav, name)
+        output_wav = await self._run_assistant(input_wav, name)
 
         # 3. Verify output if generated
         if output_wav and output_wav.exists():
@@ -403,24 +403,22 @@ class TestHarness:
             if result.stderr:
                 logger.debug(f"Assistant stderr:\n{result.stderr}")
 
-            # TODO: Capture output audio from Piper/XTTS
-            # For now, check if output.wav exists
-            # This depends on Wyoming-Piper configuration
+            # Capture output audio from Wyoming-Piper (test mode)
+            # In test mode, Wyoming-Piper saves files as output_<timestamp>_<index>.wav
 
             output_wav = self.output_dir / f"{test_name}_output.wav"
 
-            # Check common output locations
-            for possible_output in [
-                Path("output.wav"),
-                Path("/tmp/piper_output.wav"),
-                Path("./tests/audio/outputs/output.wav")
-            ]:
-                if possible_output.exists():
-                    # Move to our output directory
-                    import shutil
-                    shutil.move(str(possible_output), str(output_wav))
-                    logger.info(f"Captured output audio: {output_wav}")
-                    return output_wav
+            # Find the most recent output file in the test output directory
+            import glob
+            output_files = sorted(self.output_dir.glob("output_*_*.wav"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+            if output_files:
+                latest_output = output_files[0]
+                # Copy (not move) to preserve for debugging
+                import shutil
+                shutil.copy(str(latest_output), str(output_wav))
+                logger.info(f"Captured output audio: {output_wav} (from {latest_output.name})")
+                return output_wav
 
             logger.warning("Could not find output audio file")
             return None

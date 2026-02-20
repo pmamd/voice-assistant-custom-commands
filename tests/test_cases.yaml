@@ -140,8 +140,8 @@ test_cases:
 config:
   # Audio generation settings
   audio_generator:
-    piper_bin: "./external/piper/piper"
-    model_dir: "./external/piper-voices"
+    piper_bin: "/home/paul/.local/bin/piper"
+    model_dir: "/home/paul/.local/share/piper-tts/voices"
     default_voice: "en_US-lessac-medium"
     output_dir: "./tests/audio/inputs"
 

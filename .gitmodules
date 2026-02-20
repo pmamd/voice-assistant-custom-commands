@@ -4,3 +4,6 @@
 [submodule "wyoming-piper"]
 	path = wyoming-piper
 	url = https://github.com/rhasspy/wyoming-piper.git
+[submodule "tests/external/piper"]
+	path = tests/external/piper
+	url = https://github.com/rhasspy/piper.git
