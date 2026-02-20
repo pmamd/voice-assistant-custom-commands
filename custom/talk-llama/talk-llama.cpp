@@ -2127,12 +2127,14 @@ int run(int argc, const char **argv)
 					{
 						rand_intro_text = tts_intros[rand() % tts_intros.size()];
 						text_to_speak_arr[thread_i] = rand_intro_text;
-						threads.emplace_back([&] // creates a thread, threads are cleaned after user ends speech, after n threads
+						// Capture current index by value to avoid race condition
+						int current_thread_idx = thread_i;
+						threads.emplace_back([&, current_thread_idx] // creates a thread, threads are cleaned after user ends speech, after n threads
 											 {
-							if (text_to_speak_arr[thread_i-1].size())
+							if (text_to_speak_arr[current_thread_idx].size())
 							{
-								send_tts_async(text_to_speak_arr[thread_i-1], current_voice, params.language, params.xtts_url);
-								text_to_speak_arr[thread_i-1] = "";
+								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url);
+								text_to_speak_arr[current_thread_idx] = "";
 							} });
 						thread_i++;
 					}
@@ -2772,13 +2774,15 @@ int run(int argc, const char **argv)
 									reply_part++;
 									try
 									{
-										threads.emplace_back([&] // creates a thread, threads are cleaned after user ends speech, after 80 threads
+										// Capture current index by value to avoid race condition
+										int current_thread_idx = thread_i;
+										threads.emplace_back([&, current_thread_idx] // captures index by value
 															 {
-											if (text_to_speak_arr[thread_i-1].size())
+											if (text_to_speak_arr[current_thread_idx].size())
 											{
-												send_tts_async(text_to_speak_arr[thread_i-1], current_voice, params.language, params.xtts_url, reply_part_arr[thread_i-1]);
-												text_to_speak_arr[thread_i-1] = "";
-												reply_part_arr[thread_i-1] = 0;
+												send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx]);
+												text_to_speak_arr[current_thread_idx] = "";
+												reply_part_arr[current_thread_idx] = 0;
 											} });
 										thread_i++;
 										text_to_speak = "";
@@ -2974,13 +2978,15 @@ int run(int argc, const char **argv)
 					reply_part++;
 					try
 					{
-						threads.emplace_back([&] // creates and starts a thread
+						// Capture current index by value to avoid race condition
+						int current_thread_idx = thread_i;
+						threads.emplace_back([&, current_thread_idx] // captures index by value
 											 {
-							if (text_to_speak_arr[thread_i-1].size())
+							if (text_to_speak_arr[current_thread_idx].size())
 							{
-								send_tts_async(text_to_speak_arr[thread_i-1], current_voice, params.language, params.xtts_url, reply_part_arr[thread_i-1]);
-								text_to_speak_arr[thread_i-1] = "";
-								reply_part_arr[thread_i-1] = 0;
+								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx]);
+								text_to_speak_arr[current_thread_idx] = "";
+								reply_part_arr[current_thread_idx] = 0;
 							} });
 						thread_i++;
 						text_to_speak = "";
