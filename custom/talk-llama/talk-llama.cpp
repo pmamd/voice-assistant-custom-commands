@@ -1933,7 +1933,7 @@ int run(int argc, const char **argv)
 					vad_result = 2; // Speech ended - trigger processing
 				}
 			} else {
-				vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.vad_start_thold);
+				vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
 			{
