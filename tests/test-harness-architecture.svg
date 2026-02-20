@@ -155,7 +155,7 @@
   <text x="850" y="575" class="label" font-weight="bold">Test Types</text>
 
   <text x="720" y="605" class="label" font-size="12" font-weight="bold">Functional Tests:</text>
-  <text x="730" y="625" class="small-text">• Greetings, Q&A, conversations</text>
+  <text x="730" y="625" class="small-text">• Greetings, Q&amp;A, conversations</text>
 
   <text x="720" y="650" class="label" font-size="12" font-weight="bold">Command Tests:</text>
   <text x="730" y="670" class="small-text">• Stop, exit commands</text>
