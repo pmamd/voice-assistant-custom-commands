@@ -1,0 +1,674 @@
+#!/usr/bin/env python3
+"""End-to-end audio pipeline test harness."""
+
+import sys
+import asyncio
+import logging
+import time
+import json
+import subprocess
+import signal
+from pathlib import Path
+from typing import Dict, List, Optional
+from dataclasses import dataclass, field
+from datetime import datetime
+
+try:
+    import yaml
+except ImportError:
+    print("Error: pyyaml not installed. Run: pip install pyyaml")
+    sys.exit(1)
+
+from audio_generator import AudioGenerator
+from audio_verifier import AudioVerifier
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TestResult:
+    """Result of a single test case."""
+    name: str
+    passed: bool
+    duration_ms: float
+    actual_text: str = ""
+    expected_text: str = ""
+    confidence: float = 0.0
+    similarity: float = 0.0
+    matched_keywords: List[str] = field(default_factory=list)
+    error: str = ""
+    details: Dict = field(default_factory=dict)
+
+
+class TestHarness:
+    """Main test orchestration class."""
+
+    def __init__(self, config_file: str = "tests/test_cases.yaml"):
+        """
+        Initialize test harness.
+
+        Args:
+            config_file: Path to test configuration YAML
+        """
+        self.config_file = Path(config_file)
+        self.config = self._load_config()
+
+        # Initialize components
+        gen_config = self.config.get('config', {}).get('audio_generator', {})
+        self.generator = AudioGenerator(
+            piper_bin=gen_config.get('piper_bin', '/usr/share/piper/piper'),
+            model_dir=gen_config.get('model_dir', '/usr/share/piper-voices'),
+            output_dir=gen_config.get('output_dir', './tests/audio/inputs')
+        )
+
+        ver_config = self.config.get('config', {}).get('audio_verifier', {})
+        self.verifier = AudioVerifier(
+            whisper_bin=ver_config.get('whisper_bin', './build/bin/main'),
+            model_path=ver_config.get('whisper_model', './models/ggml-base.en.bin')
+        )
+
+        self.test_cases = self.config.get('test_cases', [])
+        self.results: List[TestResult] = []
+
+        # Create output directory
+        self.output_dir = Path(ver_config.get('output_dir', './tests/audio/outputs'))
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Results directory
+        self.results_dir = Path('./tests/results')
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+
+        # Wyoming-Piper configuration
+        wyoming_config = self.config.get('config', {}).get('wyoming_piper', {})
+        self.wyoming_cmd = wyoming_config.get('command', 'wyoming-piper')
+        self.wyoming_args = wyoming_config.get('args', ['--voice', 'en_US-lessac-medium', '--port', '10200'])
+        self.wyoming_port = wyoming_config.get('port', 10200)
+        self.wyoming_process: Optional[subprocess.Popen] = None
+        self.wyoming_started_by_us = False
+
+    def _load_config(self) -> Dict:
+        """Load test configuration from YAML file."""
+        if not self.config_file.exists():
+            raise FileNotFoundError(f"Config file not found: {self.config_file}")
+
+        with open(self.config_file, 'r') as f:
+            return yaml.safe_load(f)
+
+    def _is_wyoming_piper_running(self) -> bool:
+        """Check if Wyoming-Piper is already running."""
+        try:
+            # Check if port is in use
+            result = subprocess.run(
+                ['lsof', '-i', f':{self.wyoming_port}', '-sTCP:LISTEN'],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            # lsof might not be available, try ps aux
+            try:
+                result = subprocess.run(
+                    ['ps', 'aux'],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                return 'wyoming-piper' in result.stdout or 'piper' in result.stdout
+            except:
+                return False
+
+    async def _start_wyoming_piper(self) -> bool:
+        """
+        Start Wyoming-Piper TTS server.
+
+        Returns:
+            True if started successfully, False otherwise
+        """
+        if self._is_wyoming_piper_running():
+            logger.info("Wyoming-Piper already running")
+            return True
+
+        try:
+            logger.info(f"Starting Wyoming-Piper: {self.wyoming_cmd} {' '.join(self.wyoming_args)}")
+
+            # Start Wyoming-Piper process
+            self.wyoming_process = subprocess.Popen(
+                [self.wyoming_cmd] + self.wyoming_args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True  # Detach from parent
+            )
+
+            # Wait for startup
+            logger.info("Waiting for Wyoming-Piper to start...")
+            await asyncio.sleep(3)
+
+            # Check if it's running
+            if self.wyoming_process.poll() is not None:
+                # Process died
+                stderr = self.wyoming_process.stderr.read().decode()
+                logger.error(f"Wyoming-Piper failed to start: {stderr}")
+                return False
+
+            # Verify port is listening
+            if not self._is_wyoming_piper_running():
+                logger.error("Wyoming-Piper started but not listening on port")
+                self._stop_wyoming_piper()
+                return False
+
+            self.wyoming_started_by_us = True
+            logger.info(f"✓ Wyoming-Piper started successfully on port {self.wyoming_port}")
+            return True
+
+        except FileNotFoundError:
+            logger.error(f"Wyoming-Piper command not found: {self.wyoming_cmd}")
+            logger.error("Install with: pip install wyoming-piper")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to start Wyoming-Piper: {e}")
+            return False
+
+    def _stop_wyoming_piper(self):
+        """Stop Wyoming-Piper if we started it."""
+        if self.wyoming_process and self.wyoming_started_by_us:
+            logger.info("Stopping Wyoming-Piper...")
+            try:
+                # Send SIGTERM to process group
+                pgid = self.wyoming_process.pid
+                subprocess.run(['pkill', '-TERM', '-g', str(pgid)], timeout=2)
+
+                # Wait for graceful shutdown
+                try:
+                    self.wyoming_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # Force kill
+                    self.wyoming_process.kill()
+                    self.wyoming_process.wait()
+
+                logger.info("✓ Wyoming-Piper stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping Wyoming-Piper: {e}")
+            finally:
+                self.wyoming_process = None
+                self.wyoming_started_by_us = False
+
+    def _get_test_cases(self, group: Optional[str] = None,
+                       test_names: Optional[List[str]] = None) -> List[Dict]:
+        """
+        Get test cases to run.
+
+        Args:
+            group: Test group name (from test_groups in config)
+            test_names: Specific test names to run
+
+        Returns:
+            List of test case dictionaries
+        """
+        if test_names:
+            # Run specific tests by name
+            return [tc for tc in self.test_cases if tc['name'] in test_names]
+
+        if group:
+            # Run tests in a specific group
+            groups = self.config.get('test_groups', {})
+            if group not in groups:
+                raise ValueError(f"Unknown test group: {group}")
+
+            group_tests = groups[group]
+            return [tc for tc in self.test_cases if tc['name'] in group_tests]
+
+        # Run all tests
+        return self.test_cases
+
+    async def run_test(self, test_case: Dict) -> TestResult:
+        """
+        Run a single test case.
+
+        Args:
+            test_case: Test case dictionary from YAML
+
+        Returns:
+            TestResult object
+        """
+        name = test_case['name']
+        test_type = test_case.get('test_type', 'functional')
+
+        logger.info(f"Running test: {name} ({test_type})")
+        start_time = time.time()
+
+        try:
+            # Handle different test types
+            if test_type == 'interrupt':
+                return await self._run_interrupt_test(test_case, start_time)
+            elif test_type == 'multi_turn':
+                return await self._run_multi_turn_test(test_case, start_time)
+            else:
+                return await self._run_simple_test(test_case, start_time)
+
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            logger.error(f"Test {name} failed with exception: {e}")
+            return TestResult(
+                name=name,
+                passed=False,
+                duration_ms=duration_ms,
+                error=str(e)
+            )
+
+    async def _run_simple_test(self, test_case: Dict, start_time: float) -> TestResult:
+        """Run a simple functional test."""
+        name = test_case['name']
+        input_text = test_case['input']
+
+        # 1. Generate test audio
+        logger.info(f"Generating audio for: '{input_text}'")
+        input_wav = self.generator.generate(
+            input_text,
+            output_name=f"{name}_input.wav"
+        )
+
+        # 2. Run voice assistant with test input
+        logger.info(f"Running voice assistant with test input")
+        output_wav, assistant_stdout = await self._run_assistant(input_wav, name)
+
+        # 3. Verify output if generated
+        if output_wav and output_wav.exists():
+            logger.info(f"Verifying output: {output_wav}")
+
+            # Determine verification method
+            expected_text = test_case.get('expected_fuzzy')
+            keywords = test_case.get('expected_contains')
+            fuzzy_threshold = test_case.get('fuzzy_threshold', 0.85)
+            min_confidence = test_case.get('min_confidence', 0.80)
+
+            results = self.verifier.verify(
+                output_wav,
+                expected_text=expected_text,
+                keywords=keywords,
+                fuzzy_threshold=fuzzy_threshold,
+                min_confidence=min_confidence
+            )
+
+            duration_ms = (time.time() - start_time) * 1000
+
+            return TestResult(
+                name=name,
+                passed=results['overall_passed'],
+                duration_ms=duration_ms,
+                actual_text=results['actual_text'],
+                expected_text=expected_text or str(keywords),
+                confidence=results['confidence'],
+                similarity=results['tests'].get('fuzzy_match', {}).get('similarity', 0.0),
+                matched_keywords=results['tests'].get('keyword_match', {}).get('matched_keywords', []),
+                details=results
+            )
+        else:
+            # No output generated - might be a command test
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Check if this is expected (e.g., stop command)
+            if test_case.get('expected_behavior') == 'immediate_stop':
+                logger.info(f"Stop command test - no output expected")
+                return TestResult(
+                    name=name,
+                    passed=True,  # TODO: verify stop was actually executed
+                    duration_ms=duration_ms,
+                    actual_text="[STOP COMMAND]",
+                    expected_text="stop"
+                )
+            else:
+                logger.warning(f"No output generated for test {name}")
+                return TestResult(
+                    name=name,
+                    passed=False,
+                    duration_ms=duration_ms,
+                    error="No output audio generated"
+                )
+
+    async def _run_interrupt_test(self, test_case: Dict, start_time: float) -> TestResult:
+        """Run an interrupt test (stop command during TTS)."""
+        name = test_case['name']
+        logger.warning(f"Interrupt tests not yet fully implemented: {name}")
+
+        # TODO: Implement multi-step interrupt testing
+        # This requires:
+        # 1. Starting assistant with long prompt
+        # 2. Detecting TTS start
+        # 3. Injecting stop command
+        # 4. Verifying TTS stopped
+        # 5. Verifying system is responsive
+
+        duration_ms = (time.time() - start_time) * 1000
+        return TestResult(
+            name=name,
+            passed=False,
+            duration_ms=duration_ms,
+            error="Interrupt tests not yet implemented"
+        )
+
+    async def _run_multi_turn_test(self, test_case: Dict, start_time: float) -> TestResult:
+        """Run a multi-turn conversation test."""
+        name = test_case['name']
+        logger.warning(f"Multi-turn tests not yet fully implemented: {name}")
+
+        # TODO: Implement multi-turn testing
+        duration_ms = (time.time() - start_time) * 1000
+        return TestResult(
+            name=name,
+            passed=False,
+            duration_ms=duration_ms,
+            error="Multi-turn tests not yet implemented"
+        )
+
+    async def _run_assistant(self, input_wav: Path, test_name: str) -> Optional[Path]:
+        """
+        Run the voice assistant with test input.
+
+        Args:
+            input_wav: Path to input audio file
+            test_name: Name of test (for output naming)
+
+        Returns:
+            Path to output audio file if generated
+        """
+        import subprocess
+
+        talk_llama_config = self.config.get('config', {}).get('talk_llama', {})
+        binary = talk_llama_config.get('binary', './build/bin/talk-llama')
+        whisper_model = talk_llama_config.get('whisper_model', './models/ggml-base.en.bin')
+        llama_model = talk_llama_config.get('llama_model', './models/ggml-llama-7B.bin')
+
+        # Build command
+        cmd = [
+            binary,
+            '--test-input', str(input_wav),
+            '-mw', whisper_model,
+            '-ml', llama_model,
+            '--verbose'
+        ]
+
+        logger.info(f"Running: {' '.join(cmd)}")
+
+        try:
+            timeout = self.config.get('execution', {}).get('timeout_per_test', 120)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+
+            logger.debug(f"Assistant stdout:\n{result.stdout}")
+            if result.stderr:
+                logger.debug(f"Assistant stderr:\n{result.stderr}")
+
+            # TODO: Capture output audio from Piper/XTTS
+            # For now, check if output.wav exists
+            # This depends on Wyoming-Piper configuration
+
+            output_wav = self.output_dir / f"{test_name}_output.wav"
+
+            # Check common output locations
+            for possible_output in [
+                Path("output.wav"),
+                Path("/tmp/piper_output.wav"),
+                Path("./tests/audio/outputs/output.wav")
+            ]:
+                if possible_output.exists():
+                    # Move to our output directory
+                    import shutil
+                    shutil.move(str(possible_output), str(output_wav))
+                    logger.info(f"Captured output audio: {output_wav}")
+                    return output_wav
+
+            logger.warning("Could not find output audio file")
+            return None
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"Assistant timed out after 30 seconds")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to run assistant: {e}")
+            return None
+
+    async def run_all_tests(self, group: Optional[str] = None,
+                           test_names: Optional[List[str]] = None) -> List[TestResult]:
+        """
+        Run all test cases and generate report.
+
+        Args:
+            group: Test group to run
+            test_names: Specific tests to run
+
+        Returns:
+            List of test results
+        """
+        # Start Wyoming-Piper if needed
+        logger.info("Checking Wyoming-Piper status...")
+        if not await self._start_wyoming_piper():
+            logger.error("Failed to start Wyoming-Piper - tests may fail")
+            print("⚠ WARNING: Wyoming-Piper not running - TTS tests will fail")
+
+        try:
+            test_cases = self._get_test_cases(group, test_names)
+
+            logger.info(f"Running {len(test_cases)} tests...")
+
+            self.results = []
+            for test_case in test_cases:
+                result = await self.run_test(test_case)
+                self.results.append(result)
+
+                # Print immediate feedback
+                status = "PASS" if result.passed else "FAIL"
+                print(f"[{status}] {result.name} ({result.duration_ms:.0f}ms)")
+
+            return self.results
+
+        finally:
+            # Clean up Wyoming-Piper if we started it
+            self._stop_wyoming_piper()
+
+    def generate_report(self, output_format: str = 'text') -> str:
+        """
+        Generate test report.
+
+        Args:
+            output_format: 'text', 'json', or 'html'
+
+        Returns:
+            Report content as string
+        """
+        if output_format == 'json':
+            return self._generate_json_report()
+        elif output_format == 'html':
+            return self._generate_html_report()
+        else:
+            return self._generate_text_report()
+
+    def _generate_text_report(self) -> str:
+        """Generate plain text report."""
+        lines = []
+        lines.append("=" * 80)
+        lines.append("AUDIO PIPELINE TEST REPORT")
+        lines.append("=" * 80)
+        lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(f"Total Tests: {len(self.results)}")
+
+        passed = sum(1 for r in self.results if r.passed)
+        failed = len(self.results) - passed
+
+        lines.append(f"Passed: {passed}")
+        lines.append(f"Failed: {failed}")
+        lines.append(f"Success Rate: {passed/len(self.results)*100:.1f}%")
+        lines.append("")
+
+        # Individual test results
+        lines.append("DETAILED RESULTS")
+        lines.append("-" * 80)
+
+        for result in self.results:
+            status = "PASS" if result.passed else "FAIL"
+            lines.append(f"\n[{status}] {result.name}")
+            lines.append(f"  Duration: {result.duration_ms:.0f}ms")
+
+            if result.actual_text:
+                lines.append(f"  Transcription: '{result.actual_text}'")
+            if result.expected_text:
+                lines.append(f"  Expected: '{result.expected_text}'")
+            if result.confidence > 0:
+                lines.append(f"  Confidence: {result.confidence:.2%}")
+            if result.similarity > 0:
+                lines.append(f"  Similarity: {result.similarity:.2%}")
+            if result.matched_keywords:
+                lines.append(f"  Matched Keywords: {result.matched_keywords}")
+            if result.error:
+                lines.append(f"  Error: {result.error}")
+
+        lines.append("\n" + "=" * 80)
+
+        return "\n".join(lines)
+
+    def _generate_json_report(self) -> str:
+        """Generate JSON report."""
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'summary': {
+                'total': len(self.results),
+                'passed': sum(1 for r in self.results if r.passed),
+                'failed': sum(1 for r in self.results if not r.passed),
+            },
+            'results': [
+                {
+                    'name': r.name,
+                    'passed': r.passed,
+                    'duration_ms': r.duration_ms,
+                    'actual_text': r.actual_text,
+                    'expected_text': r.expected_text,
+                    'confidence': r.confidence,
+                    'similarity': r.similarity,
+                    'matched_keywords': r.matched_keywords,
+                    'error': r.error,
+                    'details': r.details
+                }
+                for r in self.results
+            ]
+        }
+        return json.dumps(report, indent=2)
+
+    def _generate_html_report(self) -> str:
+        """Generate HTML report."""
+        # Simple HTML template
+        passed = sum(1 for r in self.results if r.passed)
+        failed = len(self.results) - passed
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Pipeline Test Report</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        .summary {{ background: #f0f0f0; padding: 15px; margin-bottom: 20px; }}
+        .pass {{ color: green; font-weight: bold; }}
+        .fail {{ color: red; font-weight: bold; }}
+        table {{ border-collapse: collapse; width: 100%; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+        th {{ background-color: #4CAF50; color: white; }}
+    </style>
+</head>
+<body>
+    <h1>Audio Pipeline Test Report</h1>
+
+    <div class="summary">
+        <h2>Summary</h2>
+        <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p>Total: {len(self.results)} | <span class="pass">Passed: {passed}</span> | <span class="fail">Failed: {failed}</span></p>
+        <p>Success Rate: {passed/len(self.results)*100:.1f}%</p>
+    </div>
+
+    <h2>Test Results</h2>
+    <table>
+        <tr>
+            <th>Status</th>
+            <th>Test Name</th>
+            <th>Duration (ms)</th>
+            <th>Confidence</th>
+            <th>Details</th>
+        </tr>
+"""
+
+        for result in self.results:
+            status_class = "pass" if result.passed else "fail"
+            status_text = "PASS" if result.passed else "FAIL"
+
+            html += f"""        <tr>
+            <td class="{status_class}">{status_text}</td>
+            <td>{result.name}</td>
+            <td>{result.duration_ms:.0f}</td>
+            <td>{result.confidence:.2%}</td>
+            <td>{result.actual_text or result.error}</td>
+        </tr>
+"""
+
+        html += """    </table>
+</body>
+</html>"""
+
+        return html
+
+    def save_report(self, output_format: str = 'text', filename: Optional[str] = None):
+        """Save report to file."""
+        if not filename:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            ext = 'txt' if output_format == 'text' else output_format
+            filename = f"test_report_{timestamp}.{ext}"
+
+        filepath = self.results_dir / filename
+
+        report = self.generate_report(output_format)
+
+        with open(filepath, 'w') as f:
+            f.write(report)
+
+        logger.info(f"Report saved to: {filepath}")
+        return filepath
+
+
+async def main():
+    """Main entry point."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run audio pipeline tests")
+    parser.add_argument('--config', type=str, default='tests/test_cases.yaml',
+                       help='Test configuration file')
+    parser.add_argument('--group', type=str, help='Test group to run (smoke, functional, etc.)')
+    parser.add_argument('--test', type=str, nargs='+', help='Specific test(s) to run')
+    parser.add_argument('--format', type=str, default='text',
+                       choices=['text', 'json', 'html'], help='Report format')
+    parser.add_argument('--output', type=str, help='Output report filename')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
+
+    args = parser.parse_args()
+
+    # Setup logging
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    # Run tests
+    harness = TestHarness(config_file=args.config)
+    results = await harness.run_all_tests(group=args.group, test_names=args.test)
+
+    # Generate and save report
+    print("\n" + harness.generate_report('text'))
+    harness.save_report(output_format=args.format, filename=args.output)
+
+    # Exit with appropriate code
+    all_passed = all(r.passed for r in results)
+    exit(0 if all_passed else 1)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

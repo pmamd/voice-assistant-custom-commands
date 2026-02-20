@@ -7,10 +7,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Set
 
-# Use local wyoming library
-import sys
-sys.path.insert(0, "/home/paul/git/wyoming")
-
 from wyoming.info import Attribution, Info, TtsProgram, TtsVoice, TtsVoiceSpeaker
 from wyoming.server import AsyncServer
 
@@ -20,20 +16,7 @@ from .handler import PiperEventHandler
 from .process import PiperProcessManager
 
 _LOGGER = logging.getLogger(__name__)
-# _LOGGER.setLevel(logging.DEBUG)
-# # create file handler which logs even debug messages
-# fh = logging.FileHandler('wyoming_piper.log')
-# fh.setLevel(logging.DEBUG)
-# # create console handler with a higher log level
-# ch = logging.StreamHandler()
-# ch.setLevel(logging.ERROR)
-# # create formatter and add it to the handlers
-# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# fh.setFormatter(formatter)
-# ch.setFormatter(formatter)
-# # add the handlers to the logger
-# _LOGGER.addHandler(fh)
-# _LOGGER.addHandler(ch)
+
 
 async def main() -> None:
     """Main entry point."""
@@ -84,6 +67,17 @@ async def main() -> None:
         help="Download latest voices.json during startup",
     )
     #
+    parser.add_argument(
+        "--test-mode",
+        action="store_true",
+        help="Enable test mode: save audio to files instead of playing"
+    )
+    parser.add_argument(
+        "--test-output-dir",
+        type=str,
+        default="./tests/audio/outputs",
+        help="Directory to save test audio files (default: ./tests/audio/outputs)"
+    )
     parser.add_argument("--debug", action="store_true", help="Log DEBUG messages")
     parser.add_argument(
         "--log-format", default=logging.BASIC_FORMAT, help="Format for log messages"

@@ -4,8 +4,10 @@ import json
 import logging
 import math
 import os
+import shutil
 import wave
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from wyoming.audio import AudioChunk, AudioStart, AudioStop
@@ -25,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Variable to flag if the stop command word has been received
 STOP_CMD = False
- 
+
 class PiperEventHandler(AsyncEventHandler):
     def __init__(
         self,
@@ -40,6 +42,7 @@ class PiperEventHandler(AsyncEventHandler):
         self.cli_args = cli_args
         self.wyoming_info_event = wyoming_info.event()
         self.process_manager = process_manager
+        self.test_output_counter = 0  # Counter for test output files
 
     async def handle_event(self, event: Event) -> bool:
         if Describe.is_type(event.type):
@@ -126,7 +129,7 @@ class PiperEventHandler(AsyncEventHandler):
                 voice_speaker = synthesize.voice.speaker
 
             piper_proc = await self.process_manager.get_process(voice_name=voice_name)
-            
+
             assert piper_proc.proc.stdin is not None
             assert piper_proc.proc.stdout is not None
 
@@ -150,58 +153,43 @@ class PiperEventHandler(AsyncEventHandler):
             output_path = (await piper_proc.proc.stdout.readline()).decode().strip()
             _LOGGER.debug(output_path)
 
-        # Run aplay
-        async with self.process_manager.processes_lock:
-            _LOGGER.debug("Running aplay on " + output_path)
-            aplay_proc = await self.process_manager.get_aplay_process(output_path)
-            await aplay_proc.proc.wait()
-            # Hack to make stop command work
-            # while aplay_proc.proc.wait() is None:
-            #     if (STOP_CMD):
-            #         _LOGGER.debug("Terminating due to stop command")
-            #         aplay_proc.proc.terminate()
-                
-        _LOGGER.debug("Completed request")
+        # Check if test mode is enabled
+        test_mode = hasattr(self.cli_args, 'test_mode') and self.cli_args.test_mode
+        test_output_dir = getattr(self.cli_args, 'test_output_dir', None)
 
-        os.unlink(output_path)
-"""
-        wav_file: wave.Wave_read = wave.open(output_path, "rb")
-        with wav_file:
-            rate = wav_file.getframerate()
-            width = wav_file.getsampwidth()
-            channels = wav_file.getnchannels()
+        if test_mode and test_output_dir:
+            # Test mode: copy file to test output directory instead of playing
+            test_output_dir_path = Path(test_output_dir)
+            test_output_dir_path.mkdir(parents=True, exist_ok=True)
 
-            await self.write_event(
-                AudioStart(
-                    rate=rate,
-                    width=width,
-                    channels=channels,
-                ).event(),
-            )
+            # Generate output filename with timestamp and counter
+            timestamp = int(time.time())
+            self.test_output_counter += 1
+            test_output_path = test_output_dir_path / f"output_{timestamp}_{self.test_output_counter}.wav"
 
-            # Audio
-            audio_bytes = wav_file.readframes(wav_file.getnframes())
-            bytes_per_sample = width * channels
-            bytes_per_chunk = bytes_per_sample * self.cli_args.samples_per_chunk
-            num_chunks = int(math.ceil(len(audio_bytes) / bytes_per_chunk))
+            shutil.copy(output_path, test_output_path)
+            _LOGGER.info(f"Test mode: saved audio to {test_output_path}")
 
-            # Split into chunks
-            for i in range(num_chunks):
-                offset = i * bytes_per_chunk
-                chunk = audio_bytes[offset : offset + bytes_per_chunk]
-                await self.write_event(
-                    AudioChunk(
-                        audio=chunk,
-                        rate=rate,
-                        width=width,
-                        channels=channels,
-                    ).event(),
-                )
+            # Also create a symlink to the latest output for easy access
+            latest_link = test_output_dir_path / "output.wav"
+            if latest_link.exists() or latest_link.is_symlink():
+                latest_link.unlink()
+            latest_link.symlink_to(test_output_path.name)
 
-        await self.write_event(AudioStop().event())
+        else:
+            # Normal mode: run aplay
+            async with self.process_manager.processes_lock:
+                _LOGGER.debug("Running aplay on " + output_path)
+                aplay_proc = await self.process_manager.get_aplay_process(output_path)
+                await aplay_proc.proc.wait()
+                # Hack to make stop command work
+                # while aplay_proc.proc.wait() is None:
+                #     if (STOP_CMD):
+                #         _LOGGER.debug("Terminating due to stop command")
+                #         aplay_proc.proc.terminate()
+
         _LOGGER.debug("Completed request")
 
         os.unlink(output_path)
 
         return True
-"""

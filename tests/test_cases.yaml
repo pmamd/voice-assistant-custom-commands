@@ -1,0 +1,225 @@
+# Test cases for audio end-to-end verification
+
+test_cases:
+  # Basic functionality tests
+  - name: "simple_greeting"
+    description: "Test basic greeting recognition"
+    input: "Hello assistant"
+    expected_contains: ["hello", "hi", "greetings"]
+    min_confidence: 0.85
+    test_type: "functional"
+
+  - name: "question_response"
+    description: "Test question answering"
+    input: "What is two plus two"
+    expected_contains: ["four", "4"]
+    min_confidence: 0.80
+    test_type: "functional"
+
+  - name: "simple_question"
+    description: "Test simple yes/no question"
+    input: "Are you there"
+    expected_contains: ["yes", "here", "i am"]
+    min_confidence: 0.85
+    test_type: "functional"
+
+  - name: "long_response"
+    description: "Test generating a long response"
+    input: "Tell me a story about a robot"
+    expected_contains: ["robot", "story"]
+    min_confidence: 0.70
+    test_type: "functional"
+
+  # Command routing tests
+  - name: "stop_command_basic"
+    description: "Test that stop command is recognized"
+    input: "Stop"
+    expected_behavior: "immediate_stop"
+    command_type: "bypass"
+    verify_no_llm: true
+    test_type: "command"
+
+  - name: "stop_command_variations"
+    description: "Test stop command variations"
+    inputs:
+      - "Stop"
+      - "stop"
+      - "STOP"
+    expected_behavior: "immediate_stop"
+    test_type: "command"
+
+  # Interrupt test - special multi-step test
+  - name: "stop_interrupt_long_response"
+    description: "Test that stop command interrupts long TTS output"
+    test_type: "interrupt"
+    sequence:
+      - step: 1
+        action: "send_input"
+        input: "Tell me a very long detailed story about the history of computing"
+        wait_for: "tts_start"
+        timeout_ms: 5000
+
+      - step: 2
+        action: "wait"
+        duration_ms: 2000
+        description: "Wait for TTS to be in progress"
+
+      - step: 3
+        action: "send_input"
+        input: "Stop"
+        expected_behavior: "interrupt_tts"
+        verify_tts_stopped: true
+        max_stop_time_ms: 500
+
+      - step: 4
+        action: "send_input"
+        input: "Are you there"
+        expected_contains: ["yes", "here", "ready"]
+        min_confidence: 0.85
+        description: "Verify system is responsive after stop"
+
+    verification:
+      - check: "tts_interrupted"
+        description: "TTS should stop within 500ms"
+      - check: "no_llm_for_stop"
+        description: "Stop command should bypass LLM"
+      - check: "system_responsive"
+        description: "System accepts new commands after stop"
+
+  # Edge cases
+  - name: "long_sentence"
+    description: "Test longer sentence recognition"
+    input: "Can you please tell me what the weather is like today"
+    expected_contains: ["weather", "today"]
+    min_confidence: 0.75
+    test_type: "functional"
+
+  - name: "numbers"
+    description: "Test number recognition"
+    input: "Count from one to five"
+    expected_contains: ["one", "two", "three", "four", "five"]
+    min_confidence: 0.70
+    test_type: "functional"
+
+  - name: "special_characters"
+    description: "Test sentence with punctuation"
+    input: "Hello, how are you today?"
+    expected_contains: ["hello", "how", "are", "you"]
+    min_confidence: 0.80
+    test_type: "functional"
+
+  # Performance tests
+  - name: "latency_test"
+    description: "Test end-to-end latency"
+    input: "Hi"
+    max_latency_ms: 5000
+    expected_contains: ["hi", "hello"]
+    test_type: "performance"
+
+  - name: "multiple_turns"
+    description: "Test multiple conversation turns"
+    test_type: "multi_turn"
+    turns:
+      - input: "Hello"
+        expected_contains: ["hello", "hi"]
+      - input: "What is your name"
+        expected_contains: ["llama", "assistant"]
+      - input: "Thank you"
+        expected_contains: ["welcome", "glad"]
+
+  # Quality tests
+  - name: "clear_speech"
+    description: "Test clear speech recognition quality"
+    input: "The quick brown fox jumps over the lazy dog"
+    expected_fuzzy: "The quick brown fox jumps over the lazy dog"
+    fuzzy_threshold: 0.90
+    min_confidence: 0.85
+    test_type: "quality"
+
+# Test configuration
+config:
+  # Audio generation settings
+  audio_generator:
+    piper_bin: "./external/piper/piper"
+    model_dir: "./external/piper-voices"
+    default_voice: "en_US-lessac-medium"
+    output_dir: "./tests/audio/inputs"
+
+  # System under test
+  talk_llama:
+    binary: "./build/bin/talk-llama"
+    whisper_model: "./models/ggml-tiny.en.bin"
+    llama_model: "./models/ggml-llama-7B.bin"
+    test_mode: true
+
+  # Verification settings
+  audio_verifier:
+    whisper_bin: "./build/bin/main"
+    whisper_model: "./models/ggml-tiny.en.bin"
+    output_dir: "./tests/audio/outputs"
+
+  # Wyoming-Piper TTS server settings
+  wyoming_piper:
+    command: "/home/paul/.local/bin/wyoming-piper"
+    args:
+      - "--voice"
+      - "en_US-lessac-medium"
+      - "--data-dir"
+      - "./external/piper-voices"
+      - "--uri"
+      - "tcp://0.0.0.0:10200"
+    port: 10200
+    auto_start: true  # Automatically start if not running
+
+  # Test execution
+  execution:
+    timeout_per_test: 360  # seconds (6 minutes for model loading + inference)
+    retry_on_failure: 1
+    parallel_execution: false
+    verbose: true
+
+  # Pass/fail criteria
+  criteria:
+    default_min_confidence: 0.80
+    default_fuzzy_threshold: 0.85
+    default_keyword_match_ratio: 0.80  # 80% of keywords must match
+
+# Test groups for selective execution
+test_groups:
+  smoke:
+    - "simple_greeting"
+    - "question_response"
+    - "stop_command_basic"
+
+  functional:
+    - "simple_greeting"
+    - "question_response"
+    - "simple_question"
+    - "long_sentence"
+
+  command:
+    - "stop_command_basic"
+    - "stop_command_variations"
+    - "stop_interrupt_long_response"
+
+  quality:
+    - "clear_speech"
+    - "numbers"
+    - "special_characters"
+
+  performance:
+    - "latency_test"
+
+  all:
+    - "simple_greeting"
+    - "question_response"
+    - "simple_question"
+    - "stop_command_basic"
+    - "stop_command_variations"
+    - "stop_interrupt_long_response"
+    - "long_sentence"
+    - "numbers"
+    - "special_characters"
+    - "latency_test"
+    - "multiple_turns"
+    - "clear_speech"
