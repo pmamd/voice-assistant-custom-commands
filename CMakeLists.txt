@@ -19,12 +19,19 @@ if (WHISPER_SDL2)
     message(STATUS "CURL_INCLUDE_DIRS = ${CURL_INCLUDE_DIRS}")
     message(STATUS "CURL_LIBRARIES    = ${CURL_LIBRARIES}")
 
+    # Find cJSON for TTS request encoding
+    find_library(CJSON_LIBRARY cjson)
+    if(NOT CJSON_LIBRARY)
+        message(FATAL_ERROR "cJSON library not found. Install with: sudo apt-get install libcjson-dev")
+    endif()
+    message(STATUS "CJSON_LIBRARY = ${CJSON_LIBRARY}")
+
     set(TARGET talk-llama-custom)
 
     # Our custom source files (includes full llama.cpp from talk-llama-fast)
+    # Note: console.cpp is #included in talk-llama.cpp, not compiled separately
     add_executable(${TARGET}
         custom/talk-llama/talk-llama.cpp
-        custom/talk-llama/console.cpp
         custom/talk-llama/llama.cpp
         custom/talk-llama/unicode.cpp
         custom/talk-llama/unicode-data.cpp
@@ -56,6 +63,7 @@ if (WHISPER_SDL2)
         whisper
         ${SDL2_LIBRARIES}
         ${CURL_LIBRARIES}
+        ${CJSON_LIBRARY}
         ${CLBLAST_LIBNAME}
         ${CMAKE_THREAD_LIBS_INIT}
     )
