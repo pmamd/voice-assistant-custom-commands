@@ -3026,7 +3026,7 @@ int run(int argc, const char **argv)
 				// In test mode, exit after processing one input
 				if (test_mode) {
 					fprintf(stderr, "\n%s: TEST MODE - processing complete, exiting\n", __func__);
-					is_running = false;
+					_exit(0);
 				}
 			}
 		}
