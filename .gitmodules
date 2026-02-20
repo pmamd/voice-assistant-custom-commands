@@ -6,4 +6,7 @@
 	url = https://github.com/rhasspy/wyoming-piper.git
 [submodule "tests/external/piper"]
 	path = tests/external/piper
-	url = https://github.com/rhasspy/piper.git
+	url = https://github.com/OHF-Voice/piper1-gpl.git
+[submodule "external/piper"]
+	path = external/piper
+	url = https://github.com/OHF-Voice/piper1-gpl.git
