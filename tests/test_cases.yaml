@@ -150,14 +150,14 @@ config:
   # System under test
   talk_llama:
     binary: "../build/bin/talk-llama-custom"
-    whisper_model: "../models/ggml-tiny.en.bin"
-    llama_model: "../models/ggml-llama-7B.bin"
+    whisper_model: "../whisper.cpp/models/ggml-tiny.en.bin"
+    llama_model: "../models/ggml-llama-7B.bin"  # User must download separately
     test_mode: true
 
   # Verification settings
   audio_verifier:
     whisper_bin: "../build/bin/main"
-    whisper_model: "../models/ggml-tiny.en.bin"
+    whisper_model: "../whisper.cpp/models/ggml-tiny.en.bin"
     output_dir: "./audio/outputs"
 
   # Wyoming-Piper TTS server settings
