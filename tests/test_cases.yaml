@@ -151,7 +151,7 @@ config:
   talk_llama:
     binary: "../build/bin/talk-llama-custom"
     whisper_model: "../whisper.cpp/models/ggml-tiny.en.bin"
-    llama_model: "../models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+    llama_model: "../models/llama-2-7b-chat.Q4_K_M.gguf"
     test_mode: true
 
   # Verification settings
