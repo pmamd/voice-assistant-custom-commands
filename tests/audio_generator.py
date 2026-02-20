@@ -94,6 +94,9 @@ class AudioGenerator:
             # Resample to 16kHz (Whisper requirement)
             self._resample_to_16khz(output_path)
 
+            # Pad audio to ensure it meets Whisper's minimum length requirement (1000ms)
+            self._pad_audio(output_path, min_duration_ms=1500)
+
             logger.info(f"Successfully generated: {output_path}")
             return output_path
 
@@ -160,6 +163,53 @@ class AudioGenerator:
 
         except Exception as e:
             logger.warning(f"Resampling failed: {e}")
+
+    def _pad_audio(self, wav_file: Path, min_duration_ms: int = 1500):
+        """
+        Pad audio file with silence to meet minimum duration.
+        Whisper requires at least 1000ms of audio.
+
+        Args:
+            wav_file: Path to WAV file to pad (modified in place)
+            min_duration_ms: Minimum duration in milliseconds
+        """
+        try:
+            import wave
+            import struct
+
+            # Read the WAV file
+            with wave.open(str(wav_file), 'rb') as wav:
+                n_channels = wav.getnchannels()
+                sample_width = wav.getsampwidth()
+                framerate = wav.getframerate()
+                n_frames = wav.getnframes()
+                audio_data = wav.readframes(n_frames)
+
+            # Calculate current duration in ms
+            current_duration_ms = (n_frames / framerate) * 1000
+
+            if current_duration_ms >= min_duration_ms:
+                logger.debug(f"Audio already {current_duration_ms:.0f}ms, no padding needed")
+                return
+
+            # Calculate how many frames of silence to add
+            padding_ms = min_duration_ms - current_duration_ms
+            padding_frames = int((padding_ms / 1000) * framerate)
+
+            # Create silence (zeros)
+            silence = b'\x00' * (padding_frames * n_channels * sample_width)
+
+            # Write padded audio
+            with wave.open(str(wav_file), 'wb') as wav:
+                wav.setnchannels(n_channels)
+                wav.setsampwidth(sample_width)
+                wav.setframerate(framerate)
+                wav.writeframes(audio_data + silence)
+
+            logger.debug(f"Padded {wav_file} from {current_duration_ms:.0f}ms to {min_duration_ms}ms")
+
+        except Exception as e:
+            logger.warning(f"Audio padding failed: {e}")
 
     def generate_batch(self, test_cases: List[Dict]) -> Dict[str, Path]:
         """
