@@ -140,7 +140,7 @@ voice-assistant-custom-commands/
 - Python 3.9+
 - C++ compiler (gcc/g++ 8+)
 - CMake 3.12+
-- CUDA Toolkit 11.x+ (optional, for GPU acceleration)
+- ROCm 5.x+ (optional, for AMD GPU acceleration)
 - Audio system with ALSA (`aplay` command)
 
 ### Dependencies
@@ -158,8 +158,8 @@ sudo apt-get install -y \
     python3 \
     python3-pip
 
-# Optional: CUDA for GPU acceleration
-# Follow NVIDIA CUDA installation guide
+# Optional: ROCm for AMD GPU acceleration
+# Follow AMD ROCm installation guide: https://rocm.docs.amd.com/
 ```
 
 ## Setup
@@ -199,8 +199,8 @@ make help
 cmake -B build -DWHISPER_SDL2=ON
 cmake --build build -j
 
-# GPU build (CUDA)
-cmake -B build -DWHISPER_SDL2=ON -DWHISPER_CUDA=ON
+# GPU build (ROCm for AMD GPUs)
+cmake -B build -DWHISPER_SDL2=ON -DGGML_HIPBLAS=ON
 cmake --build build -j
 ```
 
@@ -303,8 +303,8 @@ Example command categories:
 # Enable SDL2 (required for talk-llama)
 -DWHISPER_SDL2=ON
 
-# Enable CUDA acceleration
--DWHISPER_CUDA=ON
+# Enable ROCm/HIP acceleration (AMD GPUs)
+-DGGML_HIPBLAS=ON
 
 # Enable OpenBLAS
 -DWHISPER_OPENBLAS=ON

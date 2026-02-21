@@ -512,7 +512,7 @@ sudo apt-get install ffmpeg
     execution:
       timeout_per_test: 600  # 10 minutes
   ```
-- Check GPU availability (ROCm for AMD, CUDA for NVIDIA)
+- Check GPU availability (ROCm for AMD GPUs)
 - Use smaller models for faster inference
 
 **Empty transcriptions**:
