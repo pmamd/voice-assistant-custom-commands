@@ -49,12 +49,11 @@ wyoming-piper \
 **2. Start Voice Assistant (Terminal 2):**
 ```bash
 ./build/bin/talk-llama-custom \
-    -m ./models/llama-2-7b-chat.Q4_K_M.gguf \
-    --model-whisper ./whisper.cpp/models/ggml-tiny.en.bin \
+    -ml ./models/llama-2-7b-chat.Q4_K_M.gguf \
+    -mw ./whisper.cpp/models/ggml-tiny.en.bin \
     --xtts-url http://localhost:10200/ \
     --xtts-voice en_US-lessac-medium \
-    --temp 0.5 \
-    -p "You are a helpful AI assistant. Keep your responses concise and friendly."
+    --temp 0.5
 ```
 
 ### Usage

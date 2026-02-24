@@ -120,12 +120,11 @@ echo ""
 
 # Start the voice assistant
 $TALK_LLAMA_BIN \
-    -m "$LLAMA_MODEL" \
-    --model-whisper "$WHISPER_MODEL" \
+    -ml "$LLAMA_MODEL" \
+    -mw "$WHISPER_MODEL" \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
-    --temp 0.5 \
-    -p "You are a helpful AI assistant. Keep your responses concise and friendly."
+    --temp 0.5
 
 # Cleanup on exit
 echo ""
