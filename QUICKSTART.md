@@ -37,8 +37,12 @@ If you prefer to start components manually:
 
 **1. Start TTS Server (Terminal 1):**
 ```bash
+# Create data directory for voice models
+mkdir -p ./piper-data
+
 wyoming-piper \
     --voice en_US-lessac-medium \
+    --data-dir ./piper-data \
     --uri tcp://0.0.0.0:10200
 ```
 
@@ -64,6 +68,7 @@ wyoming-piper \
 
 Edit `start-assistant.sh` to customize:
 - `PIPER_VOICE`: TTS voice (default: en_US-lessac-medium)
+- `PIPER_DATA_DIR`: Where Piper stores voice models (default: ./piper-data)
 - `WYOMING_PORT`: TTS server port (default: 10200)
 - `WHISPER_MODEL`: STT model path
 - `LLAMA_MODEL`: LLM model path

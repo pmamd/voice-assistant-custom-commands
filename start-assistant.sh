@@ -18,6 +18,7 @@ echo ""
 # Configuration
 WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper"
 PIPER_VOICE="en_US-lessac-medium"
+PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
 WHISPER_MODEL="./whisper.cpp/models/ggml-tiny.en.bin"
 LLAMA_MODEL="./models/llama-2-7b-chat.Q4_K_M.gguf"
@@ -47,9 +48,13 @@ if ! pgrep -f "wyoming-piper" > /dev/null; then
         exit 1
     fi
     
+    # Create data directory if it doesn't exist
+    mkdir -p "$PIPER_DATA_DIR"
+
     # Start Wyoming-Piper in background
     $WYOMING_PIPER_CMD \
         --voice "$PIPER_VOICE" \
+        --data-dir "$PIPER_DATA_DIR" \
         --uri "tcp://0.0.0.0:$WYOMING_PORT" \
         > /tmp/wyoming-piper.log 2>&1 &
     
