@@ -795,8 +795,8 @@ bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float
 
     // Minimum absolute energy threshold to avoid triggering on noise floor
     // Typical speech energy is 0.001-0.1, environmental noise is ~0.0001-0.0005
-    // Set threshold higher to prevent keyboard/breathing/room noise from triggering
-    const float min_energy = 0.0008f;
+    // TTS playback audio is ~0.0008, so set threshold above that to prevent feedback
+    const float min_energy = 0.0012f;
 
     if (energy_last > vad_thold*energy_all && energy_last > min_energy) {
         return false;  // Speech detected
