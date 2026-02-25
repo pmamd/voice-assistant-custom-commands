@@ -136,7 +136,8 @@ class PiperProcessManager:
                 str(config_path),
                 "--output_dir",
                 str(wav_dir.name),
-                "--json-input",  # piper 1.1+
+                # NOTE: --json-input removed - not supported in piper-tts 1.4.1
+                # Use plain text on stdin instead
             ]
 
             if voice_speaker is not None:

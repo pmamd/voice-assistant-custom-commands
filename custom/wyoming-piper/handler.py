@@ -133,25 +133,24 @@ class PiperEventHandler(AsyncEventHandler):
             assert piper_proc.proc.stdin is not None
             assert piper_proc.proc.stdout is not None
 
-            # JSON in, file path out
-            input_obj: Dict[str, Any] = {"text": text}
-            if voice_speaker is not None:
-                speaker_id = piper_proc.get_speaker_id(voice_speaker)
-                if speaker_id is not None:
-                    input_obj["speaker_id"] = speaker_id
-                else:
-                    _LOGGER.warning(
-                        "No speaker '%s' for voice '%s'", voice_speaker, voice_name
-                    )
-
-            _LOGGER.debug("input: %s", input_obj)
-            piper_proc.proc.stdin.write(
-                (json.dumps(input_obj, ensure_ascii=False) + "\n").encode()
-            )
+            # Send plain text to stdin (piper-tts 1.4.1 doesn't support --json-input)
+            # Speaker is passed as command-line arg in process.py
+            _LOGGER.debug("Sending text to Piper: %s", text)
+            piper_proc.proc.stdin.write((text + "\n").encode("utf-8"))
             await piper_proc.proc.stdin.drain()
 
-            output_path = (await piper_proc.proc.stdout.readline()).decode().strip()
-            _LOGGER.debug(output_path)
+            # Piper outputs "INFO:__main__:Wrote /path/to/file.wav"
+            # Extract just the path
+            output_line = (await piper_proc.proc.stdout.readline()).decode().strip()
+            _LOGGER.debug("Piper output: %s", output_line)
+
+            # Extract path from "INFO:__main__:Wrote /path/to/file.wav"
+            if "Wrote " in output_line:
+                output_path = output_line.split("Wrote ", 1)[1]
+            else:
+                output_path = output_line  # Fallback to full line
+
+            _LOGGER.debug("Audio file path: %s", output_path)
 
         # Check if test mode is enabled
         test_mode = hasattr(self.cli_args, 'test_mode') and self.cli_args.test_mode
