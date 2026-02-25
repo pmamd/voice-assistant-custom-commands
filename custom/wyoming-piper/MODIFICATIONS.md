@@ -13,6 +13,7 @@ This directory contains modified Wyoming-Piper files with custom command support
 ### Custom Files (This Directory)
 - **`__main__.py`** - Modified main entry point with test mode arguments
 - **`handler.py`** - Modified event handler with stop command and test mode
+- **`process.py`** - Modified process manager with aplay support for local audio playback
 
 ### Upstream Files (From Submodule)
 All other files are used unmodified from the wyoming-piper submodule.
@@ -141,6 +142,7 @@ pip install -e .
 # Overlay custom files
 cp custom/wyoming-piper/__main__.py wyoming-piper/wyoming_piper/
 cp custom/wyoming-piper/handler.py wyoming-piper/wyoming_piper/
+cp custom/wyoming-piper/process.py wyoming-piper/wyoming_piper/
 ```
 
 ### Option 2: Build Script (Production)
