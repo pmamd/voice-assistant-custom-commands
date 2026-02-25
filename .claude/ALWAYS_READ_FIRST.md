@@ -105,16 +105,22 @@ Located in /tmp/:
 
 **Active Branch**: vad-fixes
 **Recent Fixes**:
-- VAD state machine (0/1/2 states)
-- Wyoming-Piper TTS connection test
+- VAD timestamp precision: microseconds + double (not milliseconds + float)
+- VAD minimum energy threshold: 0.0008 (prevents noise triggers)
+- Wyoming-Piper TTS connection test with microphone pause (prevents feedback loop)
+- Custom Wyoming-Piper with aplay support (committed to custom/wyoming-piper/)
 - Signal handler for Ctrl+C
 - Energy output formatting
 
 **Models Location** (on dev machine):
 - Whisper: `~/Projects/git/talk-llama-fast/whisper.cpp/models/ggml-tiny.en.bin`
 - LLaMA: `~/Projects/git/talk-llama-fast/models/llama-2-7b-chat.Q4_K_M.gguf`
+  - ⚠️ **CRITICAL**: ALWAYS use the 7B model for testing, NEVER use tiny LLaMA!
 
-**Wyoming-Piper**: Running on port 10200
+**Wyoming-Piper Configuration**:
+- Port: 10200
+- Custom files: `custom/wyoming-piper/` (handler.py, process.py, __main__.py)
+- Features: Local aplay playback, stop command detection, test mode support
 
 ---
 
