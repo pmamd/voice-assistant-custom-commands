@@ -38,9 +38,21 @@ See `.claude/ALWAYS_READ_FIRST.md` for complete details.
 
 ## Git Workflow
 
-- Work on feature branches (e.g., vad-fixes)
-- Test on dev machine before merging to main
-- Never lose changes by checking out without committing
+**MANDATORY STEPS (NEVER SKIP):**
+
+1. **Development**: Always work on feature branches (e.g., vad-fixes)
+2. **Build**: Build on dev machine via paramiko
+3. **Automated Test**: Run full tests (minimum 30s to get past initialization)
+4. **Verify Results**: Check logs, confirm expected behavior
+5. **User Testing**: ONLY THEN ask user to manually test
+6. **Merge Decision**: ONLY merge to main after user confirms it works
+
+**CRITICAL RULES:**
+- ❌ **NEVER** ask user to test untested code
+- ❌ **NEVER** ask user to approve commits to main without testing
+- ❌ **NEVER** lose changes by checking out without committing
+- ✅ **ALWAYS** test first, ask user second
+- ✅ **ALWAYS** use feature branches for untested code
 
 ## Common Commands (via paramiko)
 

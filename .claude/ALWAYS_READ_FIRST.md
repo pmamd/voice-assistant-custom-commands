@@ -72,9 +72,34 @@ Located in /tmp/:
 - ✅ **DO**: Always check DEV_SETUP.md for full details
 - ✅ **DO**: Activate venv before using paramiko
 - ✅ **DO**: Use 192.168.86.74 for builds/tests
+- ✅ **DO**: Test EVERYTHING before asking user to test
+- ✅ **DO**: Only merge to main after testing confirms it works
 - ❌ **DON'T**: Forget this setup exists
 - ❌ **DON'T**: Try to build locally in WSL
 - ❌ **DON'T**: Use direct SSH commands
+- ❌ **DON'T**: Ask user to test untested code
+- ❌ **DON'T**: Ask user to approve commits to main that haven't been tested
+
+### Testing Workflow (CRITICAL - NEVER SKIP)
+
+**BEFORE asking user to test:**
+1. ✅ Build succeeds on dev machine
+2. ✅ Run automated tests (at least 30 seconds runtime to get past initialization)
+3. ✅ Check logs for expected output (Wyoming test, energy output, VAD triggers if possible)
+4. ✅ Verify no errors or crashes
+5. ✅ Document what was tested and what still needs manual verification
+
+**BEFORE merging to main:**
+1. ✅ All automated tests pass
+2. ✅ User has manually tested and confirmed it works
+3. ✅ No known issues or regressions
+4. ✅ Changes are committed to feature branch first
+
+**NEVER:**
+- ❌ Ask user to test code that hasn't been built
+- ❌ Ask user to test code that hasn't run through automated tests
+- ❌ Propose merging untested code to main
+- ❌ Skip testing "because it looks right"
 
 ## Current Project State
 
