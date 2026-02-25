@@ -2025,13 +2025,15 @@ int run(int argc, const char **argv)
 					vad_result = 0;
 				}
 			}
+
+			// Process VAD state transitions
 			if (vad_result == 1 && params.vad_start_thold) // speech started
 			{
 				//printf("VAD result 1\n"); // debug)
-				if (vad_result_prev != 1) // real start
+				if (vad_result_prev != 1) // real start (first frame of speech)
 				{
 					speech_start_ms = get_current_time_ms(); // float
-					vad_result_prev = 1;
+					fprintf(stderr, "VAD: Speech started at %.3f (speech_count=%d)\n", speech_start_ms, vad_speech_count);
 
 					// whisper warmup request, not real one
 					// audio.get((int)(speech_len*1000), pcmf32_cur);
@@ -2057,6 +2059,8 @@ int run(int argc, const char **argv)
 				//printf("VAD result 2\n"); // debug)
 				speech_end_ms = get_current_time_ms(); // float in seconds.ms
 				speech_len = speech_end_ms - speech_start_ms;
+				fprintf(stderr, "VAD: Speech ended at %.3f, start was %.3f, raw_len=%.3f (silence_count=%d)\n",
+					speech_end_ms, speech_start_ms, speech_len, vad_silence_count);
 				if (speech_len < 0.10)
 					speech_len = 0;
 				else if (speech_len > 10.0)
