@@ -1850,16 +1850,28 @@ int run(int argc, const char **argv)
 	printf("TTS URL: %s\n", params.xtts_url.c_str());
 	printf("TTS Voice: %s\n", params.xtts_voice.c_str());
 
+	// Pause microphone during TTS test to prevent feedback
+	if (!test_mode) {
+		audio.pause();
+		printf("(Microphone paused during TTS test)\n");
+	}
+
 	// Send a simple test message to Wyoming-Piper
 	std::thread tts_test_thread([&params]() {
 		send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url);
 	});
 	tts_test_thread.detach();
 
-	// Wait a moment for the test to complete
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	printf("TTS test sent. If you hear audio, TTS is working.\n");
+	// Wait for TTS test audio to finish playing (avoid feedback)
+	std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+	printf("TTS test sent. If you heard audio, TTS is working.\n");
 	printf("=========================================\n\n");
+
+	// Resume microphone
+	if (!test_mode) {
+		audio.resume();
+		printf("(Microphone resumed)\n");
+	}
 
 	if (params.push_to_talk)
 		printf("Type anything or hold 'Alt' to speak:\n");
