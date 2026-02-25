@@ -2777,26 +2777,27 @@ int run(int argc, const char **argv)
 								text_to_speak[text_len - 1] = ' '; // no splitting on mr.
 
 							// STOP on speech or hotkey for llama, every 2 tokens
-							// Skip VAD check in test mode as there's no audio device
-							if (!test_mode && new_tokens % 2 == 0)
-							{
-								// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
-								audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
-								int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
+							// DISABLED: This was causing TTS audio to be detected as user speech,
+							// prematurely stopping LLM generation. Baseline whisper.cpp doesn't have this.
+							// if (!test_mode && new_tokens % 2 == 0)
+							// {
+							// 	// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
+							// 	audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
+							// 	int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
-								if (!params.push_to_talk && vad_result == 1 || g_hotkey_pressed == "Ctrl+Space" || g_hotkey_pressed == "Alt") // speech started
-								{
-									llama_interrupted = 1;
-									llama_interrupted_time = get_current_time_ms();
-									printf(" [Speech/Stop!]\n");
-#ifdef XTTS_FILE
-									allow_xtts_file(params.xtts_control_path, 0); // xtts stop
-#endif
-									done = true; // llama generation stop
-									g_hotkey_pressed = "";
-									break;
-								}
-							}
+							// 	if (!params.push_to_talk && vad_result == 1 || g_hotkey_pressed == "Ctrl+Space" || g_hotkey_pressed == "Alt") // speech started
+							// 	{
+							// 		llama_interrupted = 1;
+							// 		llama_interrupted_time = get_current_time_ms();
+							// 		printf(" [Speech/Stop!]\n");
+							// #ifdef XTTS_FILE
+							// 		allow_xtts_file(params.xtts_control_path, 0); // xtts stop
+							// #endif
+							// 		done = true; // llama generation stop
+							// 		g_hotkey_pressed = "";
+							// 		break;
+							// 	}
+							// }
 							//	clear mic
 							if (new_tokens == 20 && !llama_interrupted)
 							{
@@ -2865,22 +2866,23 @@ int run(int argc, const char **argv)
 											std::this_thread::sleep_for(std::chrono::milliseconds(params.sleep_before_xtts)); // 1s pause to speed up xtts/wav2lip inference
 
 										// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
-										if (!params.push_to_talk || params.push_to_talk && g_hotkey_pressed == "Alt")
-										{
-											audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
-											int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
-											if (vad_result == 1) // speech started
-											{
-												llama_interrupted = 1;
-												llama_interrupted_time = get_current_time_ms();
-												printf(" [Speech!]\n");
-#ifdef XTTS_FILE
-												allow_xtts_file(params.xtts_control_path, 0); // xtts stop
-#endif
-												done = true; // llama generation stop
-												break;
-											}
-										}
+										// DISABLED: Same issue - TTS audio triggers false detection
+										// if (!params.push_to_talk || params.push_to_talk && g_hotkey_pressed == "Alt")
+										// {
+										// 	audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
+										// 	int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
+										// 	if (vad_result == 1) // speech started
+										// 	{
+										// 		llama_interrupted = 1;
+										// 		llama_interrupted_time = get_current_time_ms();
+										// 		printf(" [Speech!]\n");
+										// #ifdef XTTS_FILE
+										// 		allow_xtts_file(params.xtts_control_path, 0); // xtts stop
+										// #endif
+										// 		done = true; // llama generation stop
+										// 		break;
+										// 	}
+										// }
 									}
 									catch (const std::exception &ex)
 									{
