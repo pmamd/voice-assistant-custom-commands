@@ -793,11 +793,15 @@ bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float
         fflush(stderr);
     }
 
-    if (energy_last > vad_thold*energy_all) {
-        return false;
+    // Minimum absolute energy threshold to avoid triggering on noise floor
+    // Typical speech energy is 0.001-0.1, noise floor is ~0.00005-0.0001
+    const float min_energy = 0.0002f;
+
+    if (energy_last > vad_thold*energy_all && energy_last > min_energy) {
+        return false;  // Speech detected
     }
 
-    return true;
+    return true;  // Silence
 }
 
 float similarity(const std::string & s0, const std::string & s1) {
