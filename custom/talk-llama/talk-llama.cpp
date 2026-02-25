@@ -1842,6 +1842,25 @@ int run(int argc, const char **argv)
 								{ keyboard_shortcut_func(cur_window_handle); });
 #endif
 	printf("\nVoice commands: Stop(Ctrl+Space), Regenerate(Ctrl+Right), Delete(Ctrl+Delete), Reset(Ctrl+R)\n");
+
+	// Test Wyoming-Piper TTS connection
+	printf("\n=========================================\n");
+	printf("Testing Wyoming-Piper TTS Connection...\n");
+	printf("=========================================\n");
+	printf("TTS URL: %s\n", params.xtts_url.c_str());
+	printf("TTS Voice: %s\n", params.xtts_voice.c_str());
+
+	// Send a simple test message to Wyoming-Piper
+	std::thread tts_test_thread([&params]() {
+		send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url);
+	});
+	tts_test_thread.detach();
+
+	// Wait a moment for the test to complete
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	printf("TTS test sent. If you hear audio, TTS is working.\n");
+	printf("=========================================\n\n");
+
 	if (params.push_to_talk)
 		printf("Type anything or hold 'Alt' to speak:\n");
 	else
@@ -1959,9 +1978,21 @@ int run(int argc, const char **argv)
 					vad_result = 2; // Speech ended - trigger processing
 				}
 			} else {
-				// vad_simple returns true for silence, false for speech - we want 1 for speech, 0 for silence
-				// So invert the result
-				vad_result = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy) ? 1 : 0;
+				// vad_simple returns true for silence, false for speech
+				// We need to implement a state machine:
+				// vad_result = 0: silence (no speech detected)
+				// vad_result = 1: speech started (transition from silence to speech)
+				// vad_result = 2: speech ended (transition from speech to silence)
+
+				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
+
+				if (is_speech) {
+					// Speech is happening
+					vad_result = (vad_result_prev == 1) ? 1 : 1;  // Keep at 1 if already speaking, or set to 1 if just started
+				} else {
+					// Silence
+					vad_result = (vad_result_prev == 1) ? 2 : 0;  // If was speaking, set to 2 (ended), otherwise stay at 0
+				}
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
 			{
