@@ -760,7 +760,7 @@ void high_pass_filter(std::vector<float> & data, float cutoff, float sample_rate
     }
 }
 
-bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool verbose) {
+bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool verbose, float min_energy) {
     const int n_samples      = pcmf32.size();
     const int n_samples_last = (sample_rate * last_ms) / 1000;
 
@@ -796,7 +796,7 @@ bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float
     // Minimum absolute energy threshold to avoid triggering on noise floor
     // Typical speech energy is 0.001-0.1, environmental noise is ~0.0001-0.0005
     // TTS playback audio is ~0.0008, so set threshold above that to prevent feedback
-    const float min_energy = 0.0012f;
+    // Default is 0.0012f, but can be overridden via --min-energy parameter
 
     if (energy_last > vad_thold*energy_all && energy_last > min_energy) {
         return false;  // Speech detected

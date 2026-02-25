@@ -260,7 +260,8 @@ bool vad_simple(
         int   last_ms,
         float vad_thold,
         float freq_thold,
-        bool  verbose);
+        bool  verbose,
+        float min_energy = 0.0012f);
 
 // compute similarity between two strings using Levenshtein distance
 float similarity(const std::string & s0, const std::string & s1);

@@ -145,6 +145,7 @@ struct whisper_params
 	float vad_start_thold = 0.000270f; // 0 to turn off, you can see your current energy_last (loudness level) when running with --print-energy param
 	float vad_last_ms = 1250;
 	float freq_thold = 100.0f;
+	float min_energy = 0.0012f; // Minimum energy threshold to prevent TTS feedback
 
 	bool speed_up = false;
 	bool translate = false;
@@ -257,6 +258,10 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		else if (arg == "-fth" || arg == "--freq-thold")
 		{
 			params.freq_thold = std::stof(argv[++i]);
+		}
+		else if (arg == "-me" || arg == "--min-energy")
+		{
+			params.min_energy = std::stof(argv[++i]);
 		}
 		else if (arg == "-su" || arg == "--speed-up")
 		{
@@ -479,6 +484,7 @@ void whisper_print_usage(int /*argc*/, const char **argv, const whisper_params &
 	fprintf(stderr, "  -vths N,  --vad-start-thold N [%-7.6f] vad min level to stop tts, 0: off, 0.000270: default\n", params.vad_start_thold);
 	fprintf(stderr, "  -vlm N,   --vad-last-ms N  [%-7d] vad min silence after speech, ms\n", params.vad_last_ms);
 	fprintf(stderr, "  -fth N,   --freq-thold N   [%-7.2f] high-pass frequency cutoff\n", params.freq_thold);
+	fprintf(stderr, "  -me N,    --min-energy N   [%-7.4f] minimum energy threshold (prevents TTS feedback)\n", params.min_energy);
 	fprintf(stderr, "  -su,      --speed-up       [%-7s] speed up audio by x2 (not working)\n", params.speed_up ? "true" : "false");
 	fprintf(stderr, "  -tr,      --translate      [%-7s] translate from source language to english\n", params.translate ? "true" : "false");
 	fprintf(stderr, "  -ps,      --print-special  [%-7s] print special tokens\n", params.print_special ? "true" : "false");
@@ -1996,7 +2002,7 @@ int run(int argc, const char **argv)
 				// vad_result = 1: speech started (transition from silence to speech)
 				// vad_result = 2: speech ended (transition from speech to silence)
 
-				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
+				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.min_energy);
 
 				if (is_speech) {
 					// Speech is happening
