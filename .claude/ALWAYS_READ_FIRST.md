@@ -2,7 +2,11 @@
 
 ## Dev Machine Connection (NEVER FORGET!)
 
-**ALWAYS check this file at the start of EVERY conversation continuation or when asked to build/test.**
+**ALWAYS check this file:**
+- At the start of EVERY conversation continuation
+- After EVERY compaction event (when you see a summary)
+- When asked to build/test
+- Before making assumptions about configuration
 
 ### Connection Details
 - **Hostname**: 192.168.86.74
