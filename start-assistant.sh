@@ -143,7 +143,7 @@ $TALK_LLAMA_BIN \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
-    -vth 0.30 \
+    -vth 1.2 \
     -pe
 
 # Cleanup on exit
