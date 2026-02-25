@@ -77,6 +77,29 @@ For more voice options:
 wyoming-piper --list-voices
 ```
 
+### Monitoring Wyoming-Piper TTS Server
+
+**View TTS logs in real-time:**
+```bash
+# In a separate terminal
+tail -f /tmp/wyoming-piper.log
+```
+
+**Watch TTS requests:**
+```bash
+# See only synthesis requests and errors
+tail -f /tmp/wyoming-piper.log | grep -i 'synthesize\|error'
+```
+
+**Check server status:**
+```bash
+# See if Wyoming-Piper is running
+ps aux | grep wyoming-piper
+
+# Check if it's listening on port 10200
+netstat -tuln | grep 10200
+```
+
 ### Troubleshooting
 
 **TTS server won't start:**
@@ -86,6 +109,9 @@ netstat -tuln | grep 10200
 
 # View TTS server logs
 cat /tmp/wyoming-piper.log
+
+# Kill existing instance if needed
+pkill -f wyoming-piper
 ```
 
 **No audio output:**

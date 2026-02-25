@@ -24,6 +24,16 @@ WHISPER_MODEL="./whisper.cpp/models/ggml-tiny.en.bin"
 LLAMA_MODEL="./models/llama-2-7b-chat.Q4_K_M.gguf"
 TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
 
+# Check if talk-llama-custom is already running and kill it
+if pgrep -f "talk-llama-custom" > /dev/null; then
+    echo -e "${YELLOW}⚠ Found existing talk-llama-custom process(es)${NC}"
+    echo "Killing previous instances..."
+    pkill -9 -f "talk-llama-custom" || true
+    sleep 1
+    echo -e "${GREEN}✓ Cleaned up previous instances${NC}"
+    echo ""
+fi
+
 # Check if Wyoming-Piper is already running
 if pgrep -f "wyoming-piper" > /dev/null; then
     echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
@@ -51,8 +61,9 @@ if ! pgrep -f "wyoming-piper" > /dev/null; then
     # Create data directory if it doesn't exist
     mkdir -p "$PIPER_DATA_DIR"
 
-    # Start Wyoming-Piper in background
+    # Start Wyoming-Piper in background with custom handler
     $WYOMING_PIPER_CMD \
+        --piper /home/paul/.local/bin/piper \
         --voice "$PIPER_VOICE" \
         --data-dir "$PIPER_DATA_DIR" \
         --uri "tcp://0.0.0.0:$WYOMING_PORT" \
@@ -108,23 +119,32 @@ echo ""
 echo "Controls:"
 echo "  - Speak into your microphone to interact"
 echo "  - Say 'stop' to interrupt AI speech"
-echo "  - Press Ctrl+C to exit"
+echo "  - Press Ctrl+C to exit (now with graceful shutdown!)"
 echo ""
 echo "Models:"
 echo "  - Whisper: $WHISPER_MODEL"
 echo "  - LLaMA: $LLAMA_MODEL"
 echo "  - TTS Voice: $PIPER_VOICE"
 echo ""
+echo "Monitoring:"
+echo "  - Wyoming-Piper log: tail -f /tmp/wyoming-piper.log"
+echo "  - To watch TTS requests in another terminal:"
+echo "    tail -f /tmp/wyoming-piper.log | grep -i 'synthesize\\|error'"
+echo ""
 echo "=========================================="
 echo ""
 
 # Start the voice assistant
+# VAD threshold lowered to 0.30 for better voice detection
+# Print energy enabled to help debug audio issues
 $TALK_LLAMA_BIN \
     -ml "$LLAMA_MODEL" \
     -mw "$WHISPER_MODEL" \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
-    --temp 0.5
+    --temp 0.5 \
+    -vth 0.30 \
+    -pe
 
 # Cleanup on exit
 echo ""

@@ -48,6 +48,22 @@
 #include "tts-socket.h"
 #include "tts-request.h"
 
+// Signal handling for graceful shutdown
+volatile sig_atomic_t g_sigint_received = 0;
+
+void sigint_handler(int sig) {
+	static int sigint_count = 0;
+	sigint_count++;
+	if (sigint_count == 1) {
+		fprintf(stderr, "\n\nCaught signal %d (Ctrl+C), shutting down gracefully...\n", sig);
+		fprintf(stderr, "Press Ctrl+C again to force quit.\n");
+		g_sigint_received = 1;
+	} else {
+		fprintf(stderr, "\n\nForce quit! Exiting immediately...\n");
+		exit(1);
+	}
+}
+
 // global
 std::string g_hotkey_pressed = "";
 
@@ -1394,6 +1410,9 @@ The transcript only includes text, it does not include markup like HTML and Mark
 
 int run(int argc, const char **argv)
 {
+	// Set up signal handlers
+	signal(SIGINT, sigint_handler);
+	signal(SIGTERM, sigint_handler);
 
 	whisper_params params;
 	std::vector<std::thread> threads;
@@ -1849,6 +1868,13 @@ int run(int argc, const char **argv)
 	// main loop
 	while (is_running)
 	{
+		// Check for signal
+		if (g_sigint_received) {
+			fprintf(stderr, "Signal received, exiting main loop...\n");
+			is_running = false;
+			break;
+		}
+
 		// // handle Ctrl + C
 		is_running = sdl_poll_events();
 
@@ -1933,7 +1959,9 @@ int run(int argc, const char **argv)
 					vad_result = 2; // Speech ended - trigger processing
 				}
 			} else {
-				vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
+				// vad_simple returns true for silence, false for speech - we want 1 for speech, 0 for silence
+				// So invert the result
+				vad_result = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy) ? 1 : 0;
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
 			{

@@ -788,7 +788,9 @@ bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float
     energy_last /= n_samples_last;
 
     if (verbose) {
-        fprintf(stderr, "%s: energy_all: %f, energy_last: %f, vad_thold: %f, freq_thold: %f\n", __func__, energy_all, energy_last, vad_thold, freq_thold);
+        // Use \r to update the same line instead of flooding output
+        fprintf(stderr, "\r%s: energy_all: %.6f, energy_last: %.6f, vad_thold: %.2f, freq_thold: %.2f    ", __func__, energy_all, energy_last, vad_thold, freq_thold);
+        fflush(stderr);
     }
 
     if (energy_last > vad_thold*energy_all) {
