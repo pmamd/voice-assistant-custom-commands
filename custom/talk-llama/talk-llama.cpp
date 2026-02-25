@@ -1875,6 +1875,12 @@ int run(int argc, const char **argv)
 	float speech_len = 0;
 	int len_in_samples = 0;
 	std::string all_heard_pre;
+
+	// VAD debouncing counters to prevent rapid state changes
+	int vad_speech_count = 0;      // Consecutive frames with speech detected
+	int vad_silence_count = 0;     // Consecutive frames with silence detected
+	const int VAD_START_THRESHOLD = 3;  // Need 3 consecutive speech frames to start
+	const int VAD_END_THRESHOLD = 10;   // Need 10 consecutive silence frames to end (500ms at 50ms/frame)
 	int llama_interrupted = 0;
 	float llama_interrupted_time = 0.0;
 	llama_start_time = 0.0;
@@ -1979,19 +1985,44 @@ int run(int argc, const char **argv)
 				}
 			} else {
 				// vad_simple returns true for silence, false for speech
-				// We need to implement a state machine:
+				// We need to implement a debounced state machine:
 				// vad_result = 0: silence (no speech detected)
-				// vad_result = 1: speech started (transition from silence to speech)
+				// vad_result = 1: speech ongoing (confirmed speech)
 				// vad_result = 2: speech ended (transition from speech to silence)
 
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
+				// Update debouncing counters
 				if (is_speech) {
-					// Speech is happening
-					vad_result = (vad_result_prev == 1) ? 1 : 1;  // Keep at 1 if already speaking, or set to 1 if just started
+					vad_speech_count++;
+					vad_silence_count = 0;
 				} else {
-					// Silence
-					vad_result = (vad_result_prev == 1) ? 2 : 0;  // If was speaking, set to 2 (ended), otherwise stay at 0
+					vad_silence_count++;
+					vad_speech_count = 0;
+				}
+
+				// State machine with debouncing
+				if (vad_result_prev == 0 || vad_result_prev == 2) {
+					// Currently in silence state
+					if (vad_speech_count >= VAD_START_THRESHOLD) {
+						// Enough consecutive speech frames detected - transition to speech
+						vad_result = 1;
+					} else {
+						// Stay in silence
+						vad_result = 0;
+					}
+				} else if (vad_result_prev == 1) {
+					// Currently in speech state
+					if (vad_silence_count >= VAD_END_THRESHOLD) {
+						// Enough consecutive silence frames - transition to speech ended
+						vad_result = 2;
+					} else {
+						// Stay in speech state (even during brief silence)
+						vad_result = 1;
+					}
+				} else {
+					// Fallback
+					vad_result = 0;
 				}
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
