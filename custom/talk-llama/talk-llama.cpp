@@ -1875,12 +1875,6 @@ int run(int argc, const char **argv)
 	float speech_len = 0;
 	int len_in_samples = 0;
 	std::string all_heard_pre;
-
-	// VAD debouncing counters to prevent rapid state changes
-	int vad_speech_count = 0;      // Consecutive frames with speech detected
-	int vad_silence_count = 0;     // Consecutive frames with silence detected
-	const int VAD_START_THRESHOLD = 3;  // Need 3 consecutive speech frames to start
-	const int VAD_END_THRESHOLD = 10;   // Need 10 consecutive silence frames to end (500ms at 50ms/frame)
 	int llama_interrupted = 0;
 	float llama_interrupted_time = 0.0;
 	llama_start_time = 0.0;
@@ -1985,55 +1979,29 @@ int run(int argc, const char **argv)
 				}
 			} else {
 				// vad_simple returns true for silence, false for speech
-				// We need to implement a debounced state machine:
+				// We need to implement a state machine:
 				// vad_result = 0: silence (no speech detected)
-				// vad_result = 1: speech ongoing (confirmed speech)
+				// vad_result = 1: speech started (transition from silence to speech)
 				// vad_result = 2: speech ended (transition from speech to silence)
 
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
-				// Update debouncing counters
 				if (is_speech) {
-					vad_speech_count++;
-					vad_silence_count = 0;
+					// Speech is happening
+					vad_result = (vad_result_prev == 1) ? 1 : 1;  // Keep at 1 if already speaking, or set to 1 if just started
 				} else {
-					vad_silence_count++;
-					vad_speech_count = 0;
-				}
-
-				// State machine with debouncing
-				if (vad_result_prev == 0 || vad_result_prev == 2) {
-					// Currently in silence state
-					if (vad_speech_count >= VAD_START_THRESHOLD) {
-						// Enough consecutive speech frames detected - transition to speech
-						vad_result = 1;
-					} else {
-						// Stay in silence
-						vad_result = 0;
-					}
-				} else if (vad_result_prev == 1) {
-					// Currently in speech state
-					if (vad_silence_count >= VAD_END_THRESHOLD) {
-						// Enough consecutive silence frames - transition to speech ended
-						vad_result = 2;
-					} else {
-						// Stay in speech state (even during brief silence)
-						vad_result = 1;
-					}
-				} else {
-					// Fallback
-					vad_result = 0;
+					// Silence
+					vad_result = (vad_result_prev == 1) ? 2 : 0;  // If was speaking, set to 2 (ended), otherwise stay at 0
 				}
 			}
-
-			// Process VAD state transitions
 			if (vad_result == 1 && params.vad_start_thold) // speech started
 			{
 				//printf("VAD result 1\n"); // debug)
-				if (vad_result_prev != 1) // real start (first frame of speech)
+				if (vad_result_prev != 1) // real start
 				{
 					speech_start_ms = get_current_time_ms(); // float
-					fprintf(stderr, "VAD: Speech started at %.3f (speech_count=%d)\n", speech_start_ms, vad_speech_count);
+					vad_result_prev = 1;
+					fprintf(stderr, "VAD: Speech started at %.3f\n", speech_start_ms);
 
 					// whisper warmup request, not real one
 					// audio.get((int)(speech_len*1000), pcmf32_cur);
@@ -2059,8 +2027,8 @@ int run(int argc, const char **argv)
 				//printf("VAD result 2\n"); // debug)
 				speech_end_ms = get_current_time_ms(); // float in seconds.ms
 				speech_len = speech_end_ms - speech_start_ms;
-				fprintf(stderr, "VAD: Speech ended at %.3f, start was %.3f, raw_len=%.3f (silence_count=%d)\n",
-					speech_end_ms, speech_start_ms, speech_len, vad_silence_count);
+				fprintf(stderr, "VAD: Speech ended at %.3f, start was %.3f, raw_len=%.3f\n",
+					speech_end_ms, speech_start_ms, speech_len);
 				if (speech_len < 0.10)
 					speech_len = 0;
 				else if (speech_len > 10.0)
