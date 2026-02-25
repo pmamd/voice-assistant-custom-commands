@@ -111,6 +111,55 @@ fi
 echo -e "${GREEN}✓ All required files found${NC}"
 echo ""
 
+# Detect available microphones
+echo "Detecting audio devices..."
+CAPTURE_DEVICE="-1"  # Default: use default device
+
+# Get list of capture devices using SDL
+if command -v arecord &> /dev/null; then
+    # Get list of ALSA capture devices
+    DEVICE_LIST=$(arecord -l 2>/dev/null | grep "^card" | sed 's/card \([0-9]\+\).*device \([0-9]\+\).*/hw:\1,\2/' || echo "")
+
+    if [ -n "$DEVICE_LIST" ]; then
+        DEVICE_COUNT=$(echo "$DEVICE_LIST" | wc -l)
+
+        if [ "$DEVICE_COUNT" -gt 1 ]; then
+            echo ""
+            echo "Multiple microphones detected:"
+            echo "0: Default microphone"
+
+            DEVICE_NUM=1
+            while IFS= read -r device; do
+                DEVICE_NAME=$(arecord -l 2>/dev/null | grep "$device" | sed 's/.*: \(.*\) \[.*/\1/')
+                echo "$DEVICE_NUM: $DEVICE_NAME ($device)"
+                DEVICE_NUM=$((DEVICE_NUM + 1))
+            done <<< "$DEVICE_LIST"
+
+            echo ""
+            read -p "Select microphone (0-$((DEVICE_COUNT))): " -n 1 -r MIC_CHOICE
+            echo ""
+
+            if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -le "$DEVICE_COUNT" ]; then
+                if [ "$MIC_CHOICE" -eq 0 ]; then
+                    CAPTURE_DEVICE="-1"
+                    echo -e "${GREEN}✓ Using default microphone${NC}"
+                else
+                    # SDL uses 0-indexed device IDs, but we're showing 1-indexed
+                    CAPTURE_DEVICE=$((MIC_CHOICE - 1))
+                    echo -e "${GREEN}✓ Using microphone $MIC_CHOICE${NC}"
+                fi
+            else
+                echo -e "${YELLOW}⚠ Invalid selection, using default${NC}"
+                CAPTURE_DEVICE="-1"
+            fi
+        else
+            echo -e "${GREEN}✓ Using default microphone${NC}"
+        fi
+    fi
+fi
+
+echo ""
+
 # Instructions
 echo "=========================================="
 echo "Starting Voice Assistant"
@@ -144,6 +193,7 @@ $TALK_LLAMA_BIN \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
     -vth 1.2 \
+    -c "$CAPTURE_DEVICE" \
     -pe
 
 # Cleanup on exit
