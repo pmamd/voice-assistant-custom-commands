@@ -131,7 +131,7 @@ class PiperEventHandler(AsyncEventHandler):
             piper_proc = await self.process_manager.get_process(voice_name=voice_name)
 
             assert piper_proc.proc.stdin is not None
-            assert piper_proc.proc.stdout is not None
+            assert piper_proc.proc.stderr is not None
 
             # Send plain text to stdin (piper-tts 1.4.1 doesn't support --json-input)
             # Speaker is passed as command-line arg in process.py
@@ -139,9 +139,9 @@ class PiperEventHandler(AsyncEventHandler):
             piper_proc.proc.stdin.write((text + "\n").encode("utf-8"))
             await piper_proc.proc.stdin.drain()
 
-            # Piper outputs "INFO:__main__:Wrote /path/to/file.wav"
+            # Piper outputs "INFO:__main__:Wrote /path/to/file.wav" to stderr
             # Extract just the path
-            output_line = (await piper_proc.proc.stdout.readline()).decode().strip()
+            output_line = (await piper_proc.proc.stderr.readline()).decode().strip()
             _LOGGER.debug("Piper output: %s", output_line)
 
             # Extract path from "INFO:__main__:Wrote /path/to/file.wav"
