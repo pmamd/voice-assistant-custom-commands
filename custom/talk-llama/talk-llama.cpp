@@ -527,16 +527,16 @@ void whisper_print_usage(int /*argc*/, const char **argv, const whisper_params &
 	fprintf(stderr, "\n");
 }
 
-// returns seconds since epoch with milliseconds. e.g. 15244.575 (15244 s and 575 ms)
-float get_current_time_ms()
+// returns seconds since epoch with microsecond precision. e.g. 15244.575123 (15244 s and 575.123 ms)
+double get_current_time_ms()
 {
 	auto now = std::chrono::high_resolution_clock::now();
 
-	// Convert to milliseconds since the Unix epoch
+	// Convert to microseconds since the Unix epoch for higher precision
 	auto duration = now.time_since_epoch();
-	float millis = (float)std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000;
+	double micros = (double)std::chrono::duration_cast<std::chrono::microseconds>(duration).count() / 1000000.0;
 
-	return millis;
+	return micros;
 }
 
 std::string transcribe(
@@ -1675,7 +1675,7 @@ int run(int argc, const char **argv)
 	printf("\n");
 	printf("%s : initializing - please wait ...\n", __func__);
 
-	float llama_start_time = get_current_time_ms();
+	double llama_start_time = get_current_time_ms();
 
 	// NEW prompt eval
 	int n_past = 0;
@@ -1693,10 +1693,10 @@ int run(int argc, const char **argv)
 		n_past += chunk_size;
 	}
 
-	float llama_end_time = get_current_time_ms();
-	float llama_time_total = 0;
-	float llama_time_input = 0;
-	float llama_time_output = 0;
+	double llama_end_time = get_current_time_ms();
+	double llama_time_total = 0;
+	double llama_time_input = 0;
+	double llama_time_output = 0;
 
 	llama_time_total = llama_end_time - llama_start_time;
 	printf(" \nLlama start prompt: %d/%d tokens in %.3f s at %.0f t/s\n", embd_inp.size(), params.ctx_size, llama_time_total, embd_inp.size() / llama_time_total);
@@ -1870,15 +1870,15 @@ int run(int argc, const char **argv)
 	printf("%s%s ", params.person.c_str(), chat_symb.c_str());
 	fflush(stdout);
 	int vad_result_prev = 2; // ended
-	float speech_start_ms = 0;
-	float speech_end_ms = 0;
-	float speech_len = 0;
+	double speech_start_ms = 0;
+	double speech_end_ms = 0;
+	double speech_len = 0;
 	int len_in_samples = 0;
 	std::string all_heard_pre;
 	int llama_interrupted = 0;
-	float llama_interrupted_time = 0.0;
+	double llama_interrupted_time = 0.0;
 	llama_start_time = 0.0;
-	float llama_start_generation_time = 0.0; //  after prompt processing
+	double llama_start_generation_time = 0.0; //  after prompt processing
 	llama_end_time = 0.0;
 	llama_time_total = 0.0;
 	std::string user_typed = "";
@@ -1999,9 +1999,9 @@ int run(int argc, const char **argv)
 				//printf("VAD result 1\n"); // debug)
 				if (vad_result_prev != 1) // real start
 				{
-					speech_start_ms = get_current_time_ms(); // float
+					speech_start_ms = get_current_time_ms(); // double with microsecond precision
 					vad_result_prev = 1;
-					fprintf(stderr, "VAD: Speech started at %.3f\n", speech_start_ms);
+					fprintf(stderr, "VAD: Speech started at %.6f\n", speech_start_ms);
 
 					// whisper warmup request, not real one
 					// audio.get((int)(speech_len*1000), pcmf32_cur);
@@ -2025,9 +2025,9 @@ int run(int argc, const char **argv)
 			if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
 				//printf("VAD result 2\n"); // debug)
-				speech_end_ms = get_current_time_ms(); // float in seconds.ms
+				speech_end_ms = get_current_time_ms(); // double with microsecond precision
 				speech_len = speech_end_ms - speech_start_ms;
-				fprintf(stderr, "VAD: Speech ended at %.3f, start was %.3f, raw_len=%.3f\n",
+				fprintf(stderr, "VAD: Speech ended at %.6f, start was %.6f, raw_len=%.6f\n",
 					speech_end_ms, speech_start_ms, speech_len);
 				if (speech_len < 0.10)
 					speech_len = 0;
