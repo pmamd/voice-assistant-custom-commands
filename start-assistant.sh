@@ -16,9 +16,9 @@ echo "=========================================="
 echo ""
 
 # Configuration
-# Use system Wyoming-Piper (patched with queue depth logging)
-WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper"
-WYOMING_PIPER_DIR=""  # Not needed for system installation
+# Use custom Wyoming-Piper with aplay support (no audio streaming)
+WYOMING_PIPER_CMD="python3 __main__.py"
+WYOMING_PIPER_DIR="./custom/wyoming-piper"
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
@@ -52,17 +52,19 @@ fi
 
 # Start Wyoming-Piper if not running
 if ! pgrep -f "wyoming-piper" > /dev/null; then
-    echo -e "${GREEN}Starting Wyoming-Piper TTS server...${NC}"
+    echo -e "${GREEN}Starting Wyoming-Piper TTS server (custom version)...${NC}"
 
     # Create data directory if it doesn't exist
     mkdir -p "$PIPER_DATA_DIR"
 
-    # Start system Wyoming-Piper
-    $WYOMING_PIPER_CMD \
+    # Start custom Wyoming-Piper
+    cd "$WYOMING_PIPER_DIR" && $WYOMING_PIPER_CMD \
+        --piper /home/paul/.local/bin/piper \
         --voice "$PIPER_VOICE" \
-        --data-dir "$PIPER_DATA_DIR" \
+        --data-dir "../../$PIPER_DATA_DIR" \
         --uri "tcp://0.0.0.0:$WYOMING_PORT" \
         > /tmp/wyoming-piper.log 2>&1 &
+    cd - > /dev/null
     
     WYOMING_PID=$!
     echo "Wyoming-Piper started (PID: $WYOMING_PID)"
