@@ -555,7 +555,9 @@ std::string transcribe(
 {
 	const auto t_start = std::chrono::high_resolution_clock::now();
 
-	printf("%.3f in transcribe\n", get_current_time_ms());
+	if (params.debug) {
+		printf("%.3f in transcribe\n", get_current_time_ms());
+	}
 	prob = 0.0f;
 	t_ms = 0;
 
@@ -608,7 +610,9 @@ std::string transcribe(
 			++prob_n;
 		}
 	}
-	printf("%.3f after n_segments\n", get_current_time_ms());
+	if (params.debug) {
+		printf("%.3f after n_segments\n", get_current_time_ms());
+	}
 
 	if (prob_n > 0)
 	{
@@ -1120,7 +1124,9 @@ void send_tts_async(std::string text, std::string speaker_wav = "emma_1", std::s
 int hSocket, read_size;
     struct sockaddr_in server; // for tts-socket
 
-	std::cout << "send_tts_async: " << text; // debug
+	if (params.debug) {
+		std::cout << "send_tts_async: " << text;
+	}
 
 	// remove (text) and <tag> using regex
 	if (text[0] == '(' && text[text.size() - 1] != ')')
@@ -1221,16 +1227,20 @@ int hSocket, read_size;
 			printf("Could not create socket\n");
 			return;
 		}
-		printf("Socket is created\n");
+		if (params.debug) {
+			printf("Socket is created\n");
+		}
 		//Connect to remote server
 		if (TTS_SocketConnect(hSocket) < 0)
 		{
 			perror("connect failed.\n");
 			return;
 		}
-		printf("Sucessfully conected with server\n");
-		printf("Sending request to server:\n");
-		printf("%s\n", json);
+		if (params.debug) {
+			printf("Sucessfully conected with server\n");
+			printf("Sending request to server:\n");
+			printf("%s\n", json);
+		}
 		// gets(SendToServer);
 		//Send data to the server
 		TTS_SocketSend(hSocket, json, strlen(json));
@@ -2116,7 +2126,9 @@ int run(int argc, const char **argv)
 					speech_len = 0;
 				else if (speech_len > 10.0)
 					speech_len = 0;
-				printf("%.3f found vad length: %.2f\n", get_current_time_ms(), speech_len);
+				if (params.debug) {
+					printf("%.3f found vad length: %.2f\n", get_current_time_ms(), speech_len);
+				}
 				// len_in_samples = (int)(WHISPER_SAMPLE_RATE * speech_len);
 				// if (len_in_samples && len_in_samples < pcmf32_cur.size())
 				//{
@@ -2140,7 +2152,9 @@ int run(int argc, const char **argv)
 				}
 				// In test mode, pcmf32_cur already has the test data from earlier injection
 				std::string all_heard;
-				printf("%.3f after vad-end (%d)\n", get_current_time_ms(), pcmf32_cur.size());
+				if (params.debug) {
+					printf("%.3f after vad-end (%d)\n", get_current_time_ms(), pcmf32_cur.size());
+				}
 				if (user_typed.size())
 				{
 					all_heard = user_typed;
@@ -2150,13 +2164,19 @@ int run(int argc, const char **argv)
 				{
 					if (!params.push_to_talk || (params.push_to_talk && g_hotkey_pressed == "Alt"))
 					{
-						printf("%.3f before transcribe, buffer size: %d\n", get_current_time_ms(), pcmf32_cur.size());
+						if (params.debug) {
+							printf("%.3f before transcribe, buffer size: %d\n", get_current_time_ms(), pcmf32_cur.size());
+						}
 						all_heard = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms)); // real transcribe
-						printf("%.3f after transcribe, result: '%s'\n", get_current_time_ms(), all_heard.c_str());
+						if (params.debug) {
+							printf("%.3f after transcribe, result: '%s'\n", get_current_time_ms(), all_heard.c_str());
+						}
 						g_hotkey_pressed = "";
 					}
 				}
-				printf("%.3f after real whisper\n", get_current_time_ms());
+				if (params.debug) {
+					printf("%.3f after real whisper\n", get_current_time_ms());
+				}
 
 				const auto words = get_words(all_heard);
 
@@ -2532,9 +2552,11 @@ int run(int argc, const char **argv)
 				force_speak = false;
 				test_audio_injected = false; // Reset for test mode
 				trim(text_heard);
-				fprintf(stdout, "text_heard %s:\n", text_heard.c_str());
-				for (char ch : text_heard) printf("%X ", ch);
-				printf("\n\n");
+				if (params.debug) {
+					fprintf(stdout, "text_heard %s:\n", text_heard.c_str());
+					for (char ch : text_heard) printf("%X ", ch);
+					printf("\n\n");
+				}
 
 				text_heard_prev = text_heard;
 				n_past_prev = embd_inp.size();
