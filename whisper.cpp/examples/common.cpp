@@ -765,8 +765,8 @@ bool vad_simple(std::vector<float> & pcmf32, int sample_rate, int last_ms, float
     const int n_samples_last = (sample_rate * last_ms) / 1000;
 
     if (n_samples_last >= n_samples) {
-        // not enough samples - assume no speech
-        return false;
+        // not enough samples - assume no speech (return true = silence)
+        return true;
     }
 
     if (freq_thold > 0.0f) {

@@ -143,7 +143,7 @@ struct whisper_params
 
 	float vad_thold = 0.6f;
 	float vad_start_thold = 0.000270f; // 0 to turn off, you can see your current energy_last (loudness level) when running with --print-energy param
-	float vad_last_ms = 1250;
+	int vad_last_ms = 1250;  // Changed from float to int to match vad_simple signature
 	float freq_thold = 100.0f;
 	float min_energy = 0.0012f; // Minimum energy threshold to prevent TTS feedback
 
