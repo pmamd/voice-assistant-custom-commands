@@ -1245,9 +1245,15 @@ int hSocket, read_size;
 		//Send data to the server
 		TTS_SocketSend(hSocket, json, strlen(json));
 		free(json);
-		//Received the data from the server
-		// read_size = SocketReceive(hSocket, server_reply, 200);
-		// printf("Server Response : %s\n\n",server_reply);
+
+		// Wait for server response before closing (prevents BrokenPipeError)
+		char server_reply[1024];
+		int read_size = recv(hSocket, server_reply, sizeof(server_reply) - 1, 0);
+		if (read_size > 0 && debug) {
+			server_reply[read_size] = '\0';
+			printf("Server Response: %s\n", server_reply);
+		}
+
 		close(hSocket);
 		shutdown(hSocket,0);
 		shutdown(hSocket,1);
