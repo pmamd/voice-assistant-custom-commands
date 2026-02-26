@@ -17,7 +17,7 @@ echo ""
 
 # Configuration
 # Use custom Wyoming-Piper with queue depth logging
-WYOMING_PIPER_CMD="python3 -m wyoming_piper"
+WYOMING_PIPER_CMD="python3 __main__.py"
 WYOMING_PIPER_DIR="./custom/wyoming-piper"
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
