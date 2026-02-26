@@ -10,7 +10,12 @@ from typing import Any, Dict, Set
 from wyoming.info import Attribution, Info, TtsProgram, TtsVoice, TtsVoiceSpeaker
 from wyoming.server import AsyncServer
 
-from . import __version__
+try:
+    from . import __version__
+except ImportError:
+    # Fallback if __version__ is not available (editable install)
+    __version__ = "2.2.2"
+
 from .download import find_voice, get_voices
 from .handler import PiperEventHandler
 from .process import PiperProcessManager
