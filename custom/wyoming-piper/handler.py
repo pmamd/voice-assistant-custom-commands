@@ -88,33 +88,6 @@ class PiperEventHandler(AsyncEventHandler):
         # Clear at the start of a new synthesize event
         STOP_CMD = False
 
-        # begin Debug
-        _LOGGER.debug("Debug")
-        #_LOGGER.debug(event)
-
-        event_dict: Dict[str, Any] = event.to_dict()
-        event_dict[wyoming.event._VERSION] = wyoming.event._VERSION_NUMBER
-
-        data_dict = event_dict.pop(wyoming.event._DATA, None)
-        data_bytes: Optional[bytes] = None
-        if data_dict:
-            data_bytes = json.dumps(data_dict, ensure_ascii=False).encode("utf-8")
-            event_dict[wyoming.event._DATA_LENGTH] = len(data_bytes)
-
-        if event.payload:
-            event_dict[wyoming.event._PAYLOAD_LENGTH] = len(event.payload)
-
-        json_line = json.dumps(event_dict, ensure_ascii=False)
-
-        _LOGGER.debug(json_line.encode())
-        _LOGGER.debug(wyoming.event._NEWLINE)
-        if data_bytes:
-            _LOGGER.debug(data_bytes)
-
-        if event.payload:
-            _LOGGER.debug(event.payload)
-
-        # end Debug
         synthesize = Synthesize.from_event(event)
         _LOGGER.debug(synthesize)
 
@@ -135,10 +108,7 @@ class PiperEventHandler(AsyncEventHandler):
                 text = text + self.cli_args.auto_punctuation[0]
 
         async with self.process_manager.processes_lock:
-            # Log queue depth before processing
             global ACTIVE_APLAY_PROCESSES
-            queue_depth = len(ACTIVE_APLAY_PROCESSES)
-            _LOGGER.info(f"📊 Queue depth BEFORE synthesis: {queue_depth} chunks currently playing")
             _LOGGER.debug("synthesize: raw_text=%s, text='%s'", raw_text, text)
             voice_name: Optional[str] = None
             voice_speaker: Optional[str] = None
@@ -201,8 +171,6 @@ class PiperEventHandler(AsyncEventHandler):
 
                 # Track this process so stop command can kill it
                 ACTIVE_APLAY_PROCESSES.append(aplay_proc)
-                queue_depth_after = len(ACTIVE_APLAY_PROCESSES)
-                _LOGGER.info(f"🎵 Queue depth AFTER adding to playback: {queue_depth_after} chunks now playing")
 
                 try:
                     await aplay_proc.proc.wait()
@@ -210,8 +178,6 @@ class PiperEventHandler(AsyncEventHandler):
                     # Remove from active list when done
                     if aplay_proc in ACTIVE_APLAY_PROCESSES:
                         ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
-                        remaining = len(ACTIVE_APLAY_PROCESSES)
-                        _LOGGER.info(f"✅ Playback finished. Queue depth now: {remaining} chunks remaining")
 
         _LOGGER.debug("Completed request")
 

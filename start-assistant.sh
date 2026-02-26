@@ -187,8 +187,6 @@ echo "=========================================="
 echo ""
 
 # Start the voice assistant
-# VAD threshold lowered to 0.30 for better voice detection
-# Print energy enabled to help debug audio issues
 $TALK_LLAMA_BIN \
     -ml "$LLAMA_MODEL" \
     -mw "$WHISPER_MODEL" \
@@ -196,8 +194,7 @@ $TALK_LLAMA_BIN \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
     -vth 1.2 \
-    -c "$CAPTURE_DEVICE" \
-    -pe
+    -c "$CAPTURE_DEVICE"
 
 # Cleanup on exit
 echo ""

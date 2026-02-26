@@ -1563,13 +1563,11 @@ int run(int argc, const char **argv)
 	bool test_audio_injected = false; // Track if we've injected test audio
 
 	if (test_mode) {
-		fprintf(stderr, "%s: TEST MODE - loading audio from: %s\n", __func__, params.test_input_file.c_str());
 		std::vector<std::vector<float>> test_audio_stereo;
 		if (!read_wav(params.test_input_file, test_audio_data, test_audio_stereo, false)) {
 			fprintf(stderr, "%s: failed to read test input file: %s\n", __func__, params.test_input_file.c_str());
 			return 1;
 		}
-		fprintf(stderr, "%s: loaded %d audio samples from test file\n", __func__, (int)test_audio_data.size());
 	}
 
 	audio_async audio(15 * 1000); // length_ms
@@ -2018,7 +2016,6 @@ int run(int argc, const char **argv)
 				pcmf32_cur = test_audio_data;
 				test_audio_data.clear(); // Use only once
 				test_audio_injected = true;
-				fprintf(stderr, "%s: injected test audio data (%d samples)\n", __func__, (int)pcmf32_cur.size());
 			} else if (!test_mode) {
 				audio.get(2000, pcmf32_cur); // step_ms, async
 			}
@@ -2094,7 +2091,6 @@ int run(int argc, const char **argv)
 				{
 					speech_start_ms = get_current_time_ms(); // double with microsecond precision
 					vad_result_prev = 1;
-					fprintf(stderr, "VAD: Speech started at %.6f\n", speech_start_ms);
 
 					// whisper warmup request, not real one
 					// audio.get((int)(speech_len*1000), pcmf32_cur);
@@ -2120,8 +2116,6 @@ int run(int argc, const char **argv)
 				//printf("VAD result 2\n"); // debug)
 				speech_end_ms = get_current_time_ms(); // double with microsecond precision
 				speech_len = speech_end_ms - speech_start_ms;
-				fprintf(stderr, "VAD: Speech ended at %.6f, start was %.6f, raw_len=%.6f\n",
-					speech_end_ms, speech_start_ms, speech_len);
 				if (speech_len < 0.10)
 					speech_len = 0;
 				else if (speech_len > 10.0)
@@ -3206,7 +3200,6 @@ int run(int argc, const char **argv)
 							t.join();
 						}
 					}
-					fprintf(stderr, "%s: TEST MODE - all TTS complete, exiting\n", __func__);
 					_exit(0);
 				}
 			}
