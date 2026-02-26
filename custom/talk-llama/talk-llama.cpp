@@ -2017,7 +2017,7 @@ int run(int argc, const char **argv)
 				test_audio_data.clear(); // Use only once
 				test_audio_injected = true;
 			} else if (!test_mode) {
-				audio.get(2000, pcmf32_cur); // step_ms, async
+				audio.get(1000, pcmf32_cur); // step_ms, async - reduced to 1s for better responsiveness
 			}
 			// In test mode after injection, don't get more audio
 

@@ -100,7 +100,7 @@ async def main() -> None:
         args.download_dir = args.data_dir[0]
 
     logging.basicConfig(
-        level=logging.DEBUG if args.debug else logging.INFO, format=args.log_format
+        level=logging.DEBUG if args.debug else logging.WARNING, format=args.log_format
     )
     _LOGGER.debug(args)
 
