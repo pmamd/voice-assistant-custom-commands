@@ -52,14 +52,13 @@ fi
 
 # Start Wyoming-Piper if not running
 if ! pgrep -f "wyoming-piper" > /dev/null; then
-    echo -e "${GREEN}Starting Wyoming-Piper TTS server (patched with queue logging)...${NC}"
+    echo -e "${GREEN}Starting Wyoming-Piper TTS server...${NC}"
 
     # Create data directory if it doesn't exist
     mkdir -p "$PIPER_DATA_DIR"
 
-    # Start system Wyoming-Piper (patched with queue depth logging)
+    # Start system Wyoming-Piper
     $WYOMING_PIPER_CMD \
-        --piper /home/paul/.local/bin/piper \
         --voice "$PIPER_VOICE" \
         --data-dir "$PIPER_DATA_DIR" \
         --uri "tcp://0.0.0.0:$WYOMING_PORT" \
