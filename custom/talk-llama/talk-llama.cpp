@@ -1119,12 +1119,12 @@ std::string emb_to_str(llama_context *ctx_llama, const std::vector<llama_token> 
 // async curl, but it's still blocking for some reason
 // use in a new thread for non-blocking
 // doesn't wait for responce
-void send_tts_async(std::string text, std::string speaker_wav = "emma_1", std::string language = "en", std::string tts_url = "http://localhost:8020/", int reply_part = 0)
+void send_tts_async(std::string text, std::string speaker_wav = "emma_1", std::string language = "en", std::string tts_url = "http://localhost:8020/", int reply_part = 0, bool debug = false)
 {
 int hSocket, read_size;
     struct sockaddr_in server; // for tts-socket
 
-	if (params.debug) {
+	if (debug) {
 		std::cout << "send_tts_async: " << text;
 	}
 
@@ -1227,7 +1227,7 @@ int hSocket, read_size;
 			printf("Could not create socket\n");
 			return;
 		}
-		if (params.debug) {
+		if (debug) {
 			printf("Socket is created\n");
 		}
 		//Connect to remote server
@@ -1236,7 +1236,7 @@ int hSocket, read_size;
 			perror("connect failed.\n");
 			return;
 		}
-		if (params.debug) {
+		if (debug) {
 			printf("Sucessfully conected with server\n");
 			printf("Sending request to server:\n");
 			printf("%s\n", json);
@@ -1896,7 +1896,7 @@ int run(int argc, const char **argv)
 
 	// Send a simple test message to Wyoming-Piper
 	std::thread tts_test_thread([&params]() {
-		send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url);
+		send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
 	});
 	tts_test_thread.detach();
 
@@ -1986,7 +1986,7 @@ int run(int argc, const char **argv)
 			{
 				// IMMEDIATE STOP: Bypass VAD and Whisper entirely for <100ms latency
 				printf(" [Escape - Immediate Stop!]\n");
-				send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url);
+				send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
 				audio.clear();
 				g_hotkey_pressed = "";
 				continue; // Skip rest of loop, don't process as typed input
@@ -2298,7 +2298,7 @@ int run(int argc, const char **argv)
 											 {
 							if (text_to_speak_arr[current_thread_idx].size())
 							{
-								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url);
+								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, 0, params.debug);
 								text_to_speak_arr[current_thread_idx] = "";
 							} });
 						thread_i++;
@@ -2471,7 +2471,7 @@ int run(int argc, const char **argv)
 					printf(" [Stopped!]\n");
 
 					// CRITICAL FIX: Send stop command to Wyoming-Piper to actually terminate TTS
-					send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url);
+					send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
 
 					text_heard = "";
 					text_heard_trimmed = "";
@@ -2953,7 +2953,7 @@ int run(int argc, const char **argv)
 															 {
 											if (text_to_speak_arr[current_thread_idx].size())
 											{
-												send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx]);
+												send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx], params.debug);
 												text_to_speak_arr[current_thread_idx] = "";
 												reply_part_arr[current_thread_idx] = 0;
 											} });
@@ -3158,7 +3158,7 @@ int run(int argc, const char **argv)
 											 {
 							if (text_to_speak_arr[current_thread_idx].size())
 							{
-								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx]);
+								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx], params.debug);
 								text_to_speak_arr[current_thread_idx] = "";
 								reply_part_arr[current_thread_idx] = 0;
 							} });
