@@ -27,6 +27,8 @@ _LOGGER = logging.getLogger(__name__)
 
 # Variable to flag if the stop command word has been received
 STOP_CMD = False
+# List to track all active aplay processes
+ACTIVE_APLAY_PROCESSES = []
 
 class PiperEventHandler(AsyncEventHandler):
     def __init__(
@@ -58,8 +60,20 @@ class PiperEventHandler(AsyncEventHandler):
         synthesize = Synthesize.from_event(event)
         raw_text = synthesize.text
         if ("stop" in raw_text.lower()) and (len(raw_text) < 10):
-            _LOGGER.debug("Saw STOP event")
+            _LOGGER.debug("Saw STOP event - killing all active aplay processes")
+            global STOP_CMD, ACTIVE_APLAY_PROCESSES
             STOP_CMD = True
+
+            # Kill all currently playing audio
+            for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:  # Copy list to avoid modification during iteration
+                try:
+                    if aplay_proc.proc.returncode is None:  # Process still running
+                        _LOGGER.debug(f"Terminating aplay process {aplay_proc.proc.pid}")
+                        aplay_proc.proc.terminate()
+                        ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
+                except Exception as e:
+                    _LOGGER.warning(f"Error terminating aplay: {e}")
+
             return True
 
         try:
@@ -177,15 +191,20 @@ class PiperEventHandler(AsyncEventHandler):
 
         else:
             # Normal mode: run aplay
+            global ACTIVE_APLAY_PROCESSES
             async with self.process_manager.processes_lock:
                 _LOGGER.debug("Running aplay on " + output_path)
                 aplay_proc = await self.process_manager.get_aplay_process(output_path)
-                await aplay_proc.proc.wait()
-                # Hack to make stop command work
-                # while aplay_proc.proc.wait() is None:
-                #     if (STOP_CMD):
-                #         _LOGGER.debug("Terminating due to stop command")
-                #         aplay_proc.proc.terminate()
+
+                # Track this process so stop command can kill it
+                ACTIVE_APLAY_PROCESSES.append(aplay_proc)
+
+                try:
+                    await aplay_proc.proc.wait()
+                finally:
+                    # Remove from active list when done
+                    if aplay_proc in ACTIVE_APLAY_PROCESSES:
+                        ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
 
         _LOGGER.debug("Completed request")
 
