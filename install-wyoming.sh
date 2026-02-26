@@ -10,12 +10,37 @@ echo "========================================================================"
 
 cd "$(dirname "$0")"
 
-# Step 1: Install Wyoming-Piper from submodule
+# Step 1: Install Wyoming-Piper-Custom from submodule (if not already installed)
 echo ""
-echo "1. Installing Wyoming-Piper from submodule..."
-cd wyoming-piper
-pip install -e .
-cd ..
+echo "1. Checking Wyoming-Piper-Custom installation..."
+
+# Check if already installed
+if pipx list 2>/dev/null | grep -q wyoming-piper-custom || pip show wyoming-piper-custom >/dev/null 2>&1; then
+    echo "   Wyoming-Piper-Custom already installed"
+else
+    echo "   Installing Wyoming-Piper-Custom..."
+    # Try pipx first (recommended for CLI tools)
+    if command -v pipx &> /dev/null; then
+        echo "   Using pipx for installation..."
+        cd wyoming-piper
+        pipx install -e . || {
+            echo "   ⚠ pipx install failed, trying pip..."
+            pip install -e . 2>/dev/null || {
+                echo "   ⚠ pip install also failed (externally-managed-environment)"
+                echo "   File overlay will still work if Wyoming-Piper is already installed"
+            }
+        }
+        cd ..
+    else
+        echo "   pipx not found, trying pip..."
+        cd wyoming-piper
+        pip install -e . || {
+            echo "   ⚠ pip install failed (externally-managed-environment?)"
+            echo "   Consider installing pipx: sudo apt install pipx"
+        }
+        cd ..
+    fi
+fi
 
 # Step 2: Overlay custom files
 echo ""
@@ -44,10 +69,11 @@ echo "========================================================================"
 echo "✓ Installation Complete"
 echo "========================================================================"
 echo ""
-echo "Wyoming-Piper is now installed with custom modifications:"
+echo "Wyoming-Piper-Custom is now installed with custom modifications:"
 echo "  - Uses aplay for local audio playback (no streaming)"
 echo "  - Supports --piper flag to specify piper binary"
 echo "  - Supports stop command detection"
+echo "  - Installs as 'wyoming-piper-custom' (won't conflict with standard)"
 echo ""
 echo "You can now run: ./start-assistant.sh"
 echo ""

@@ -16,8 +16,8 @@ echo "=========================================="
 echo ""
 
 # Configuration
-# Use Wyoming-Piper with custom files installed (aplay support, no audio streaming)
-WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper"
+# Use Wyoming-Piper-Custom with custom files installed (aplay support, no audio streaming)
+WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper-custom"
 WYOMING_PIPER_DIR=""
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
@@ -36,23 +36,23 @@ if pgrep -f "talk-llama-custom" > /dev/null; then
     echo ""
 fi
 
-# Check if Wyoming-Piper is already running
-if pgrep -f "wyoming-piper" > /dev/null; then
-    echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
+# Check if Wyoming-Piper-Custom is already running
+if pgrep -f "wyoming-piper-custom" > /dev/null; then
+    echo -e "${YELLOW}⚠ Wyoming-Piper-Custom is already running${NC}"
     read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Stopping Wyoming-Piper..."
-        pkill -f "wyoming-piper" || true
+        echo "Stopping Wyoming-Piper-Custom..."
+        pkill -f "wyoming-piper-custom" || true
         sleep 2
     else
-        echo "Continuing with existing Wyoming-Piper instance..."
+        echo "Continuing with existing Wyoming-Piper-Custom instance..."
     fi
 fi
 
-# Start Wyoming-Piper if not running
-if ! pgrep -f "wyoming-piper" > /dev/null; then
-    echo -e "${GREEN}Starting Wyoming-Piper TTS server (custom version with aplay)...${NC}"
+# Start Wyoming-Piper-Custom if not running
+if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
+    echo -e "${GREEN}Starting Wyoming-Piper-Custom TTS server (custom version with aplay)...${NC}"
 
     # Create data directory if it doesn't exist
     mkdir -p "$PIPER_DATA_DIR"
@@ -66,15 +66,15 @@ if ! pgrep -f "wyoming-piper" > /dev/null; then
         > /tmp/wyoming-piper.log 2>&1 &
     
     WYOMING_PID=$!
-    echo "Wyoming-Piper started (PID: $WYOMING_PID)"
+    echo "Wyoming-Piper-Custom started (PID: $WYOMING_PID)"
     echo "Log: /tmp/wyoming-piper.log"
-    
+
     # Wait for server to be ready
     echo "Waiting for TTS server to start..."
     sleep 3
-    
-    if ! pgrep -f "wyoming-piper" > /dev/null; then
-        echo -e "${RED}✗ Failed to start Wyoming-Piper${NC}"
+
+    if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
+        echo -e "${RED}✗ Failed to start Wyoming-Piper-Custom${NC}"
         echo "Check log: cat /tmp/wyoming-piper.log"
         exit 1
     fi
@@ -202,15 +202,15 @@ echo "=========================================="
 echo "Shutting down..."
 echo "=========================================="
 
-# Ask if user wants to stop Wyoming-Piper
-read -p "Stop Wyoming-Piper TTS server? (y/N) [default: N] " -n 1 -r
+# Ask if user wants to stop Wyoming-Piper-Custom
+read -p "Stop Wyoming-Piper-Custom TTS server? (y/N) [default: N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Stopping Wyoming-Piper..."
-    pkill -f "wyoming-piper" || true
+    echo "Stopping Wyoming-Piper-Custom..."
+    pkill -f "wyoming-piper-custom" || true
     echo -e "${GREEN}✓ TTS server stopped${NC}"
 else
-    echo "Wyoming-Piper left running in background"
+    echo "Wyoming-Piper-Custom left running in background"
 fi
 
 echo "Goodbye!"
