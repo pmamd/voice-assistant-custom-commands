@@ -135,6 +135,10 @@ class PiperEventHandler(AsyncEventHandler):
                 text = text + self.cli_args.auto_punctuation[0]
 
         async with self.process_manager.processes_lock:
+            # Log queue depth before processing
+            global ACTIVE_APLAY_PROCESSES
+            queue_depth = len(ACTIVE_APLAY_PROCESSES)
+            _LOGGER.info(f"📊 Queue depth BEFORE synthesis: {queue_depth} chunks currently playing")
             _LOGGER.debug("synthesize: raw_text=%s, text='%s'", raw_text, text)
             voice_name: Optional[str] = None
             voice_speaker: Optional[str] = None
@@ -198,6 +202,8 @@ class PiperEventHandler(AsyncEventHandler):
 
                 # Track this process so stop command can kill it
                 ACTIVE_APLAY_PROCESSES.append(aplay_proc)
+                queue_depth_after = len(ACTIVE_APLAY_PROCESSES)
+                _LOGGER.info(f"🎵 Queue depth AFTER adding to playback: {queue_depth_after} chunks now playing")
 
                 try:
                     await aplay_proc.proc.wait()
@@ -205,6 +211,8 @@ class PiperEventHandler(AsyncEventHandler):
                     # Remove from active list when done
                     if aplay_proc in ACTIVE_APLAY_PROCESSES:
                         ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
+                        remaining = len(ACTIVE_APLAY_PROCESSES)
+                        _LOGGER.info(f"✅ Playback finished. Queue depth now: {remaining} chunks remaining")
 
         _LOGGER.debug("Completed request")
 
