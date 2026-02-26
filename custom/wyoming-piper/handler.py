@@ -195,7 +195,6 @@ class PiperEventHandler(AsyncEventHandler):
 
         else:
             # Normal mode: run aplay
-            global ACTIVE_APLAY_PROCESSES
             async with self.process_manager.processes_lock:
                 _LOGGER.debug("Running aplay on " + output_path)
                 aplay_proc = await self.process_manager.get_aplay_process(output_path)
