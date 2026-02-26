@@ -37,7 +37,7 @@ fi
 # Check if Wyoming-Piper is already running
 if pgrep -f "wyoming-piper" > /dev/null; then
     echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
-    read -p "Stop it and restart? (y/n) " -n 1 -r
+    read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "Stopping Wyoming-Piper..."
@@ -126,31 +126,38 @@ if command -v arecord &> /dev/null; then
         if [ "$DEVICE_COUNT" -gt 1 ]; then
             echo ""
             echo "Multiple microphones detected:"
-            echo "0: Default microphone"
 
-            DEVICE_NUM=1
+            # Build array of device names for display
+            DEVICE_NAMES=()
+            DEVICE_NUM=0
             while IFS= read -r device; do
-                DEVICE_NAME=$(arecord -l 2>/dev/null | grep "$device" | sed 's/.*: \(.*\) \[.*/\1/')
-                echo "$DEVICE_NUM: $DEVICE_NAME ($device)"
+                # Convert hw:X,Y format to grep pattern for card X, device Y
+                CARD_NUM=$(echo "$device" | sed 's/hw:\([0-9]\+\),.*/\1/')
+                DEV_NUM=$(echo "$device" | sed 's/hw:[0-9]\+,\([0-9]\+\)/\1/')
+
+                # Extract card name and device name from arecord -l output (extract bracketed names)
+                DEVICE_NAME=$(arecord -l 2>/dev/null | grep -E "card $CARD_NUM:.*device $DEV_NUM:" | sed 's/card [0-9]\+: [^ ]* \[\([^]]*\)\], device [0-9]\+: [^[]*\[\([^]]*\)\].*/\1 - \2/')
+                DEVICE_NAMES+=("$DEVICE_NAME")
+                echo "$DEVICE_NUM: $DEVICE_NAME"
                 DEVICE_NUM=$((DEVICE_NUM + 1))
             done <<< "$DEVICE_LIST"
 
             echo ""
-            read -p "Select microphone (0-$((DEVICE_COUNT))): " -n 1 -r MIC_CHOICE
+            read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -r MIC_CHOICE
             echo ""
 
-            if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -le "$DEVICE_COUNT" ]; then
-                if [ "$MIC_CHOICE" -eq 0 ]; then
-                    CAPTURE_DEVICE="-1"
-                    echo -e "${GREEN}✓ Using default microphone${NC}"
-                else
-                    # SDL uses 0-indexed device IDs, but we're showing 1-indexed
-                    CAPTURE_DEVICE=$((MIC_CHOICE - 1))
-                    echo -e "${GREEN}✓ Using microphone $MIC_CHOICE${NC}"
-                fi
+            # Default to 0 if empty
+            if [ -z "$MIC_CHOICE" ]; then
+                MIC_CHOICE=0
+            fi
+
+            if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -lt "$DEVICE_COUNT" ]; then
+                # SDL uses the device index directly (0-indexed)
+                CAPTURE_DEVICE="$MIC_CHOICE"
+                echo -e "${GREEN}✓ Using microphone $MIC_CHOICE: ${DEVICE_NAMES[$MIC_CHOICE]}${NC}"
             else
-                echo -e "${YELLOW}⚠ Invalid selection, using default${NC}"
-                CAPTURE_DEVICE="-1"
+                echo -e "${YELLOW}⚠ Invalid selection, using default (0)${NC}"
+                CAPTURE_DEVICE="0"
             fi
         else
             echo -e "${GREEN}✓ Using default microphone${NC}"
@@ -203,7 +210,7 @@ echo "Shutting down..."
 echo "=========================================="
 
 # Ask if user wants to stop Wyoming-Piper
-read -p "Stop Wyoming-Piper TTS server? (y/n) " -n 1 -r
+read -p "Stop Wyoming-Piper TTS server? (y/N) [default: N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Stopping Wyoming-Piper..."
