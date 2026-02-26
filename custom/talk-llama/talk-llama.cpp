@@ -143,7 +143,7 @@ struct whisper_params
 
 	float vad_thold = 0.6f;
 	float vad_start_thold = 0.000270f; // 0 to turn off, you can see your current energy_last (loudness level) when running with --print-energy param
-	int vad_last_ms = 1250;  // Changed from float to int to match vad_simple signature
+	int vad_last_ms = 700;  // Reduced from 1250ms to 700ms for faster stop response
 	float freq_thold = 100.0f;
 	float min_energy = 0.0012f; // Minimum energy threshold to prevent TTS feedback
 
@@ -1280,7 +1280,7 @@ bool IsConsoleWindowFocused(HWND cur_window_handle)
 	return (cur_window_handle == GetForegroundWindow());
 }
 
-// Stop: Ctrl+Space
+// Stop: Ctrl+Space or Escape (Escape bypasses VAD/Whisper for immediate stop)
 // Regenerate: Ctrl+Right
 // Delete: Ctrl+Delete
 // Reset: Ctrl+R
@@ -1291,14 +1291,17 @@ void keyboard_shortcut_func(HWND cur_window_handle)
 	bool b_ctr_right_processed = false;
 	bool b_ctr_delete_processed = false;
 	bool b_ctr_r_processed = false;
+	bool b_escape_processed = false;
 	bool b_ctr_space_prev = false;
 	bool b_ctr_right_prev = false;
 	bool b_ctr_delete_prev = false;
 	bool b_ctr_r_prev = false;
+	bool b_escape_prev = false;
 	bool b_ctr_space = false;
 	bool b_ctr_right = false;
 	bool b_ctr_delete = false;
 	bool b_ctr_r = false;
+	bool b_escape = false;
 	bool b_alt = false;
 	bool isFocused = false;
 	g_hotkey_pressed = "";
@@ -1312,6 +1315,7 @@ void keyboard_shortcut_func(HWND cur_window_handle)
 			b_ctr_right = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState(VK_RIGHT) & 0x8000;
 			b_ctr_delete = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState(VK_DELETE) & 0x8000;
 			b_ctr_r = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState('R') & 0x8000;
+			b_escape = GetAsyncKeyState(VK_ESCAPE) & 0x8000;
 			b_alt = GetAsyncKeyState(VK_MENU) & 0x8000;
 
 			if (b_alt)
@@ -1335,6 +1339,23 @@ void keyboard_shortcut_func(HWND cur_window_handle)
 			else if (!b_ctr_space && b_ctr_space_prev && b_ctr_space_processed)
 			{
 				b_ctr_space_processed = false;
+			}
+
+			// Escape key for immediate stop (bypasses VAD and Whisper)
+			if (b_escape && !b_escape_prev)
+			{
+				if (!b_escape_processed)
+				{
+					fflush(stdout);
+					printf("\b"); // remove printed symbols
+					fflush(stdout);
+					g_hotkey_pressed = "Escape";
+					b_escape_processed = true;
+				}
+			}
+			else if (!b_escape && b_escape_prev && b_escape_processed)
+			{
+				b_escape_processed = false;
 			}
 
 			if (b_ctr_right && !b_ctr_right_prev)
@@ -1389,6 +1410,7 @@ void keyboard_shortcut_func(HWND cur_window_handle)
 			b_ctr_right_prev = b_ctr_right;
 			b_ctr_delete_prev = b_ctr_delete;
 			b_ctr_r_prev = b_ctr_r;
+			b_escape_prev = b_escape;
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 	}
@@ -1847,7 +1869,7 @@ int run(int argc, const char **argv)
 	std::thread shortcut_thread([cur_window_handle]()
 								{ keyboard_shortcut_func(cur_window_handle); });
 #endif
-	printf("\nVoice commands: Stop(Ctrl+Space), Regenerate(Ctrl+Right), Delete(Ctrl+Delete), Reset(Ctrl+R)\n");
+	printf("\nVoice commands: Stop(Ctrl+Space or Escape), Regenerate(Ctrl+Right), Delete(Ctrl+Delete), Reset(Ctrl+R)\n");
 
 	// Test Wyoming-Piper TTS connection
 	printf("\n=========================================\n");
@@ -1950,6 +1972,15 @@ int run(int argc, const char **argv)
 			{
 				user_typed = "Stop";
 			}
+			else if (g_hotkey_pressed == "Escape")
+			{
+				// IMMEDIATE STOP: Bypass VAD and Whisper entirely for <100ms latency
+				printf(" [Escape - Immediate Stop!]\n");
+				send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url);
+				audio.clear();
+				g_hotkey_pressed = "";
+				continue; // Skip rest of loop, don't process as typed input
+			}
 			else if (g_hotkey_pressed == "Ctrl+Right")
 			{
 				user_typed = "Regenerate";
@@ -2004,9 +2035,43 @@ int run(int argc, const char **argv)
 
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.min_energy);
 
+				// SMART EARLY STOP DETECTION: Check for high-energy short utterances (like "STOP!")
+				// If speech just started and we detect high energy + short duration, trigger early
+				static double early_trigger_start_time = 0;
+				bool early_trigger = false;
+
+				if (is_speech && vad_result_prev != 1) {
+					// Speech just started - record time
+					early_trigger_start_time = get_current_time_ms();
+				} else if (is_speech && vad_result_prev == 1) {
+					// Speech continuing - check if it's been short + high energy
+					double speech_duration_ms = get_current_time_ms() - early_trigger_start_time;
+
+					// Calculate energy of recent audio (last 300-500ms)
+					int check_samples = std::min((int)pcmf32_cur.size(), (WHISPER_SAMPLE_RATE * 500) / 1000);
+					float recent_energy = 0.0f;
+					for (int i = pcmf32_cur.size() - check_samples; i < pcmf32_cur.size(); i++) {
+						recent_energy += fabsf(pcmf32_cur[i]);
+					}
+					recent_energy /= check_samples;
+
+					// If short duration (300-600ms) + high energy (>0.01, typical of shouted commands)
+					// trigger early without waiting for full VAD silence
+					if (speech_duration_ms >= 300.0 && speech_duration_ms <= 600.0 && recent_energy > 0.01f) {
+						early_trigger = true;
+						if (params.print_energy) {
+							fprintf(stderr, "\n[Early Stop Trigger: dur=%.0fms, energy=%.6f]\n", speech_duration_ms, recent_energy);
+						}
+					}
+				}
+
 				if (is_speech) {
 					// Speech is happening
-					vad_result = (vad_result_prev == 1) ? 1 : 1;  // Keep at 1 if already speaking, or set to 1 if just started
+					if (early_trigger) {
+						vad_result = 2; // Trigger early end for interrupt commands
+					} else {
+						vad_result = (vad_result_prev == 1) ? 1 : 1;  // Keep at 1 if already speaking, or set to 1 if just started
+					}
 				} else {
 					// Silence
 					vad_result = (vad_result_prev == 1) ? 2 : 0;  // If was speaking, set to 2 (ended), otherwise stay at 0
@@ -2384,6 +2449,10 @@ int run(int argc, const char **argv)
 				if (user_command == "stop")
 				{
 					printf(" [Stopped!]\n");
+
+					// CRITICAL FIX: Send stop command to Wyoming-Piper to actually terminate TTS
+					send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url);
+
 					text_heard = "";
 					text_heard_trimmed = "";
 					audio.clear();
