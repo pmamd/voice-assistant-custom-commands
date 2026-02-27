@@ -2098,8 +2098,16 @@ int run(int argc, const char **argv)
 					// Skip warmup in test mode to preserve injected audio
 					if (!test_mode && (!params.push_to_talk || (params.push_to_talk && g_hotkey_pressed == "Alt")))
 					{
-						all_heard_pre = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms)); // warmup - try with small size audio
-						g_hotkey_pressed = "";
+						// Ensure minimum buffer size for Whisper (at least 1 second = 16000 samples)
+						const int min_samples_warmup = WHISPER_SAMPLE_RATE; // 16000 samples = 1 second
+						if (pcmf32_cur.size() < min_samples_warmup) {
+							pcmf32_cur.resize(min_samples_warmup, 0.0f); // Pad with silence
+						}
+
+						{
+							all_heard_pre = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms)); // warmup - try with small size audio
+							g_hotkey_pressed = "";
+						}
 					}
 					// printf("%.3f after pre transcribe (%d)\n", get_current_time_ms(), pcmf32_cur.size());
 				}
