@@ -2158,6 +2158,12 @@ int run(int argc, const char **argv)
 				{
 					if (!params.push_to_talk || (params.push_to_talk && g_hotkey_pressed == "Alt"))
 					{
+						// Ensure minimum buffer size for Whisper (at least 1 second = 16000 samples)
+						const int min_samples = WHISPER_SAMPLE_RATE; // 16000 samples = 1 second
+						if (pcmf32_cur.size() < min_samples) {
+							pcmf32_cur.resize(min_samples, 0.0f); // Pad with silence
+						}
+
 						if (params.debug) {
 							printf("%.3f before transcribe, buffer size: %d\n", get_current_time_ms(), pcmf32_cur.size());
 						}
