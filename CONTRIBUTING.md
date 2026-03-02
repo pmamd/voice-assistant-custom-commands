@@ -1,6 +1,6 @@
-# Development Environment Setup
+# Contributing to Voice Assistant Custom Commands
 
-This document describes how to set up your development environment for working on this project.
+Thank you for your interest in contributing! This guide will help you set up your development environment and understand the project structure.
 
 ## Prerequisites
 
@@ -15,45 +15,17 @@ This document describes how to set up your development environment for working o
 Install on Ubuntu/Debian:
 ```bash
 sudo apt-get update
-sudo apt-get install -y cmake libsdl2-dev libcurl4-openssl-dev git python3 python3-venv build-essential ninja-build
-```
-
-### For Piper TTS (optional - only if building from submodule)
-```bash
-sudo apt-get install -y build-essential cmake ninja-build
-```
-
-## WSL Python Environment
-
-The build and deployment scripts use Python with SSH/SFTP capabilities. Since WSL uses an externally-managed Python environment, you need to use a virtual environment.
-
-### Create and Activate Virtual Environment
-
-```bash
-# Create virtual environment (one-time setup)
-cd /tmp
-python3 -m venv build-venv
-
-# Activate virtual environment
-source /tmp/build-venv/bin/activate
-
-# Install required packages
-pip install paramiko
-```
-
-### Using the Scripts
-
-Always activate the venv before running build/test scripts:
-
-```bash
-# Activate venv
-source /tmp/build-venv/bin/activate
-
-# Run your script
-python3 /tmp/test_build_fixed.py
-
-# Deactivate when done (optional)
-deactivate
+sudo apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    libsdl2-dev \
+    libcurl4-openssl-dev \
+    libcjson-dev \
+    alsa-utils \
+    python3 \
+    python3-pip \
+    pipx
 ```
 
 ## Building the Project
@@ -62,8 +34,8 @@ deactivate
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/pmamd/voice-assistant-custom-commands-clean.git
-cd voice-assistant-custom-commands-clean
+git clone --recursive https://github.com/YOUR_USERNAME/voice-assistant-custom-commands.git
+cd voice-assistant-custom-commands
 
 # Configure
 cmake -B build -DWHISPER_SDL2=ON
@@ -74,16 +46,12 @@ cmake --build build -j
 # Executable will be at: build/bin/talk-llama-custom
 ```
 
-### Remote Build (Development Machine)
+### GPU Build (Optional - AMD ROCm)
 
-Use the provided Python scripts in `/tmp/` to test builds on the remote development machine:
-
+For AMD GPU acceleration:
 ```bash
-# Make sure venv is activated
-source /tmp/build-venv/bin/activate
-
-# Run build test
-python3 /tmp/test_build_fixed.py
+cmake -B build -DWHISPER_SDL2=ON -DGGML_HIPBLAS=ON
+cmake --build build -j
 ```
 
 ## Git Submodules
@@ -230,5 +198,72 @@ After building, test the executable:
 ## Next Steps
 
 - See `custom/talk-llama/MODIFICATIONS.md` for details on code modifications
+- See `wyoming-piper/MODIFICATIONS.md` for TTS modifications
 - See `README.md` for usage instructions
-- See Wyoming-Piper documentation for TTS server setup
+
+## Making Contributions
+
+### Workflow
+
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
+   ```bash
+   git clone --recursive https://github.com/YOUR_USERNAME/voice-assistant-custom-commands.git
+   cd voice-assistant-custom-commands
+   ```
+3. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+4. **Make your changes** in the appropriate directory:
+   - Talk-llama changes: `custom/talk-llama/`
+   - Wyoming-Piper changes: `wyoming-piper/wyoming_piper/`
+   - Tests: `tests/`
+5. **Test thoroughly**:
+   ```bash
+   # Build
+   cmake --build build -j
+
+   # Run tests (if available)
+   make test
+   ```
+6. **Commit your changes**:
+   ```bash
+   git add .
+   git commit -m "Description of your changes"
+   ```
+7. **Push to your fork**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+8. **Submit a pull request** on GitHub
+
+### Code Style
+
+- **C/C++**: Follow existing code style in the project
+- **Python**: Follow PEP 8
+- **Commit messages**: Clear, descriptive messages in imperative mood
+
+### Areas for Contribution
+
+- **Custom commands**: Add more LLM-bypass commands beyond "stop"
+- **Test coverage**: Expand test harness with more test cases
+- **Documentation**: Improve setup guides and troubleshooting
+- **Performance**: Optimize audio processing or TTS latency
+- **Platform support**: macOS or Windows compatibility
+- **Bug fixes**: Check issues on GitHub
+
+### Documentation
+
+If you add features, please update:
+- `README.md` - User-facing documentation
+- `MODIFICATIONS.md` - Technical changes in modified files
+- Code comments - For complex logic
+
+### Questions?
+
+Open an issue on GitHub for:
+- Feature requests
+- Bug reports
+- Setup help
+- General questions

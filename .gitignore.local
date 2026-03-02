@@ -1,0 +1,9 @@
+# Local development configuration (not in git)
+# Add this to .git/info/exclude or keep as .gitignore.local
+
+# Machine-specific deployment configs
+DEPLOY_README.md
+DEV_MACHINES.md
+
+# Deployment artifacts
+DEPLOYMENT_*.md

@@ -688,6 +688,68 @@ aplay -l                                    # List audio devices
 aplay /usr/share/sounds/alsa/Front_Center.wav  # Test playback
 ```
 
+### wyoming-piper-custom Command Not Found
+
+If `wyoming-piper-custom` is not found after installation:
+
+```bash
+# Add pipx bin directory to PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Make it persistent
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### ROCm Package Conflicts (AMD GPU Systems)
+
+If you encounter broken ROCm packages blocking apt installations:
+
+```bash
+# Check for broken packages
+dpkg -l | grep -E 'hipblas|rocblas|rocsolver'
+
+# Force-remove broken ROCm -dev packages
+sudo dpkg --remove --force-depends hipblas7.1.1 hipblaslt-dev rocsolver7.1.1 \
+    hipblas-dev7.1.1 rocsolver-dev7.1.1
+
+# Then retry package installation
+sudo apt-get install -f
+```
+
+### libcurl Version Mismatch
+
+If libcurl4-openssl-dev installation fails due to version mismatch:
+
+```bash
+# Upgrade libcurl4t64 first
+sudo apt-get install --only-upgrade libcurl4t64
+
+# Then install the -dev package
+sudo apt-get install libcurl4-openssl-dev
+```
+
+### Piper TTS Binary Not Found
+
+Wyoming-Piper requires the Piper binary. Options:
+
+1. **System package** (if available):
+   ```bash
+   sudo apt install piper-tts
+   ```
+
+2. **Download release binary**:
+   ```bash
+   wget https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz
+   tar -xzf piper_amd64.tar.gz
+   sudo mv piper/piper /usr/local/bin/
+   ```
+
+3. **Use included piper** (if available in repo):
+   ```bash
+   # Check external/piper/ directory
+   ```
+
 ## Known Limitations
 
 1. **Platform**: Linux/WSL only (uses aplay for audio)
