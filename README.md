@@ -73,15 +73,17 @@ This repository uses **git submodules** for upstream dependencies to keep only c
 voice-assistant-custom-commands/
 ├── whisper.cpp/              # Submodule: Upstream Whisper STT engine
 ├── wyoming-piper/            # Custom Wyoming-Piper (wyoming-piper-custom)
+│   ├── wyoming_piper/        # Modified source files
+│   │   ├── __main__.py       # Entry point (test mode, custom logging)
+│   │   ├── handler.py        # Event handler (stop cmd, test mode)
+│   │   └── process.py        # Process manager (aplay support)
+│   ├── pyproject.toml        # Package config (renamed to wyoming-piper-custom)
+│   └── MODIFICATIONS.md      # Documentation of all changes
 ├── custom/                   # Your custom modifications
-│   ├── talk-llama/           # Modified talk-llama application
-│   │   ├── talk-llama.cpp    # Main application (TTS fixes, test mode)
-│   │   ├── llama.cpp         # Full LLaMA inference engine
-│   │   ├── llama.h           # LLaMA API header
-│   │   └── MODIFICATIONS.md  # Documentation of changes
-│   └── wyoming-piper/        # Custom Wyoming-Piper overlay files
-│       ├── __main__.py       # Entry point (test mode support)
-│       ├── handler.py        # Event handler (stop cmd, test mode)
+│   └── talk-llama/           # Modified talk-llama application
+│       ├── talk-llama.cpp    # Main application (TTS fixes, test mode)
+│       ├── llama.cpp         # Full LLaMA inference engine
+│       ├── llama.h           # LLaMA API header
 │       └── MODIFICATIONS.md  # Documentation of changes
 ├── tests/                    # Test harness
 │   ├── audio_generator.py    # Piper TTS test audio generator
@@ -110,15 +112,12 @@ voice-assistant-custom-commands/
 - Custom fork of Wyoming-Piper named **wyoming-piper-custom**
 - Based on upstream Wyoming-Piper with custom modifications
 - Installs as separate package to avoid conflicts with standard wyoming-piper
-- Modified files overlaid from `custom/wyoming-piper/`:
-  - **__main__.py** - Added test mode arguments (`--test-mode`, `--test-output-dir`)
-  - **handler.py** - Modified with:
-    - Stop command detection (bypasses TTS for "stop" utterances)
-    - Test mode logic (save audio to files instead of playing)
-    - Direct audio playback via aplay
-  - **process.py** - Audio process management
+- Key modifications:
+  - **__main__.py** - Test mode arguments, reduced logging verbosity
+  - **handler.py** - Stop command detection, test mode, aplay playback
+  - **process.py** - Audio process management with aplay support
   - **pyproject.toml** - Package name changed to wyoming-piper-custom
-- See `custom/wyoming-piper/MODIFICATIONS.md` for details
+- See `wyoming-piper/MODIFICATIONS.md` for complete documentation
 
 **Test harness** (`tests/`):
 - Complete end-to-end testing framework
