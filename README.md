@@ -145,6 +145,7 @@ voice-assistant-custom-commands/
 
 ### Dependencies
 
+**Required packages:**
 ```bash
 # Ubuntu/Debian
 sudo apt-get update
@@ -154,9 +155,11 @@ sudo apt-get install -y \
     git \
     libsdl2-dev \
     libcurl4-openssl-dev \
+    libcjson-dev \
     alsa-utils \
     python3 \
-    python3-pip
+    python3-pip \
+    pipx
 
 # Optional: ROCm for AMD GPU acceleration
 # Follow AMD ROCm installation guide: https://rocm.docs.amd.com/
@@ -294,6 +297,277 @@ Example command categories:
 - **System commands**: volume up/down, mute
 - **Quick queries**: what time, what date
 - **App control**: exit, restart, help
+
+## Deployment
+
+This section documents deployment to a fresh target machine based on real-world deployment experience.
+
+### Prerequisites
+
+**IMPORTANT**: You will need sudo access on the target machine to install system packages.
+
+**Target machine requirements**:
+- Linux (Ubuntu/Debian recommended)
+- SSH access configured
+- At least 8GB RAM (for LLM inference)
+- 10GB free disk space (for models)
+- Audio output device (speakers or headphones)
+
+### Step-by-Step Deployment
+
+#### 1. Clone Repository on Target Machine
+
+SSH into the target machine and clone the repository:
+
+```bash
+# SSH into target
+ssh user@target-machine
+
+# Clone repository with submodules
+git clone --recursive https://github.com/YOUR_USERNAME/voice-assistant-custom-commands.git
+cd voice-assistant-custom-commands
+```
+
+**Common Issues**:
+- If `whisper.cpp` directory is empty: Run `git submodule update --init --recursive`
+- If clone fails with submodule errors: Check that all submodule URLs are accessible
+
+#### 2. Install System Dependencies
+
+**REQUIRES SUDO ACCESS**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    libsdl2-dev \
+    libcurl4-openssl-dev \
+    libcjson-dev \
+    alsa-utils \
+    python3 \
+    python3-pip \
+    pipx
+```
+
+**Package Notes**:
+- `libsdl2-dev`: Required for audio capture in talk-llama
+- `libcurl4-openssl-dev`: Required for HTTP TTS requests
+- `libcjson-dev`: Required for JSON parsing (easily missed!)
+- `pipx`: Recommended for isolated Python package installation
+- `alsa-utils`: Provides `aplay` command for audio playback
+
+**Common Issues**:
+- **"libcjson-dev not found"**: This package is critical but often not documented. Without it, build will fail with `cJSON.h not found`.
+- **"pipx not found"**: Fall back to `pip` if `pipx` is unavailable, but isolated installation is recommended.
+
+#### 3. Build the Application
+
+```bash
+# CPU-only build
+cmake -B build -DWHISPER_SDL2=ON
+cmake --build build -j
+
+# GPU build (ROCm for AMD GPUs)
+cmake -B build -DWHISPER_SDL2=ON -DGGML_HIPBLAS=ON
+cmake --build build -j
+```
+
+**Expected output**: Executable at `build/bin/talk-llama-custom`
+
+**Common Issues**:
+- **CMake fails with "SDL2 not found"**: Install `libsdl2-dev`
+- **Linker error "cannot find -lcurl"**: Install `libcurl4-openssl-dev`
+- **"cJSON.h not found"**: Install `libcjson-dev` (most commonly missed!)
+- **Build hangs or slow**: Use `-j` to parallelize build
+
+#### 4. Install Wyoming-Piper TTS
+
+```bash
+# Install wyoming-piper-custom using pipx (recommended)
+./install-wyoming.sh
+
+# Or manually with pipx
+cd wyoming-piper
+pipx install -e .
+cd ..
+
+# Or manually with pip (if pipx unavailable)
+cd wyoming-piper
+pip install -e .
+cd ..
+```
+
+**Verify installation**:
+```bash
+which wyoming-piper-custom
+wyoming-piper-custom --version
+```
+
+**Common Issues**:
+- **"wyoming-piper-custom: command not found"**:
+  - Ensure pipx bin directory is in PATH: `export PATH="$HOME/.local/bin:$PATH"`
+  - Add to `~/.bashrc` for persistence
+- **"ModuleNotFoundError: No module named 'wyoming'"**: Dependencies not installed, re-run install
+
+#### 5. Download Models
+
+**Whisper Model** (for speech-to-text):
+```bash
+cd whisper.cpp/models
+bash download-ggml-model.sh base.en  # English-only, 150MB
+# Or for better quality:
+# bash download-ggml-model.sh medium  # Multilingual, 1.5GB
+cd ../..
+```
+
+**LLaMA Model** (for conversation):
+```bash
+# Example: Download Mistral 7B Instruct Q5_0 (~5GB)
+wget https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_0.gguf
+
+# Or download to a models directory
+mkdir -p models
+cd models
+wget https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_0.gguf
+cd ..
+```
+
+**Common Issues**:
+- **Downloads are slow**: Use `wget -c` to resume interrupted downloads
+- **Out of disk space**: Check available space with `df -h` before downloading large models
+
+#### 6. Test Audio System
+
+**CRITICAL**: Verify audio output works before running the full system.
+
+```bash
+# List audio devices
+aplay -l
+
+# Test playback
+aplay /usr/share/sounds/alsa/Front_Center.wav
+```
+
+**Common Issues**:
+- **"aplay: command not found"**: Install `alsa-utils`
+- **"No such file or directory" for test sound**: Use your own WAV file or skip this test
+- **No sound output**: Check speaker connection, volume settings, and default audio device
+
+#### 7. Start the TTS Server
+
+In a dedicated terminal or screen session:
+
+```bash
+# Start Wyoming-Piper TTS server
+wyoming-piper-custom \
+    --piper /usr/bin/piper \
+    --uri tcp://0.0.0.0:8020 \
+    --voice en_US-lessac-medium
+```
+
+**Expected output**:
+```
+INFO:wyoming_piper:Ready
+```
+
+**The server will auto-download the voice model on first run** (~50-100MB).
+
+**Common Issues**:
+- **"piper: command not found"**:
+  - Install Piper: `wget -O piper.tar.gz <piper-release-url> && tar -xvf piper.tar.gz`
+  - Or use the included Piper in `external/piper/` (see README in that directory)
+- **Port 8020 already in use**: Change to different port with `--uri tcp://0.0.0.0:8021`
+- **Model download fails**: Check internet connectivity, try manual download
+
+#### 8. Run the Voice Assistant
+
+In a second terminal:
+
+```bash
+cd build/bin
+./talk-llama-custom \
+    -m ../../models/mistral-7b-instruct-v0.2.Q5_0.gguf \
+    --model-whisper ../../whisper.cpp/models/ggml-base.en.bin \
+    --xtts-url http://localhost:8020/ \
+    --xtts-voice emma_1 \
+    -p "You are a helpful AI assistant."
+```
+
+**Expected output**:
+```
+whisper_init_from_file_with_params_no_state: loading model from '../../whisper.cpp/models/ggml-base.en.bin'
+...
+system_info: n_threads = 4 / 8 | AVX = 1 | ...
+[Start speaking]
+```
+
+**Common Issues**:
+- **"Failed to initialize audio capture"**: Check microphone is connected and permissions
+- **"Failed to load model"**: Verify model path is correct
+- **"Connection refused to TTS server"**: Ensure Wyoming-Piper is running on port 8020
+- **Constant "Speech started/ended" messages**: This is normal for background noise detection
+
+#### 9. Test the System
+
+1. **Say "Hello"** - Should hear AI response
+2. **Say "What is two plus two"** - Should answer "four"
+3. **Say "Stop"** - Should interrupt AI mid-sentence
+4. **Press Ctrl+C** - Should exit cleanly
+
+### Deployment Checklist
+
+Use this checklist to verify successful deployment:
+
+- [ ] Repository cloned with `git clone --recursive`
+- [ ] All system packages installed (especially `libcjson-dev`!)
+- [ ] Build completed successfully (`build/bin/talk-llama-custom` exists)
+- [ ] Wyoming-Piper installed (`wyoming-piper-custom --version` works)
+- [ ] Whisper model downloaded (`whisper.cpp/models/ggml-base.en.bin` exists)
+- [ ] LLaMA model downloaded (e.g., `models/mistral-7b-instruct-v0.2.Q5_0.gguf`)
+- [ ] Audio output tested (`aplay` works)
+- [ ] TTS server running (Wyoming-Piper on port 8020)
+- [ ] Voice assistant responds to speech
+- [ ] Stop command works
+
+### Deployment Scripts
+
+For repeated deployments, consider creating deployment scripts:
+
+**deploy.sh**:
+```bash
+#!/bin/bash
+set -e
+
+echo "Installing system dependencies..."
+sudo apt-get update && sudo apt-get install -y \
+    build-essential cmake git libsdl2-dev libcurl4-openssl-dev \
+    libcjson-dev alsa-utils python3 python3-pip pipx
+
+echo "Building talk-llama-custom..."
+cmake -B build -DWHISPER_SDL2=ON
+cmake --build build -j
+
+echo "Installing Wyoming-Piper..."
+./install-wyoming.sh
+
+echo "Deployment complete! Download models and run start-assistant.sh"
+```
+
+### Remote Deployment
+
+For deploying to remote machines:
+
+```bash
+# From local machine, deploy to remote target
+rsync -avz --exclude build --exclude models \
+    ./ user@target-machine:~/voice-assistant/
+
+ssh user@target-machine "cd voice-assistant && ./deploy.sh"
+```
+
+**Note**: Models are large (5-6GB total), so exclude from rsync and download directly on target.
 
 ## Configuration
 
