@@ -72,14 +72,14 @@ This repository uses **git submodules** for upstream dependencies to keep only c
 ```
 voice-assistant-custom-commands/
 ├── whisper.cpp/              # Submodule: Upstream Whisper STT engine
-├── wyoming-piper/            # Submodule: Upstream Wyoming-Piper TTS server
+├── wyoming-piper/            # Custom Wyoming-Piper (wyoming-piper-custom)
 ├── custom/                   # Your custom modifications
 │   ├── talk-llama/           # Modified talk-llama application
 │   │   ├── talk-llama.cpp    # Main application (TTS fixes, test mode)
 │   │   ├── llama.cpp         # Full LLaMA inference engine
 │   │   ├── llama.h           # LLaMA API header
 │   │   └── MODIFICATIONS.md  # Documentation of changes
-│   └── wyoming-piper/        # Modified Wyoming-Piper files
+│   └── wyoming-piper/        # Custom Wyoming-Piper overlay files
 │       ├── __main__.py       # Entry point (test mode support)
 │       ├── handler.py        # Event handler (stop cmd, test mode)
 │       └── MODIFICATIONS.md  # Documentation of changes
@@ -106,12 +106,18 @@ voice-assistant-custom-commands/
 - **llama.cpp/llama.h** - Full LLaMA inference engine from llama.cpp repo
 - See `custom/talk-llama/MODIFICATIONS.md` for details
 
-**Wyoming-Piper modifications** (`custom/wyoming-piper/`):
-- **__main__.py** - Added test mode arguments (`--test-mode`, `--test-output-dir`)
-- **handler.py** - Modified with:
-  - Stop command detection (bypasses TTS for "stop" utterances)
-  - Test mode logic (save audio to files instead of playing)
-  - Direct audio playback via aplay
+**Wyoming-Piper Custom** (`wyoming-piper/`):
+- Custom fork of Wyoming-Piper named **wyoming-piper-custom**
+- Based on upstream Wyoming-Piper with custom modifications
+- Installs as separate package to avoid conflicts with standard wyoming-piper
+- Modified files overlaid from `custom/wyoming-piper/`:
+  - **__main__.py** - Added test mode arguments (`--test-mode`, `--test-output-dir`)
+  - **handler.py** - Modified with:
+    - Stop command detection (bypasses TTS for "stop" utterances)
+    - Test mode logic (save audio to files instead of playing)
+    - Direct audio playback via aplay
+  - **process.py** - Audio process management
+  - **pyproject.toml** - Package name changed to wyoming-piper-custom
 - See `custom/wyoming-piper/MODIFICATIONS.md` for details
 
 **Test harness** (`tests/`):
@@ -126,12 +132,6 @@ voice-assistant-custom-commands/
 - Locked at commit: `d207c688` (whisper.cpp v1.5.5 era)
 - Source: https://github.com/ggerganov/whisper.cpp
 - Includes: Whisper models, GGML tensor library, examples
-
-**wyoming-piper**:
-- Wyoming protocol TTS server with Piper
-- Locked at commit: `21f9966d`
-- Source: https://github.com/rhasspy/wyoming-piper
-- Custom modifications overlaid from `custom/wyoming-piper/`
 
 ## Prerequisites
 
@@ -234,15 +234,21 @@ wget https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/
 ### 4. Setup Wyoming-Piper TTS Server
 
 ```bash
-# Install base Wyoming-Piper from submodule
+# Install wyoming-piper-custom using the install script
+./install-wyoming.sh
+
+# Or manually with pipx (recommended)
+cd wyoming-piper
+pipx install -e .
+cd ..
+
+# Or manually with pip
 cd wyoming-piper
 pip install -e .
-
-# Overlay custom modifications
 cd ..
-cp custom/wyoming-piper/__main__.py wyoming-piper/wyoming_piper/
-cp custom/wyoming-piper/handler.py wyoming-piper/wyoming_piper/
 ```
+
+The `wyoming-piper/` directory contains our custom fork with all modifications already applied. It installs as `wyoming-piper-custom` to avoid conflicts with standard wyoming-piper.
 
 ## Usage
 
