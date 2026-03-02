@@ -42,16 +42,11 @@ else
     fi
 fi
 
-# Step 2: Overlay custom files
+# Step 2: Verify custom modifications are present
 echo ""
-echo "2. Overlaying custom modifications..."
-cp custom/wyoming-piper/__main__.py wyoming-piper/wyoming_piper/
-cp custom/wyoming-piper/handler.py wyoming-piper/wyoming_piper/
-cp custom/wyoming-piper/process.py wyoming-piper/wyoming_piper/
-
-# Step 3: Verify
-echo ""
-echo "3. Verifying installation..."
+echo "2. Verifying custom modifications are in place..."
+# Custom modifications are already built into wyoming-piper/ directory
+# (No overlay needed - wyoming-piper is our custom fork)
 HAS_PIPER=$(grep -c '"--piper"' wyoming-piper/wyoming_piper/__main__.py || echo 0)
 HAS_APLAY=$(grep -c 'aplay' wyoming-piper/wyoming_piper/handler.py || echo 0)
 
