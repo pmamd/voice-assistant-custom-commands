@@ -1,0 +1,77 @@
+[project]
+name = "wyoming-piper-custom"
+version = "2.2.2"
+description = "Wyoming Server for Piper"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Michael Hansen", email = "mike@rhasspy.org"}
+]
+keywords = ["rhasspy", "wyoming", "piper", "tts"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "wyoming>=1.8,<2",
+    "regex>=2024.11.6",
+    "piper-tts>=1.4.1,<2",
+    "sentence-stream>=1.2.0,<2",
+]
+
+[project.urls]
+Homepage = "http://github.com/rhasspy/wyoming-piper"
+
+[project.scripts]
+wyoming-piper-custom = "wyoming_piper.__main__:run"
+
+[tool.setuptools.packages.find]
+include = ["wyoming_piper"]
+exclude = ["tests", "tests.*"]
+
+[tool.setuptools.package-data]
+wyoming_piper = ["voices.json"]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_untyped_defs = true
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "mypy",
+    "pylint",
+    "pytest",
+    "pytest-asyncio",
+    "build",
+    "scipy>=1.10,<2",
+    "numpy>=1.20,<2",
+    "python-speech-features>=0.6,<1",
+]
+zeroconf = [
+    "wyoming[zeroconf]",
+]
+zh = [
+    "piper-tts[zh]",
+]
