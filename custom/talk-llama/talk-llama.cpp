@@ -48,6 +48,11 @@
 #include "tts-socket.h"
 #include "tts-request.h"
 
+// For tool calling system
+#include "tool-system.h"
+#include "tool-parser.h"
+#include "wyoming-client.h"
+
 // Signal handling for graceful shutdown
 volatile sig_atomic_t g_sigint_received = 0;
 
@@ -1670,6 +1675,13 @@ int run(int argc, const char **argv)
 
 	prompt_llama = ::replace(prompt_llama, "{4}", chat_symb);
 
+	// Inject tool definitions into prompt (for Mistral tool calling)
+	if (tool_registry.getAllTools().size() > 0) {
+		std::string tools_prompt = tool_registry.getToolsPrompt();
+		prompt_llama += "\n\n" + tools_prompt;
+		fprintf(stdout, "[Tool System] Injected %zu tools into system prompt\n", tool_registry.getAllTools().size());
+	}
+
 	// init session
 	std::string path_session = params.path_session;
 	std::vector<llama_token> session_tokens;
@@ -1908,6 +1920,29 @@ int run(int argc, const char **argv)
 		audio.resume();
 		printf("(Microphone resumed)\n");
 	}
+
+	// Initialize tool calling system
+	printf("\n=========================================\n");
+	printf("Initializing Tool Calling System...\n");
+	printf("=========================================\n");
+	tool_system::ToolRegistry& tool_registry = tool_system::ToolRegistry::getInstance();
+
+	// Load tool definitions from JSON
+	std::string tools_json_path = "custom/talk-llama/tools/tools.json";
+	if (!tool_registry.loadFromFile(tools_json_path)) {
+		fprintf(stderr, "WARNING: Failed to load tools from %s\n", tools_json_path.c_str());
+		fprintf(stderr, "Tool calling will not be available.\n");
+	} else {
+		// Register built-in executors
+		tool_system::registerBuiltinExecutors(tool_registry);
+		printf("Tool system initialized with %zu tools\n", tool_registry.getAllTools().size());
+
+		// List available tools
+		for (const auto& tool : tool_registry.getAllTools()) {
+			printf("  - %s%s\n", tool.name.c_str(), tool.fast_path ? " (fast path)" : "");
+		}
+	}
+	printf("=========================================\n\n");
 
 	if (params.push_to_talk)
 		printf("Type anything or hold 'Alt' to speak:\n");
@@ -2543,6 +2578,34 @@ int run(int argc, const char **argv)
 				std::string current_voice_tmp = "";
 				reply_part = 0;
 
+				// FAST PATH TOOL EXECUTION (pre-LLaMA)
+				// Check if the user said a fast-path command (e.g., "stop")
+				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
+				if (matched && tool_def.fast_path) {
+					fprintf(stdout, "\n[Fast Path Tool: %s]\n", tool_def.name.c_str());
+
+					// Execute the tool
+					tool_system::ToolResult result = tool_registry.execute(tool_def.name, json::object());
+
+					if (result.success) {
+						// Handle specific fast-path tools
+						if (tool_def.name == "stop_speaking") {
+							// Send stop command to Wyoming-Piper
+							send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
+							fprintf(stdout, "Stopped speaking\n");
+						}
+
+						// Skip LLaMA processing for fast-path commands
+						audio.clear();
+						g_hotkey_pressed = "";
+						test_audio_injected = false;
+						continue;
+					} else {
+						fprintf(stderr, "Fast path tool execution failed: %s\n", result.message.c_str());
+						// Fall through to normal LLaMA processing
+					}
+				}
+
 				// LLAMA
 				llama_start_time = get_current_time_ms();
 				const std::vector<llama_token> tokens = llama_tokenize(ctx_llama, text_heard.c_str(), false);
@@ -2645,6 +2708,10 @@ int run(int argc, const char **argv)
 					thread_i = 0; // rotation
 
 				float temp_next = params.temp;
+
+				// Initialize tool call parser for this generation
+				static tool_system::ToolCallParser tool_parser;
+				tool_parser.reset();
 
 				// text inference
 				bool done = false;
@@ -2809,9 +2876,42 @@ int run(int argc, const char **argv)
 							// add it to the context
 							embd.push_back(id);
 							out_token_str = llama_token_to_piece(ctx_llama, id);
-							text_to_speak += out_token_str;
-							// printf("[%s]", out_token_str.c_str());
-							printf("%s", out_token_str.c_str());
+
+							// Feed token to tool call parser
+							bool tool_detected = tool_parser.feedToken(out_token_str);
+
+							if (tool_detected && tool_parser.hasToolCall()) {
+								// Extract and execute the tool call
+								tool_system::ToolCall call = tool_parser.getToolCall();
+								fprintf(stdout, "\n[Tool Call: %s]\n", call.name.c_str());
+
+								tool_system::ToolResult result = tool_registry.execute(call.name, call.arguments);
+
+								if (result.success) {
+									// Handle tool-specific actions
+									if (call.name == "stop_speaking") {
+										send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
+									} else if (call.name == "set_temperature") {
+										fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
+									} else if (call.name == "navigate_to") {
+										fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
+									}
+									// Add more tool handlers as needed
+								} else {
+									fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
+								}
+
+								// Reset parser for potential next tool call
+								tool_parser.reset();
+							}
+
+							// Use the parser's normal text (excluding tool tags)
+							std::string clean_text = tool_parser.getText();
+							if (!clean_text.empty()) {
+								text_to_speak += clean_text;
+								printf("%s", clean_text.c_str());
+							}
+
 							tokens_in_reply++;
 
 							// detect sequence repetition (llama stuck in a loop) https://github.com/ggerganov/llama.cpp/pull/2593

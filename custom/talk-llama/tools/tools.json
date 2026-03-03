@@ -1,0 +1,158 @@
+{
+  "tools": [
+    {
+      "name": "stop_speaking",
+      "description": "Immediately stop the assistant from speaking (interrupt current speech)",
+      "fast_path": true,
+      "keywords": ["stop", "quiet", "silence", "shut up", "enough"],
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "set_temperature",
+      "description": "Adjust the climate control temperature",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "Temperature in Fahrenheit (60-85)"
+          },
+          "zone": {
+            "type": "string",
+            "enum": ["driver", "passenger", "both"],
+            "description": "Which zone to adjust"
+          }
+        },
+        "required": ["value"]
+      }
+    },
+    {
+      "name": "set_fan_speed",
+      "description": "Adjust the HVAC fan speed",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": ["off", "low", "medium", "high", "auto"],
+            "description": "Fan speed level"
+          }
+        },
+        "required": ["level"]
+      }
+    },
+    {
+      "name": "enable_defrost",
+      "description": "Turn on windshield defrost/defog",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "enum": ["front", "rear", "both"],
+            "description": "Which windshield to defrost"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["defrost", "defog"],
+            "description": "Defrost (heat) or defog (AC)"
+          }
+        },
+        "required": ["location"]
+      }
+    },
+    {
+      "name": "navigate_to",
+      "description": "Start navigation to a destination",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "description": "Address or place name"
+          },
+          "preset": {
+            "type": "string",
+            "enum": ["home", "work"],
+            "description": "Use preset destination instead of address"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "find_nearby",
+      "description": "Find nearby points of interest",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["gas_station", "ev_charger", "restaurant", "parking", "rest_area", "hospital"],
+            "description": "Type of place to find"
+          },
+          "max_distance": {
+            "type": "number",
+            "description": "Maximum distance in miles"
+          }
+        },
+        "required": ["category"]
+      }
+    },
+    {
+      "name": "get_eta",
+      "description": "Get estimated time of arrival to current destination",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "check_tire_pressure",
+      "description": "Check tire pressure status for all tires",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get_fuel_range",
+      "description": "Get remaining fuel range or EV battery range",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "check_vehicle_status",
+      "description": "Check overall vehicle status (warnings, alerts, maintenance)",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "detail_level": {
+            "type": "string",
+            "enum": ["summary", "detailed"],
+            "description": "Level of detail for status report"
+          }
+        },
+        "required": []
+      }
+    }
+  ]
+}
