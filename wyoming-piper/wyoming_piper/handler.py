@@ -127,16 +127,21 @@ class PiperEventHandler(AsyncEventHandler):
             piper_proc.proc.stdin.write((text + "\n").encode("utf-8"))
             await piper_proc.proc.stdin.drain()
 
-            # Piper outputs "INFO:__main__:Wrote /path/to/file.wav" to stderr
-            # Extract just the path
-            output_line = (await piper_proc.proc.stderr.readline()).decode().strip()
-            _LOGGER.debug("Piper output: %s", output_line)
+            # Piper outputs multiple log lines to stderr, ending with "Wrote /path/to/file.wav"
+            # Read lines until we find the one with the file path
+            output_path = None
+            max_lines = 20  # Safety limit to prevent infinite loop
+            for _ in range(max_lines):
+                output_line = (await piper_proc.proc.stderr.readline()).decode().strip()
+                _LOGGER.debug("Piper output: %s", output_line)
 
-            # Extract path from "INFO:__main__:Wrote /path/to/file.wav"
-            if "Wrote " in output_line:
-                output_path = output_line.split("Wrote ", 1)[1]
-            else:
-                output_path = output_line  # Fallback to full line
+                # Extract path from "INFO:__main__:Wrote /path/to/file.wav" or "Wrote /path/to/file.wav"
+                if "Wrote " in output_line:
+                    output_path = output_line.split("Wrote ", 1)[1]
+                    break
+
+            if not output_path:
+                raise RuntimeError("Failed to get output file path from Piper")
 
             _LOGGER.debug("Audio file path: %s", output_path)
 
