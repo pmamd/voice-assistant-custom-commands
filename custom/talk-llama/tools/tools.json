@@ -12,6 +12,28 @@
       }
     },
     {
+      "name": "pause_speaking",
+      "description": "Pause the assistant's current speech (can be resumed later)",
+      "fast_path": true,
+      "keywords": ["pause", "hold on", "wait", "hold up"],
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "resume_speaking",
+      "description": "Resume paused speech from the assistant",
+      "fast_path": true,
+      "keywords": ["resume", "continue", "go ahead", "go on"],
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
       "name": "set_temperature",
       "description": "Adjust the climate control temperature",
       "fast_path": false,

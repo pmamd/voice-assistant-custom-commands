@@ -193,6 +193,18 @@ ToolResult stop_speaking(const json& args) {
     return ToolResult(true, "Stopping speech");
 }
 
+ToolResult pause_speaking(const json& args) {
+    // This will be handled by the main loop to send pause command to Wyoming
+    fprintf(stdout, "[Tool] pause_speaking executed\n");
+    return ToolResult(true, "Pausing speech");
+}
+
+ToolResult resume_speaking(const json& args) {
+    // This will be handled by the main loop to send resume command to Wyoming
+    fprintf(stdout, "[Tool] resume_speaking executed\n");
+    return ToolResult(true, "Resuming speech");
+}
+
 ToolResult set_temperature(const json& args) {
     if (!args.contains("value")) {
         return ToolResult(false, "Missing 'value' parameter");
@@ -338,6 +350,8 @@ ToolResult check_vehicle_status(const json& args) {
 // Register all built-in executors
 void registerBuiltinExecutors(ToolRegistry& registry) {
     registry.registerExecutor("stop_speaking", executors::stop_speaking);
+    registry.registerExecutor("pause_speaking", executors::pause_speaking);
+    registry.registerExecutor("resume_speaking", executors::resume_speaking);
     registry.registerExecutor("set_temperature", executors::set_temperature);
     registry.registerExecutor("set_fan_speed", executors::set_fan_speed);
     registry.registerExecutor("enable_defrost", executors::enable_defrost);
