@@ -4,6 +4,10 @@
 
 set -e
 
+# Add paths for wyoming-piper-custom and piper libraries
+export PATH="$HOME/.local/bin:$PATH"
+export LD_LIBRARY_PATH="/opt/piper:$LD_LIBRARY_PATH"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -15,15 +19,42 @@ echo "Voice Assistant with Custom Commands"
 echo "=========================================="
 echo ""
 
-# Configuration
-# Use Wyoming-Piper-Custom with custom files installed (aplay support, no audio streaming)
-WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper-custom"
-WYOMING_PIPER_DIR=""
+# Configuration - Auto-detect paths
+WYOMING_PIPER_CMD="wyoming-piper-custom"
 PIPER_VOICE="en_US-lessac-medium"
-PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
-WYOMING_PORT=10200
-WHISPER_MODEL="./whisper.cpp/models/ggml-tiny.en.bin"
-LLAMA_MODEL="./models/llama-2-7b-chat.Q4_K_M.gguf"
+PIPER_DATA_DIR="./piper-data"
+WYOMING_PORT=8020
+
+# Auto-detect Piper binary location
+if [ -x "/opt/piper/piper" ]; then
+    PIPER_BIN="/opt/piper/piper"
+elif [ -x "/usr/local/bin/piper" ]; then
+    PIPER_BIN="/usr/local/bin/piper"
+elif [ -x "/usr/bin/piper" ]; then
+    PIPER_BIN="/usr/bin/piper"
+elif [ -x "$HOME/.local/bin/piper" ]; then
+    PIPER_BIN="$HOME/.local/bin/piper"
+else
+    PIPER_BIN="piper"  # Hope it's in PATH
+fi
+
+# Model paths - look for common models
+WHISPER_MODEL=""
+for model in ./whisper.cpp/models/ggml-base.en.bin ./whisper.cpp/models/ggml-tiny.en.bin; do
+    if [ -f "$model" ]; then
+        WHISPER_MODEL="$model"
+        break
+    fi
+done
+
+LLAMA_MODEL=""
+for model in ./models/*.gguf; do
+    if [ -f "$model" ]; then
+        LLAMA_MODEL="$model"
+        break
+    fi
+done
+
 TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
 
 # Check if talk-llama-custom is already running and kill it
@@ -59,7 +90,7 @@ if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
 
     # Start Wyoming-Piper (with custom files installed)
     $WYOMING_PIPER_CMD \
-        --piper /home/paul/.local/bin/piper \
+        --piper "$PIPER_BIN" \
         --voice "$PIPER_VOICE" \
         --data-dir "$PIPER_DATA_DIR" \
         --uri "tcp://0.0.0.0:$WYOMING_PORT" \
@@ -188,13 +219,12 @@ echo ""
 
 # Start the voice assistant
 $TALK_LLAMA_BIN \
-    -ml "$LLAMA_MODEL" \
-    -mw "$WHISPER_MODEL" \
+    --model-llama "$LLAMA_MODEL" \
+    --model-whisper "$WHISPER_MODEL" \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
-    --temp 0.5 \
-    -vth 1.2 \
-    -c "$CAPTURE_DEVICE"
+    --temp 0.8 \
+    -p Georgi
 
 # Cleanup on exit
 echo ""
