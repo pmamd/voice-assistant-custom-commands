@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import shutil
+import signal
 import wave
 import time
 from pathlib import Path
@@ -47,35 +48,72 @@ class PiperEventHandler(AsyncEventHandler):
         self.test_output_counter = 0  # Counter for test output files
 
     async def handle_event(self, event: Event) -> bool:
+        global STOP_CMD, ACTIVE_APLAY_PROCESSES
+
+        # Handle service discovery
         if Describe.is_type(event.type):
             await self.write_event(self.wyoming_info_event)
             _LOGGER.debug("Sent info")
             return True
 
-        if not Synthesize.is_type(event.type):
-            _LOGGER.warning("Unexpected event: %s", event)
-            return True
-
-        # Hack to make stop work
-        synthesize = Synthesize.from_event(event)
-        raw_text = synthesize.text
-        if ("stop" in raw_text.lower()) and (len(raw_text) < 10):
-            _LOGGER.debug("Saw STOP event - killing all active aplay processes")
-            global STOP_CMD, ACTIVE_APLAY_PROCESSES
+        # Handle AudioStop event (standard Wyoming protocol)
+        if AudioStop.is_type(event.type):
+            _LOGGER.debug("Received AudioStop event - terminating all active aplay processes")
             STOP_CMD = True
 
             # Kill all currently playing audio
-            for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:  # Copy list to avoid modification during iteration
+            for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:
                 try:
-                    if aplay_proc.proc.returncode is None:  # Process still running
+                    if aplay_proc.proc.returncode is None:
                         _LOGGER.debug(f"Terminating aplay process {aplay_proc.proc.pid}")
                         aplay_proc.proc.terminate()
                         ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
                 except Exception as e:
                     _LOGGER.warning(f"Error terminating aplay: {e}")
 
+            # Acknowledge the stop
+            await self.write_event(AudioStop().event())
             return True
 
+        # Handle custom audio-pause event
+        if event.type == "audio-pause":
+            _LOGGER.debug("Received audio-pause event - pausing all active aplay processes")
+
+            for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:
+                try:
+                    if aplay_proc.proc.returncode is None:
+                        _LOGGER.debug(f"Pausing aplay process {aplay_proc.proc.pid}")
+                        aplay_proc.proc.send_signal(signal.SIGSTOP)
+                        # Mark as paused (add attribute if not exists)
+                        if not hasattr(aplay_proc, 'paused'):
+                            aplay_proc.paused = False
+                        aplay_proc.paused = True
+                except Exception as e:
+                    _LOGGER.warning(f"Error pausing aplay: {e}")
+
+            return True
+
+        # Handle custom audio-resume event
+        if event.type == "audio-resume":
+            _LOGGER.debug("Received audio-resume event - resuming all paused aplay processes")
+
+            for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:
+                try:
+                    if aplay_proc.proc.returncode is None and hasattr(aplay_proc, 'paused') and aplay_proc.paused:
+                        _LOGGER.debug(f"Resuming aplay process {aplay_proc.proc.pid}")
+                        aplay_proc.proc.send_signal(signal.SIGCONT)
+                        aplay_proc.paused = False
+                except Exception as e:
+                    _LOGGER.warning(f"Error resuming aplay: {e}")
+
+            return True
+
+        # Handle TTS synthesis
+        if not Synthesize.is_type(event.type):
+            _LOGGER.warning("Unexpected event: %s", event)
+            return True
+
+        # Process synthesize event normally (removed hardcoded stop detection)
         try:
             return await self._handle_event(event)
         except Exception as err:
@@ -85,6 +123,7 @@ class PiperEventHandler(AsyncEventHandler):
             raise err
 
     async def _handle_event(self, event: Event) -> bool:
+        global STOP_CMD, ACTIVE_APLAY_PROCESSES
         # Clear at the start of a new synthesize event
         STOP_CMD = False
 
@@ -108,7 +147,6 @@ class PiperEventHandler(AsyncEventHandler):
                 text = text + self.cli_args.auto_punctuation[0]
 
         async with self.process_manager.processes_lock:
-            global ACTIVE_APLAY_PROCESSES
             _LOGGER.debug("synthesize: raw_text=%s, text='%s'", raw_text, text)
             voice_name: Optional[str] = None
             voice_speaker: Optional[str] = None

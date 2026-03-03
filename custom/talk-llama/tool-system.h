@@ -93,4 +93,11 @@ namespace executors {
 // Helper function to register all built-in executors
 void registerBuiltinExecutors(ToolRegistry& registry);
 
+// Forward declare WyomingClient (defined in wyoming-client.h)
+class WyomingClient;
+
+// Global Wyoming client pointer for tool executors to use
+// Set this before executing voice control tools (stop, pause, resume)
+extern WyomingClient* g_wyoming_client;
+
 } // namespace tool_system

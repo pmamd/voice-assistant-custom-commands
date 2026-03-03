@@ -1615,6 +1615,18 @@ int run(int argc, const char **argv)
 		fprintf(stdout, "[Tool System] Loaded %zu tools from %s\n", tool_registry.getAllTools().size(), tools_json_path.c_str());
 	}
 
+	// Initialize Wyoming client for voice control tools
+	std::string wyoming_host;
+	int wyoming_port;
+	tool_system::WyomingClient* wyoming_client = nullptr;
+	if (tool_system::parseWyomingUrl(params.xtts_url, wyoming_host, wyoming_port)) {
+		wyoming_client = new tool_system::WyomingClient(wyoming_host, wyoming_port);
+		tool_system::g_wyoming_client = wyoming_client;
+		fprintf(stdout, "[Wyoming Client] Initialized for %s:%d\n", wyoming_host.c_str(), wyoming_port);
+	} else {
+		fprintf(stderr, "WARNING: Failed to parse Wyoming URL: %s\n", params.xtts_url.c_str());
+	}
+
 	// instruct mode
 	if (!params.instruct_preset.empty())
 	{
@@ -3340,6 +3352,13 @@ int run(int argc, const char **argv)
 		shortcut_thread.join(); // shortcuts
 #endif
 	}
+
+	// Cleanup Wyoming client
+	if (wyoming_client) {
+		delete wyoming_client;
+		tool_system::g_wyoming_client = nullptr;
+	}
+
 	return 0;
 }
 

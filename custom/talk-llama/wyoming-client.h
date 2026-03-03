@@ -1,31 +1,51 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 namespace tool_system {
 
-// Wyoming protocol client for sending commands to Wyoming-Piper
+// Wyoming protocol client for sending control events to Wyoming-Piper
+// Implements the Wyoming protocol: JSON events over TCP
 class WyomingClient {
 public:
-    WyomingClient(const std::string& base_url);
+    WyomingClient(const std::string& host, int port);
+    ~WyomingClient();
 
-    // Send stop command to halt current TTS playback
-    // Uses the existing send_tts_async infrastructure with "stop" text
-    bool sendStop(const std::string& voice, const std::string& language);
+    // Send AudioStop event (standard Wyoming protocol)
+    // Terminates current TTS playback
+    bool sendAudioStop();
 
-    // Future extensions:
-    // bool setVolume(int percent);
-    // bool setVoice(const std::string& voice_name);
+    // Send audio-pause event (custom event)
+    // Pauses current TTS playback (can be resumed)
+    bool sendAudioPause();
+
+    // Send audio-resume event (custom event)
+    // Resumes paused TTS playback
+    bool sendAudioResume();
+
+    // Check if client is connected
+    bool isConnected() const;
 
 private:
-    std::string base_url_;
+    // Send a Wyoming protocol event
+    // Format: {"type": "event_type", "data": {...}}\n
+    bool sendEvent(const std::string& event_type, const std::string& data_json = "{}");
+
+    // Connect to Wyoming server
+    bool connect();
+
+    // Close connection
+    void disconnect();
+
+    std::string host_;
+    int port_;
+    int socket_fd_;
+    bool connected_;
 };
 
-// Helper function: Send stop command using existing TTS infrastructure
-// This is a thin wrapper around send_tts_async("stop", ...)
-void send_wyoming_stop_command(const std::string& voice,
-                                 const std::string& language,
-                                 const std::string& tts_url,
-                                 bool debug = false);
+// Parse Wyoming TTS URL to extract host and port
+// Example: "http://localhost:10200/" -> ("localhost", 10200)
+bool parseWyomingUrl(const std::string& url, std::string& host, int& port);
 
 } // namespace tool_system

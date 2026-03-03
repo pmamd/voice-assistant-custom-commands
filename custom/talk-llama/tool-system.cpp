@@ -1,4 +1,5 @@
 #include "tool-system.h"
+#include "wyoming-client.h"
 #include <fstream>
 #include <algorithm>
 #include <cctype>
@@ -6,6 +7,9 @@
 #include <cstdio>
 
 namespace tool_system {
+
+// Global Wyoming client pointer (set by main program)
+WyomingClient* g_wyoming_client = nullptr;
 
 // Singleton instance
 ToolRegistry& ToolRegistry::getInstance() {
@@ -188,21 +192,48 @@ std::string ToolRegistry::getToolsPrompt() const {
 namespace executors {
 
 ToolResult stop_speaking(const json& args) {
-    // This will be handled by the main loop to send stop command to Wyoming
     fprintf(stdout, "[Tool] stop_speaking executed\n");
-    return ToolResult(true, "Stopping speech");
+
+    if (g_wyoming_client == nullptr) {
+        fprintf(stderr, "[Tool] ERROR: Wyoming client not initialized\n");
+        return ToolResult(false, "Wyoming client not available");
+    }
+
+    if (g_wyoming_client->sendAudioStop()) {
+        return ToolResult(true, "Stopped speaking");
+    } else {
+        return ToolResult(false, "Failed to send stop command");
+    }
 }
 
 ToolResult pause_speaking(const json& args) {
-    // This will be handled by the main loop to send pause command to Wyoming
     fprintf(stdout, "[Tool] pause_speaking executed\n");
-    return ToolResult(true, "Pausing speech");
+
+    if (g_wyoming_client == nullptr) {
+        fprintf(stderr, "[Tool] ERROR: Wyoming client not initialized\n");
+        return ToolResult(false, "Wyoming client not available");
+    }
+
+    if (g_wyoming_client->sendAudioPause()) {
+        return ToolResult(true, "Paused speaking");
+    } else {
+        return ToolResult(false, "Failed to send pause command");
+    }
 }
 
 ToolResult resume_speaking(const json& args) {
-    // This will be handled by the main loop to send resume command to Wyoming
     fprintf(stdout, "[Tool] resume_speaking executed\n");
-    return ToolResult(true, "Resuming speech");
+
+    if (g_wyoming_client == nullptr) {
+        fprintf(stderr, "[Tool] ERROR: Wyoming client not initialized\n");
+        return ToolResult(false, "Wyoming client not available");
+    }
+
+    if (g_wyoming_client->sendAudioResume()) {
+        return ToolResult(true, "Resumed speaking");
+    } else {
+        return ToolResult(false, "Failed to send resume command");
+    }
 }
 
 ToolResult set_temperature(const json& args) {
