@@ -100,16 +100,43 @@ if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
     echo "Wyoming-Piper-Custom started (PID: $WYOMING_PID)"
     echo "Log: /tmp/wyoming-piper.log"
 
-    # Wait for server to be ready
+    # Wait for server to be ready (needs time to download/load voice model)
     echo "Waiting for TTS server to start..."
-    sleep 3
+    echo "(This may take 10-15 seconds for first-time voice model download)"
 
+    # Check if process is still running
+    sleep 2
     if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
         echo -e "${RED}✗ Failed to start Wyoming-Piper-Custom${NC}"
         echo "Check log: cat /tmp/wyoming-piper.log"
         exit 1
     fi
-    
+
+    # Wait for port to accept connections (max 30 seconds)
+    MAX_WAIT=30
+    WAIT_COUNT=0
+    while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+        if nc -z localhost $WYOMING_PORT 2>/dev/null; then
+            echo -e "${GREEN}✓ TTS server is listening on port $WYOMING_PORT${NC}"
+            break
+        fi
+        sleep 1
+        WAIT_COUNT=$((WAIT_COUNT + 1))
+        if [ $((WAIT_COUNT % 5)) -eq 0 ]; then
+            echo "  Still waiting... ($WAIT_COUNT seconds)"
+        fi
+    done
+
+    if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+        echo -e "${RED}✗ TTS server did not start within $MAX_WAIT seconds${NC}"
+        echo "Check log: cat /tmp/wyoming-piper.log"
+        exit 1
+    fi
+
+    # Additional wait for voice model to fully load
+    echo "Waiting for voice model to load..."
+    sleep 3
+
     echo -e "${GREEN}✓ TTS server ready${NC}"
     echo ""
 fi
@@ -170,12 +197,19 @@ if command -v arecord &> /dev/null; then
             done <<< "$DEVICE_LIST"
 
             echo ""
-            read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -r MIC_CHOICE
-            echo ""
+            # Allow setting microphone via environment variable for automation
+            if [ -n "$MIC_DEVICE" ]; then
+                MIC_CHOICE="$MIC_DEVICE"
+                echo "Using microphone $MIC_CHOICE from MIC_DEVICE environment variable"
+            else
+                read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -t 10 -r MIC_CHOICE || true
+                echo ""
+            fi
 
             # Default to 0 if empty
             if [ -z "$MIC_CHOICE" ]; then
                 MIC_CHOICE=0
+                echo "No selection made, using default (0)"
             fi
 
             if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -lt "$DEVICE_COUNT" ]; then
