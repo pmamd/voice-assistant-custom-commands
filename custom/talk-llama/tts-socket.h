@@ -9,7 +9,7 @@
 #include<unistd.h>
 
 // Port on which TTS Server is listenting
-#define TTS_SERVER_PORT 8020
+#define TTS_SERVER_PORT 10200
 
 #ifdef __cplusplus
 extern "C" {
