@@ -8,6 +8,48 @@ set -e
 export PATH="$HOME/.local/bin:$PATH"
 export LD_LIBRARY_PATH="/opt/piper:$LD_LIBRARY_PATH"
 
+# Track PIDs for cleanup
+WYOMING_PID=""
+TALK_LLAMA_PID=""
+CLEANUP_DONE=0
+
+# Cleanup function
+cleanup() {
+    # Prevent double cleanup
+    if [ "$CLEANUP_DONE" -eq 1 ]; then
+        return
+    fi
+    CLEANUP_DONE=1
+
+    echo ""
+    echo "=========================================="
+    echo "Shutting down..."
+    echo "=========================================="
+
+    # Kill talk-llama if running
+    if [ -n "$TALK_LLAMA_PID" ] && kill -0 "$TALK_LLAMA_PID" 2>/dev/null; then
+        echo "Stopping talk-llama-custom (PID: $TALK_LLAMA_PID)..."
+        kill -TERM "$TALK_LLAMA_PID" 2>/dev/null || true
+        sleep 1
+    fi
+
+    # Kill Wyoming-Piper if we started it
+    if [ -n "$WYOMING_PID" ] && kill -0 "$WYOMING_PID" 2>/dev/null; then
+        echo "Stopping Wyoming-Piper-Custom (PID: $WYOMING_PID)..."
+        kill -TERM "$WYOMING_PID" 2>/dev/null || true
+        sleep 1
+        # Force kill if still running
+        if kill -0 "$WYOMING_PID" 2>/dev/null; then
+            kill -9 "$WYOMING_PID" 2>/dev/null || true
+        fi
+    fi
+
+    echo "Goodbye!"
+}
+
+# Set up signal handlers
+trap cleanup SIGINT SIGTERM EXIT
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -258,23 +300,11 @@ $TALK_LLAMA_BIN \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.8 \
-    -p Georgi
+    -p Georgi &
 
-# Cleanup on exit
-echo ""
-echo "=========================================="
-echo "Shutting down..."
-echo "=========================================="
+TALK_LLAMA_PID=$!
 
-# Ask if user wants to stop Wyoming-Piper-Custom
-read -p "Stop Wyoming-Piper-Custom TTS server? (y/N) [default: N] " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Stopping Wyoming-Piper-Custom..."
-    pkill -f "wyoming-piper-custom" || true
-    echo -e "${GREEN}✓ TTS server stopped${NC}"
-else
-    echo "Wyoming-Piper-Custom left running in background"
-fi
+# Wait for talk-llama to exit
+wait $TALK_LLAMA_PID
 
-echo "Goodbye!"
+# Cleanup will be handled by trap
