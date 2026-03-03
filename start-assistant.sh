@@ -175,9 +175,9 @@ if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
         exit 1
     fi
 
-    # Additional wait for voice model to fully load
-    echo "Waiting for voice model to load..."
-    sleep 3
+    # Additional wait for voice model to fully load and Wyoming protocol to be ready
+    echo "Waiting for voice model to load and Wyoming protocol to initialize..."
+    sleep 10
 
     echo -e "${GREEN}✓ TTS server ready${NC}"
     echo ""
