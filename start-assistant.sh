@@ -65,7 +65,7 @@ echo ""
 WYOMING_PIPER_CMD="wyoming-piper-custom"
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"
-WYOMING_PORT=8020
+WYOMING_PORT=10200
 
 # Auto-detect Piper binary location
 if [ -x "/opt/piper/piper" ]; then
