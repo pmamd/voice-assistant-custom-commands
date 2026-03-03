@@ -1605,6 +1605,16 @@ int run(int argc, const char **argv)
 	// construct the initial prompt for LLaMA inference
 	std::string prompt_llama = params.prompt.empty() ? k_prompt_llama : params.prompt;
 
+	// Initialize tool calling system early (needed for prompt injection)
+	tool_system::ToolRegistry& tool_registry = tool_system::ToolRegistry::getInstance();
+	std::string tools_json_path = "custom/talk-llama/tools/tools.json";
+	if (!tool_registry.loadFromFile(tools_json_path)) {
+		fprintf(stderr, "WARNING: Failed to load tools from %s\n", tools_json_path.c_str());
+	} else {
+		tool_system::registerBuiltinExecutors(tool_registry);
+		fprintf(stdout, "[Tool System] Loaded %zu tools from %s\n", tool_registry.getAllTools().size(), tools_json_path.c_str());
+	}
+
 	// instruct mode
 	if (!params.instruct_preset.empty())
 	{
@@ -1921,26 +1931,19 @@ int run(int argc, const char **argv)
 		printf("(Microphone resumed)\n");
 	}
 
-	// Initialize tool calling system
+	// Display tool system status
 	printf("\n=========================================\n");
-	printf("Initializing Tool Calling System...\n");
+	printf("Tool Calling System Status\n");
 	printf("=========================================\n");
-	tool_system::ToolRegistry& tool_registry = tool_system::ToolRegistry::getInstance();
-
-	// Load tool definitions from JSON
-	std::string tools_json_path = "custom/talk-llama/tools/tools.json";
-	if (!tool_registry.loadFromFile(tools_json_path)) {
-		fprintf(stderr, "WARNING: Failed to load tools from %s\n", tools_json_path.c_str());
-		fprintf(stderr, "Tool calling will not be available.\n");
-	} else {
-		// Register built-in executors
-		tool_system::registerBuiltinExecutors(tool_registry);
+	if (tool_registry.getAllTools().size() > 0) {
 		printf("Tool system initialized with %zu tools\n", tool_registry.getAllTools().size());
 
 		// List available tools
 		for (const auto& tool : tool_registry.getAllTools()) {
 			printf("  - %s%s\n", tool.name.c_str(), tool.fast_path ? " (fast path)" : "");
 		}
+	} else {
+		printf("No tools loaded (tool calling disabled)\n");
 	}
 	printf("=========================================\n\n");
 
