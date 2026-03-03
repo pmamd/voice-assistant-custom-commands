@@ -4,52 +4,6 @@
 
 set -e
 
-# Add paths for wyoming-piper-custom and piper libraries
-export PATH="$HOME/.local/bin:$PATH"
-export LD_LIBRARY_PATH="/opt/piper:$LD_LIBRARY_PATH"
-
-# Track PIDs for cleanup
-WYOMING_PID=""
-TALK_LLAMA_PID=""
-CLEANUP_DONE=0
-
-# Cleanup function
-cleanup() {
-    # Prevent double cleanup
-    if [ "$CLEANUP_DONE" -eq 1 ]; then
-        return
-    fi
-    CLEANUP_DONE=1
-
-    echo ""
-    echo "=========================================="
-    echo "Shutting down..."
-    echo "=========================================="
-
-    # Kill talk-llama if running
-    if [ -n "$TALK_LLAMA_PID" ] && kill -0 "$TALK_LLAMA_PID" 2>/dev/null; then
-        echo "Stopping talk-llama-custom (PID: $TALK_LLAMA_PID)..."
-        kill -TERM "$TALK_LLAMA_PID" 2>/dev/null || true
-        sleep 1
-    fi
-
-    # Kill Wyoming-Piper if we started it
-    if [ -n "$WYOMING_PID" ] && kill -0 "$WYOMING_PID" 2>/dev/null; then
-        echo "Stopping Wyoming-Piper-Custom (PID: $WYOMING_PID)..."
-        kill -TERM "$WYOMING_PID" 2>/dev/null || true
-        sleep 1
-        # Force kill if still running
-        if kill -0 "$WYOMING_PID" 2>/dev/null; then
-            kill -9 "$WYOMING_PID" 2>/dev/null || true
-        fi
-    fi
-
-    echo "Goodbye!"
-}
-
-# Set up signal handlers
-trap cleanup SIGINT SIGTERM EXIT
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -61,42 +15,15 @@ echo "Voice Assistant with Custom Commands"
 echo "=========================================="
 echo ""
 
-# Configuration - Auto-detect paths
-WYOMING_PIPER_CMD="wyoming-piper-custom"
+# Configuration
+# Use Wyoming-Piper-Custom with custom files installed (aplay support, no audio streaming)
+WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper-custom"
+WYOMING_PIPER_DIR=""
 PIPER_VOICE="en_US-lessac-medium"
-PIPER_DATA_DIR="./piper-data"
+PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
-
-# Auto-detect Piper binary location
-if [ -x "/opt/piper/piper" ]; then
-    PIPER_BIN="/opt/piper/piper"
-elif [ -x "/usr/local/bin/piper" ]; then
-    PIPER_BIN="/usr/local/bin/piper"
-elif [ -x "/usr/bin/piper" ]; then
-    PIPER_BIN="/usr/bin/piper"
-elif [ -x "$HOME/.local/bin/piper" ]; then
-    PIPER_BIN="$HOME/.local/bin/piper"
-else
-    PIPER_BIN="piper"  # Hope it's in PATH
-fi
-
-# Model paths - look for common models
-WHISPER_MODEL=""
-for model in ./whisper.cpp/models/ggml-base.en.bin ./whisper.cpp/models/ggml-tiny.en.bin; do
-    if [ -f "$model" ]; then
-        WHISPER_MODEL="$model"
-        break
-    fi
-done
-
-LLAMA_MODEL=""
-for model in ./models/*.gguf; do
-    if [ -f "$model" ]; then
-        LLAMA_MODEL="$model"
-        break
-    fi
-done
-
+WHISPER_MODEL="./whisper.cpp/models/ggml-tiny.en.bin"
+LLAMA_MODEL="./models/llama-2-7b-chat.Q4_K_M.gguf"
 TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
 
 # Check if talk-llama-custom is already running and kill it
@@ -132,7 +59,7 @@ if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
 
     # Start Wyoming-Piper (with custom files installed)
     $WYOMING_PIPER_CMD \
-        --piper "$PIPER_BIN" \
+        --piper /home/paul/.local/bin/piper \
         --voice "$PIPER_VOICE" \
         --data-dir "$PIPER_DATA_DIR" \
         --uri "tcp://0.0.0.0:$WYOMING_PORT" \
@@ -142,43 +69,16 @@ if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
     echo "Wyoming-Piper-Custom started (PID: $WYOMING_PID)"
     echo "Log: /tmp/wyoming-piper.log"
 
-    # Wait for server to be ready (needs time to download/load voice model)
+    # Wait for server to be ready
     echo "Waiting for TTS server to start..."
-    echo "(This may take 10-15 seconds for first-time voice model download)"
+    sleep 3
 
-    # Check if process is still running
-    sleep 2
     if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
         echo -e "${RED}✗ Failed to start Wyoming-Piper-Custom${NC}"
         echo "Check log: cat /tmp/wyoming-piper.log"
         exit 1
     fi
-
-    # Wait for port to accept connections (max 30 seconds)
-    MAX_WAIT=30
-    WAIT_COUNT=0
-    while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-        if nc -z localhost $WYOMING_PORT 2>/dev/null; then
-            echo -e "${GREEN}✓ TTS server is listening on port $WYOMING_PORT${NC}"
-            break
-        fi
-        sleep 1
-        WAIT_COUNT=$((WAIT_COUNT + 1))
-        if [ $((WAIT_COUNT % 5)) -eq 0 ]; then
-            echo "  Still waiting... ($WAIT_COUNT seconds)"
-        fi
-    done
-
-    if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
-        echo -e "${RED}✗ TTS server did not start within $MAX_WAIT seconds${NC}"
-        echo "Check log: cat /tmp/wyoming-piper.log"
-        exit 1
-    fi
-
-    # Additional wait for voice model to fully load and Wyoming protocol to be ready
-    echo "Waiting for voice model to load and Wyoming protocol to initialize..."
-    sleep 10
-
+    
     echo -e "${GREEN}✓ TTS server ready${NC}"
     echo ""
 fi
@@ -239,19 +139,12 @@ if command -v arecord &> /dev/null; then
             done <<< "$DEVICE_LIST"
 
             echo ""
-            # Allow setting microphone via environment variable for automation
-            if [ -n "$MIC_DEVICE" ]; then
-                MIC_CHOICE="$MIC_DEVICE"
-                echo "Using microphone $MIC_CHOICE from MIC_DEVICE environment variable"
-            else
-                read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -t 10 -r MIC_CHOICE || true
-                echo ""
-            fi
+            read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -r MIC_CHOICE
+            echo ""
 
             # Default to 0 if empty
             if [ -z "$MIC_CHOICE" ]; then
                 MIC_CHOICE=0
-                echo "No selection made, using default (0)"
             fi
 
             if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -lt "$DEVICE_COUNT" ]; then
@@ -295,16 +188,29 @@ echo ""
 
 # Start the voice assistant
 $TALK_LLAMA_BIN \
-    --model-llama "$LLAMA_MODEL" \
-    --model-whisper "$WHISPER_MODEL" \
+    -ml "$LLAMA_MODEL" \
+    -mw "$WHISPER_MODEL" \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
-    --temp 0.8 \
-    -p Georgi &
+    --temp 0.5 \
+    -vth 1.2 \
+    -c "$CAPTURE_DEVICE"
 
-TALK_LLAMA_PID=$!
+# Cleanup on exit
+echo ""
+echo "=========================================="
+echo "Shutting down..."
+echo "=========================================="
 
-# Wait for talk-llama to exit
-wait $TALK_LLAMA_PID
+# Ask if user wants to stop Wyoming-Piper-Custom
+read -p "Stop Wyoming-Piper-Custom TTS server? (y/N) [default: N] " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Stopping Wyoming-Piper-Custom..."
+    pkill -f "wyoming-piper-custom" || true
+    echo -e "${GREEN}✓ TTS server stopped${NC}"
+else
+    echo "Wyoming-Piper-Custom left running in background"
+fi
 
-# Cleanup will be handled by trap
+echo "Goodbye!"
