@@ -387,34 +387,58 @@ cmake --build build -j
 - **"cJSON.h not found"**: Install `libcjson-dev` (most commonly missed!)
 - **Build hangs or slow**: Use `-j` to parallelize build
 
-#### 4. Install Wyoming-Piper TTS
+#### 4. Install Piper TTS and Wyoming-Piper
 
+**IMPORTANT**: You must use piper-tts 1.4.1 (Python version), NOT the older C++ binary versions (1.2.0 or earlier). Version mismatch will cause output parsing errors.
+
+**Install Piper TTS 1.4.1**:
 ```bash
-# Install wyoming-piper-custom using pipx (recommended)
-./install-wyoming.sh
+# Install piper-tts using pipx (required for consistent output format)
+pipx install piper-tts==1.4.1
 
-# Or manually with pipx
+# Install missing dependency
+pipx inject piper-tts pathvalidate
+
+# Verify piper is accessible
+export PATH="$HOME/.local/bin:$PATH"
+piper --help
+```
+
+**Install Wyoming-Piper-Custom**:
+```bash
+# Install wyoming-piper-custom using pipx with editable install
 cd wyoming-piper
 pipx install -e .
 cd ..
 
-# Or manually with pip (if pipx unavailable)
-cd wyoming-piper
-pip install -e .
-cd ..
+# Verify installation
+which wyoming-piper-custom
+wyoming-piper-custom --version  # Should show 2.2.2
 ```
 
-**Verify installation**:
+**Add to PATH permanently**:
 ```bash
-which wyoming-piper-custom
-wyoming-piper-custom --version
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Verify versions match**:
+```bash
+# Dev machine and target machine must have matching versions
+piper --help | head -1          # Should use piper-tts (Python version)
+wyoming-piper-custom --version  # Should be 2.2.2
 ```
 
 **Common Issues**:
 - **"wyoming-piper-custom: command not found"**:
   - Ensure pipx bin directory is in PATH: `export PATH="$HOME/.local/bin:$PATH"`
   - Add to `~/.bashrc` for persistence
-- **"ModuleNotFoundError: No module named 'wyoming'"**: Dependencies not installed, re-run install
+- **"ModuleNotFoundError: No module named 'wyoming'"**: Dependencies not installed, re-run pipx install
+- **"ModuleNotFoundError: No module named 'pathvalidate'"**: Run `pipx inject piper-tts pathvalidate`
+- **Using wrong Piper version (1.2.0 C++ binary)**:
+  - Remove old binary: `sudo rm /opt/piper/piper` or `sudo rm /usr/local/bin/piper`
+  - Verify which piper: `which piper` should point to `~/.local/bin/piper`
+  - Check it's Python version: `file $(which piper)` should show "Python script"
 
 #### 5. Download Models
 
@@ -460,61 +484,89 @@ aplay /usr/share/sounds/alsa/Front_Center.wav
 - **"No such file or directory" for test sound**: Use your own WAV file or skip this test
 - **No sound output**: Check speaker connection, volume settings, and default audio device
 
-#### 7. Start the TTS Server
+#### 7. Start the Voice Assistant
 
-In a dedicated terminal or screen session:
+**Use the provided startup script** (recommended):
 
 ```bash
-# Start Wyoming-Piper TTS server
-wyoming-piper-custom \
-    --piper /usr/bin/piper \
-    --uri tcp://0.0.0.0:8020 \
-    --voice en_US-lessac-medium
+# Start both Wyoming-Piper and talk-llama
+./start-assistant.sh
 ```
+
+The script will:
+1. Auto-detect Piper binary location (`~/.local/bin/piper`)
+2. Auto-detect available models (Whisper and LLaMA)
+3. Auto-detect microphone devices
+4. Start Wyoming-Piper TTS server on port 10200
+5. Start talk-llama voice assistant
+6. Handle graceful shutdown with Ctrl+C
 
 **Expected output**:
 ```
-INFO:wyoming_piper:Ready
-```
+==========================================
+Voice Assistant with Custom Commands
+==========================================
 
-**The server will auto-download the voice model on first run** (~50-100MB).
+Starting Wyoming-Piper-Custom TTS server (custom version with aplay)...
+Wyoming-Piper-Custom started (PID: 12345)
+Waiting for TTS server to start...
+✓ TTS server is listening on port 10200
+✓ TTS server ready
 
-**Common Issues**:
-- **"piper: command not found"**:
-  - Install Piper: `wget -O piper.tar.gz <piper-release-url> && tar -xvf piper.tar.gz`
-  - Or use the included Piper in `external/piper/` (see README in that directory)
-- **Port 8020 already in use**: Change to different port with `--uri tcp://0.0.0.0:8021`
-- **Model download fails**: Check internet connectivity, try manual download
+Checking required files...
+✓ All required files found
 
-#### 8. Run the Voice Assistant
+Detecting audio devices...
+✓ Using microphone 0: Blue Snowball
 
-In a second terminal:
+==========================================
+Starting Voice Assistant
+==========================================
 
-```bash
-cd build/bin
-./talk-llama-custom \
-    -m ../../models/mistral-7b-instruct-v0.2.Q5_0.gguf \
-    --model-whisper ../../whisper.cpp/models/ggml-base.en.bin \
-    --xtts-url http://localhost:8020/ \
-    --xtts-voice emma_1 \
-    -p "You are a helpful AI assistant."
-```
+Models:
+  - Whisper: ./whisper.cpp/models/ggml-base.en.bin
+  - LLaMA: ./models/mistral-7b-instruct-v0.2.Q5_0.gguf
+  - TTS Voice: en_US-lessac-medium
 
-**Expected output**:
-```
-whisper_init_from_file_with_params_no_state: loading model from '../../whisper.cpp/models/ggml-base.en.bin'
-...
-system_info: n_threads = 4 / 8 | AVX = 1 | ...
+[LLaMA model loading output...]
+[Whisper initialization...]
 [Start speaking]
 ```
 
-**Common Issues**:
-- **"Failed to initialize audio capture"**: Check microphone is connected and permissions
-- **"Failed to load model"**: Verify model path is correct
-- **"Connection refused to TTS server"**: Ensure Wyoming-Piper is running on port 8020
-- **Constant "Speech started/ended" messages**: This is normal for background noise detection
+**Manual startup** (for debugging):
 
-#### 9. Test the System
+In terminal 1:
+```bash
+# Start Wyoming-Piper TTS server manually
+wyoming-piper-custom \
+    --piper ~/.local/bin/piper \
+    --uri tcp://0.0.0.0:10200 \
+    --voice en_US-lessac-medium \
+    --data-dir ./piper-data
+```
+
+In terminal 2:
+```bash
+# Start voice assistant
+./build/bin/talk-llama-custom \
+    --model-llama ./models/mistral-7b-instruct-v0.2.Q5_0.gguf \
+    --model-whisper ./whisper.cpp/models/ggml-base.en.bin \
+    --xtts-url http://localhost:10200/ \
+    --xtts-voice en_US-lessac-medium \
+    --temp 0.8
+```
+
+**Common Issues**:
+- **"piper: command not found"**:
+  - Ensure piper-tts 1.4.1 is installed: `pipx install piper-tts==1.4.1`
+  - Check PATH includes ~/.local/bin: `export PATH="$HOME/.local/bin:$PATH"`
+- **"Port 10200 already in use"**: Kill existing Wyoming-Piper: `pkill -9 -f wyoming-piper`
+- **"Connection refused to TTS server"**: Ensure Wyoming-Piper started successfully and shows "Ready"
+- **"FileNotFoundError" in Wyoming-Piper logs**: Wrong Piper version! Must use piper-tts 1.4.1, not 1.2.0
+- **Wyoming-Piper crashes immediately**: Check logs at `/tmp/wyoming-piper.log`
+- **Model download fails**: Voice model auto-downloads on first run (~50-100MB), check internet connection
+
+#### 8. Test the System
 
 1. **Say "Hello"** - Should hear AI response
 2. **Say "What is two plus two"** - Should answer "four"
@@ -525,16 +577,34 @@ system_info: n_threads = 4 / 8 | AVX = 1 | ...
 
 Use this checklist to verify successful deployment:
 
+**Setup**:
 - [ ] Repository cloned with `git clone --recursive`
 - [ ] All system packages installed (especially `libcjson-dev`!)
 - [ ] Build completed successfully (`build/bin/talk-llama-custom` exists)
-- [ ] Wyoming-Piper installed (`wyoming-piper-custom --version` works)
-- [ ] Whisper model downloaded (`whisper.cpp/models/ggml-base.en.bin` exists)
+
+**Piper TTS (CRITICAL - Version must match!)**:
+- [ ] piper-tts 1.4.1 installed: `pipx list | grep piper-tts` shows "1.4.1"
+- [ ] pathvalidate dependency installed: `pipx inject piper-tts pathvalidate`
+- [ ] Piper is Python version: `file $(which piper)` shows "Python script"
+- [ ] Correct piper in PATH: `which piper` shows `~/.local/bin/piper`
+- [ ] Wyoming-Piper installed: `wyoming-piper-custom --version` shows "2.2.2"
+
+**Models**:
+- [ ] Whisper model downloaded (e.g., `whisper.cpp/models/ggml-base.en.bin`)
 - [ ] LLaMA model downloaded (e.g., `models/mistral-7b-instruct-v0.2.Q5_0.gguf`)
-- [ ] Audio output tested (`aplay` works)
-- [ ] TTS server running (Wyoming-Piper on port 8020)
+
+**Testing**:
+- [ ] Audio output tested: `aplay -l` shows devices
+- [ ] Wyoming-Piper starts and shows "Ready": Start manually and check for "INFO:wyoming_piper.__main__:Ready"
+- [ ] Voice assistant starts without errors: `./start-assistant.sh`
 - [ ] Voice assistant responds to speech
-- [ ] Stop command works
+- [ ] Stop command interrupts AI speech
+- [ ] Ctrl+C exits cleanly with graceful shutdown
+
+**Version Verification** (compare dev and target machines):
+- [ ] Piper versions match: `file $(which piper)` on both machines
+- [ ] Wyoming-Piper versions match: `wyoming-piper-custom --version` on both
+- [ ] Python versions compatible: Python 3.10+ on both machines
 
 ### Deployment Scripts
 
@@ -729,26 +799,90 @@ sudo apt-get install --only-upgrade libcurl4t64
 sudo apt-get install libcurl4-openssl-dev
 ```
 
-### Piper TTS Binary Not Found
+### Piper Version Mismatch Issues
 
-Wyoming-Piper requires the Piper binary. Options:
+**CRITICAL**: You must use piper-tts 1.4.1 (Python version). Using older C++ binaries (1.2.0 or earlier) will cause FileNotFoundError and output parsing failures.
 
-1. **System package** (if available):
-   ```bash
-   sudo apt install piper-tts
-   ```
+**Symptoms of wrong Piper version**:
+- `FileNotFoundError: [Errno 2] No such file or directory: '[2026-03-03 11:46:23.441] [piper] [info] Loaded voice...'`
+- Wyoming-Piper crashes after TTS request
+- Log shows Piper output lines being used as filenames
 
-2. **Download release binary**:
-   ```bash
-   wget https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz
-   tar -xzf piper_amd64.tar.gz
-   sudo mv piper/piper /usr/local/bin/
-   ```
+**Check your Piper version**:
+```bash
+# Find which piper is being used
+which piper
 
-3. **Use included piper** (if available in repo):
-   ```bash
-   # Check external/piper/ directory
-   ```
+# Should be: /home/username/.local/bin/piper (pipx installed)
+# NOT: /opt/piper/piper or /usr/local/bin/piper (old C++ binary)
+
+# Verify it's the Python version
+file $(which piper)
+# Should show: "Python script" or "python3 script"
+# NOT: "ELF 64-bit executable" (C++ binary)
+```
+
+**Fix: Remove old binary and install correct version**:
+```bash
+# 1. Remove old C++ binary versions (if present)
+sudo rm -f /opt/piper/piper /usr/local/bin/piper /usr/bin/piper
+
+# 2. Install piper-tts 1.4.1 via pipx
+pipx install piper-tts==1.4.1
+pipx inject piper-tts pathvalidate
+
+# 3. Verify correct version
+which piper  # Should be ~/.local/bin/piper
+piper --help | head -1  # Should show Python-based usage
+
+# 4. Update PATH if needed
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+```
+
+**Verify all machines use the same version**:
+```bash
+# On dev machine
+piper --help | head -3
+wyoming-piper-custom --version
+
+# On target machine (should match)
+piper --help | head -3
+wyoming-piper-custom --version
+```
+
+### Wyoming-Piper Crashes or "Ready" Not Shown
+
+**Symptoms**:
+- Wyoming-Piper exits immediately after starting
+- No "Ready" message in logs
+- `/tmp/wyoming-piper.log` is empty or shows startup errors
+
+**Debug steps**:
+```bash
+# 1. Start Wyoming-Piper with debug logging
+wyoming-piper-custom \
+    --piper ~/.local/bin/piper \
+    --voice en_US-lessac-medium \
+    --data-dir ./piper-data \
+    --uri tcp://0.0.0.0:10200 \
+    --debug
+
+# 2. Check if it shows "Ready"
+# Expected output:
+# DEBUG:wyoming_piper.__main__:Namespace(piper='...')
+# DEBUG:wyoming_piper.process:Starting piper process...
+# INFO:wyoming_piper.__main__:Ready
+
+# 3. If it crashes, check the logs
+cat /tmp/wyoming-piper.log
+```
+
+**Common causes**:
+- **Wrong Piper version**: See "Piper Version Mismatch Issues" above
+- **Missing dependencies**: Run `pipx inject piper-tts pathvalidate`
+- **Port already in use**: Kill existing Wyoming-Piper: `pkill -9 -f wyoming-piper`
+- **Voice model download failed**: Delete `./piper-data/` and let it re-download
 
 ## Known Limitations
 
