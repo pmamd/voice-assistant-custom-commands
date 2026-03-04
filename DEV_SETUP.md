@@ -1,6 +1,10 @@
-# Contributing to Voice Assistant Custom Commands
+# Development Setup Guide
 
-Thank you for your interest in contributing! This guide will help you set up your development environment and understand the project structure.
+**NOTE: DO NOT RENAME THIS FILE.** This file is referenced in Claude Code's custom summarization instructions and must remain as `DEV_SETUP.md` to ensure proper context restoration after compaction events.
+
+---
+
+This guide will help you set up your development environment and understand the project structure.
 
 ## Prerequisites
 
