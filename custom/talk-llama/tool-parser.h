@@ -44,8 +44,13 @@ public:
     // Get the parsed tool call (only valid if hasToolCall() == true)
     ToolCall getToolCall();
 
-    // Get accumulated normal text (non-tool-tag text)
-    std::string getText() const { return normal_text_; }
+    // Get accumulated normal text (non-tool-tag text) and clear the buffer
+    // This returns the text since the last call to getText()
+    std::string getText() {
+        std::string result = normal_text_;
+        normal_text_ = "";
+        return result;
+    }
 
     // Reset parser state for next tool call
     void reset();
