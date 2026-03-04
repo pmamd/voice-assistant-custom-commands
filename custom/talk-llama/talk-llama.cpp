@@ -2524,10 +2524,6 @@ int run(int argc, const char **argv)
 				// }
 				// STOP - now handled by tool system fast path
 				// Old hardcoded stop detection removed - using tool system instead
-					user_typed = "";
-					user_typed_this = false;
-					continue;
-				}
 				// // GOOGLE
 				// else if (user_command == "google")
 				// {

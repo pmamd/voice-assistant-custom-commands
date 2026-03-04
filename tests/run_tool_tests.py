@@ -307,6 +307,79 @@ class ToolSystemTestRunner:
         except Exception as e:
             return False, str(e)
 
+    def test_no_old_stop_code(self) -> Tuple[bool, str]:
+        """Verify old hardcoded stop detection has been removed."""
+        print("\nTEST: No Old Stop Code (Regression)")
+        print("-" * 60)
+
+        talk_llama_cpp = self.project_root / "custom/talk-llama/talk-llama.cpp"
+
+        if not talk_llama_cpp.exists():
+            return False, "talk-llama.cpp not found"
+
+        try:
+            with open(talk_llama_cpp) as f:
+                content = f.read()
+
+            # Check for old patterns that should NOT exist
+            old_patterns = {
+                '[Stopped!]': r'printf.*\[Stopped!\]',
+                'hardcoded stop check': r'if\s*\(\s*user_command\s*==\s*["\']stop["\'].*\)\s*\{[^}]*printf',
+            }
+
+            found_issues = []
+            for name, pattern in old_patterns.items():
+                if re.search(pattern, content):
+                    found_issues.append(name)
+                    print(f"  ✗ Found old code: {name}")
+
+            if found_issues:
+                return False, f"Old stop code still exists: {', '.join(found_issues)}"
+
+            print("  ✓ No old hardcoded stop patterns found")
+            return True, ""
+
+        except Exception as e:
+            return False, str(e)
+
+    def test_pause_resume_state_management(self) -> Tuple[bool, str]:
+        """Verify Wyoming-Piper properly manages pause/resume state."""
+        print("\nTEST: Pause/Resume State Management")
+        print("-" * 60)
+
+        handler_py = self.project_root / "wyoming-piper/wyoming_piper/handler.py"
+
+        if not handler_py.exists():
+            return False, "handler.py not found"
+
+        try:
+            with open(handler_py) as f:
+                content = f.read()
+
+            # Check critical patterns for proper state management
+            checks = {
+                "Initialize paused=False when created": r'aplay_proc\.paused\s*=\s*False.*ACTIVE_APLAY_PROCESSES\.append',
+                "Set paused=True in pause handler": r'event\.type.*audio-pause.*aplay_proc\.paused\s*=\s*True',
+                "Check paused in resume handler": r'aplay_proc\.paused.*SIGCONT',
+                "Set paused=False in resume handler": r'SIGCONT.*aplay_proc\.paused\s*=\s*False',
+            }
+
+            all_passed = True
+            for check_name, pattern in checks.items():
+                if re.search(pattern, content, re.DOTALL):
+                    print(f"  ✓ {check_name}")
+                else:
+                    print(f"  ✗ {check_name}")
+                    all_passed = False
+
+            if all_passed:
+                return True, ""
+            else:
+                return False, "State management patterns incomplete"
+
+        except Exception as e:
+            return False, str(e)
+
     def run_all_tests(self) -> int:
         """Run all tool system tests."""
         print("=" * 60)
@@ -320,6 +393,8 @@ class ToolSystemTestRunner:
             ("Text Output Fix", self.test_text_output_no_duplication),
             ("Wyoming Client", self.test_wyoming_client),
             ("Tool Initialization", self.test_tool_initialization),
+            ("No Old Stop Code (Regression)", self.test_no_old_stop_code),
+            ("Pause/Resume State Management", self.test_pause_resume_state_management),
         ]
 
         results = []
