@@ -202,11 +202,10 @@ import paramiko
 
 hostname = "192.168.86.74"
 username = "paul"
-password = "amdisthebest"
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(hostname, username=username, password=password)
+client.connect(hostname, username=username)  # Uses SSH key authentication
 
 # Execute test commands
 stdin, stdout, stderr = client.exec_command(
