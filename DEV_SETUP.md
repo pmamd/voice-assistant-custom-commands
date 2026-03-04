@@ -1,6 +1,10 @@
-# Contributing to Voice Assistant Custom Commands
+# Development Setup Guide
 
-Thank you for your interest in contributing! This guide will help you set up your development environment and understand the project structure.
+**NOTE: DO NOT RENAME THIS FILE.** This file is referenced in Claude Code's custom summarization instructions and must remain as `DEV_SETUP.md` to ensure proper context restoration after compaction events.
+
+---
+
+This guide will help you set up your development environment and understand the project structure.
 
 ## Prerequisites
 
@@ -107,20 +111,53 @@ git commit -m "Update whisper.cpp submodule"
 .
 ├── custom/
 │   └── talk-llama/           # Custom modified talk-llama files
-│       ├── talk-llama.cpp    # Main application (CURL-based TTS)
+│       ├── talk-llama.cpp    # Main application with tool system
+│       ├── tool-system.cpp   # Tool registry and executors
+│       ├── tool-system.h     # Tool framework
+│       ├── tool-parser.cpp   # Mistral tool call parser
+│       ├── tool-parser.h     # Parser interface
+│       ├── wyoming-client.cpp # Wyoming protocol client
+│       ├── wyoming-client.h  # Client interface
+│       ├── tools/
+│       │   └── tools.json    # Tool definitions (12 tools)
 │       ├── llama.cpp         # Standalone llama.cpp inference engine
 │       ├── llama.h
-│       ├── console.cpp
+│       ├── console.cpp       # Console handling
 │       ├── console.h
-│       ├── unicode.cpp
+│       ├── unicode.cpp       # Unicode support
 │       ├── unicode-data.cpp
 │       ├── unicode.h
 │       ├── unicode-data.h
+│       ├── tts-request.c     # TTS request handling
+│       ├── tts-request.h
+│       ├── tts-socket.c      # TTS socket communication
+│       ├── tts-socket.h
 │       └── MODIFICATIONS.md  # Detailed modification notes
 ├── wyoming-piper/            # Modified Wyoming-Piper TTS server
+│   └── wyoming_piper/
+│       └── handler.py        # Event handlers (stop/pause/resume)
 ├── whisper.cpp/              # Upstream whisper.cpp (git submodule)
+├── tests/                    # Test infrastructure
+│   ├── run_tests.py          # Main test runner
+│   ├── run_tool_tests.py     # Tool system test runner
+│   ├── test_tool_system.py   # Tool integration tests
+│   ├── test_tool_audio.py    # Audio-based tool tests
+│   ├── audio_generator.py    # Piper TTS audio generation
+│   ├── audio_verifier.py     # Whisper STT verification
+│   ├── test_cases.yaml       # Original test specifications
+│   ├── test_cases_tool_system.yaml # Tool system test specs (31 tests)
+│   ├── TEST_INFRASTRUCTURE.md # Test infrastructure docs
+│   ├── README.md             # Test harness overview
+│   └── README_TOOL_TESTS.md  # Tool test documentation
+├── docs/                     # Additional documentation
+├── scripts/                  # Build and utility scripts
+├── external/                 # External dependencies (git submodules)
 ├── CMakeLists.txt            # Root build configuration
-└── DEV_SETUP.md             # This file
+├── DEV_SETUP.md              # This file (DO NOT RENAME)
+├── README.md                 # User-facing documentation
+├── TOOL_SYSTEM_IMPLEMENTATION.md # Tool system architecture
+├── TOOL_SYSTEM_TEST_RESULTS.md   # Test results
+└── start-assistant.sh        # Launch script
 ```
 
 ## Common Issues
@@ -165,11 +202,10 @@ import paramiko
 
 hostname = "192.168.86.74"
 username = "paul"
-password = "amdisthebest"
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(hostname, username=username, password=password)
+client.connect(hostname, username=username)  # Uses SSH key authentication
 
 # Execute test commands
 stdin, stdout, stderr = client.exec_command(
