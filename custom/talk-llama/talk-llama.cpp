@@ -2522,21 +2522,8 @@ int run(int argc, const char **argv)
 				// 	audio.clear();
 				// 	continue;
 				// }
-				// STOP
-				//else 
-				if (user_command == "stop")
-				{
-					printf(" [Stopped!]\n");
-
-					// CRITICAL FIX: Send stop command to Wyoming-Piper to actually terminate TTS
-					send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
-
-					text_heard = "";
-					text_heard_trimmed = "";
-					audio.clear();
-#ifdef XTTS_FILE
-					allow_xtts_file(params.xtts_control_path, 0);
-#endif
+				// STOP - now handled by tool system fast path
+				// Old hardcoded stop detection removed - using tool system instead
 					user_typed = "";
 					user_typed_this = false;
 					continue;

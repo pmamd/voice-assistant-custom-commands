@@ -81,12 +81,9 @@ class PiperEventHandler(AsyncEventHandler):
 
             for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:
                 try:
-                    if aplay_proc.proc.returncode is None:
+                    if aplay_proc.proc.returncode is None and not aplay_proc.paused:
                         _LOGGER.debug(f"Pausing aplay process {aplay_proc.proc.pid}")
                         aplay_proc.proc.send_signal(signal.SIGSTOP)
-                        # Mark as paused (add attribute if not exists)
-                        if not hasattr(aplay_proc, 'paused'):
-                            aplay_proc.paused = False
                         aplay_proc.paused = True
                 except Exception as e:
                     _LOGGER.warning(f"Error pausing aplay: {e}")
@@ -213,6 +210,8 @@ class PiperEventHandler(AsyncEventHandler):
                 aplay_proc = await self.process_manager.get_aplay_process(output_path)
 
                 # Track this process so stop command can kill it
+                # Initialize paused state for pause/resume functionality
+                aplay_proc.paused = False
                 ACTIVE_APLAY_PROCESSES.append(aplay_proc)
 
                 try:
