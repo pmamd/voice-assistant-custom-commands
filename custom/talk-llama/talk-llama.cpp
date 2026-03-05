@@ -2586,14 +2586,8 @@ int run(int argc, const char **argv)
 					tool_system::ToolResult result = tool_registry.execute(tool_def.name, json::object());
 
 					if (result.success) {
-						// Handle specific fast-path tools
-						if (tool_def.name == "stop_speaking") {
-							// Send stop command to Wyoming-Piper
-							send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
-							fprintf(stdout, "Stopped speaking\n");
-						}
-
 						// Skip LLaMA processing for fast-path commands
+						// (Tool executors handle Wyoming events)
 						audio.clear();
 						g_hotkey_pressed = "";
 						test_audio_injected = false;
@@ -2886,15 +2880,8 @@ int run(int argc, const char **argv)
 								tool_system::ToolResult result = tool_registry.execute(call.name, call.arguments);
 
 								if (result.success) {
-									// Handle tool-specific actions
-									if (call.name == "stop_speaking") {
-										send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
-									} else if (call.name == "set_temperature") {
-										fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
-									} else if (call.name == "navigate_to") {
-										fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
-									}
-									// Add more tool handlers as needed
+									// Tool executors handle Wyoming events
+									fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
 								} else {
 									fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
 								}

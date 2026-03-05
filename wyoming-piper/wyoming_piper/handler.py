@@ -58,18 +58,18 @@ class PiperEventHandler(AsyncEventHandler):
 
         # Handle AudioStop event (standard Wyoming protocol)
         if AudioStop.is_type(event.type):
-            _LOGGER.debug("Received AudioStop event - terminating all active aplay processes")
+            _LOGGER.debug("Received AudioStop event - killing all active aplay processes")
             STOP_CMD = True
 
-            # Kill all currently playing audio
+            # Kill all currently playing audio immediately
             for aplay_proc in ACTIVE_APLAY_PROCESSES[:]:
                 try:
                     if aplay_proc.proc.returncode is None:
-                        _LOGGER.debug(f"Terminating aplay process {aplay_proc.proc.pid}")
-                        aplay_proc.proc.terminate()
+                        _LOGGER.debug(f"Killing aplay process {aplay_proc.proc.pid}")
+                        aplay_proc.proc.kill()  # Use kill() instead of terminate() for immediate stop
                         ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
                 except Exception as e:
-                    _LOGGER.warning(f"Error terminating aplay: {e}")
+                    _LOGGER.warning(f"Error killing aplay: {e}")
 
             # Acknowledge the stop
             await self.write_event(AudioStop().event())
@@ -205,21 +205,25 @@ class PiperEventHandler(AsyncEventHandler):
 
         else:
             # Normal mode: run aplay
-            async with self.process_manager.processes_lock:
-                _LOGGER.debug("Running aplay on " + output_path)
-                aplay_proc = await self.process_manager.get_aplay_process(output_path)
+            # Check if stop was requested before starting playback
+            if STOP_CMD:
+                _LOGGER.debug("Skipping aplay - stop command received")
+            else:
+                async with self.process_manager.processes_lock:
+                    _LOGGER.debug("Running aplay on " + output_path)
+                    aplay_proc = await self.process_manager.get_aplay_process(output_path)
 
-                # Track this process so stop command can kill it
-                # Initialize paused state for pause/resume functionality
-                aplay_proc.paused = False
-                ACTIVE_APLAY_PROCESSES.append(aplay_proc)
+                    # Track this process so stop command can kill it
+                    # Initialize paused state for pause/resume functionality
+                    aplay_proc.paused = False
+                    ACTIVE_APLAY_PROCESSES.append(aplay_proc)
 
-                try:
-                    await aplay_proc.proc.wait()
-                finally:
-                    # Remove from active list when done
-                    if aplay_proc in ACTIVE_APLAY_PROCESSES:
-                        ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
+                    try:
+                        await aplay_proc.proc.wait()
+                    finally:
+                        # Remove from active list when done
+                        if aplay_proc in ACTIVE_APLAY_PROCESSES:
+                            ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
 
         _LOGGER.debug("Completed request")
 
