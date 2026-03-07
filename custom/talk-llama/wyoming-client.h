@@ -12,6 +12,11 @@ public:
     WyomingClient(const std::string& host, int port);
     ~WyomingClient();
 
+    // Send new-response event: signals start of a new user response.
+    // Wyoming-Piper resets its STOP_CMD flag so queued chunks play normally.
+    // Must be called before dispatching any TTS chunks for a new response.
+    bool sendNewResponse();
+
     // Send AudioStop event (standard Wyoming protocol)
     // Terminates current TTS playback
     bool sendAudioStop();

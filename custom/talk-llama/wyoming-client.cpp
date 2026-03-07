@@ -108,6 +108,12 @@ bool WyomingClient::sendEvent(const std::string& event_type, const std::string& 
     return true;
 }
 
+bool WyomingClient::sendNewResponse() {
+    // Signals Wyoming-Piper that a new user response is starting.
+    // Wyoming-Piper resets STOP_CMD so subsequent TTS chunks play normally.
+    return sendEvent("new-response", "{}");
+}
+
 bool WyomingClient::sendAudioStop() {
     // AudioStop event format: {"type": "audio-stop", "data": {"timestamp": null}}
     return sendEvent("audio-stop", "{\"timestamp\": null}");

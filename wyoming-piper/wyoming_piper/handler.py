@@ -56,6 +56,13 @@ class PiperEventHandler(AsyncEventHandler):
             _LOGGER.debug("Sent info")
             return True
 
+        # Handle new-response event: talk-llama signals start of a new user response.
+        # This is the only place STOP_CMD is reset to False.
+        if event.type == "new-response":
+            _LOGGER.debug("Received new-response event - resetting STOP_CMD")
+            STOP_CMD = False
+            return True
+
         # Handle AudioStop event (standard Wyoming protocol)
         if AudioStop.is_type(event.type):
             _LOGGER.debug("Received AudioStop event - killing all active aplay processes")
@@ -121,8 +128,11 @@ class PiperEventHandler(AsyncEventHandler):
 
     async def _handle_event(self, event: Event) -> bool:
         global STOP_CMD, ACTIVE_APLAY_PROCESSES
-        # Clear at the start of a new synthesize event
-        STOP_CMD = False
+        # STOP_CMD is intentionally NOT reset here.
+        # It is only reset when talk-llama sends an explicit "new-response" event
+        # at the start of each generation, before any TTS chunks are dispatched.
+        # This ensures that stop commands silence ALL queued chunks, not just
+        # the one currently playing.
 
         synthesize = Synthesize.from_event(event)
         _LOGGER.debug(synthesize)
@@ -210,6 +220,13 @@ class PiperEventHandler(AsyncEventHandler):
                 _LOGGER.debug("Skipping aplay - stop command received")
             else:
                 async with self.process_manager.processes_lock:
+                    # Re-check STOP_CMD inside the lock.
+                    # A chunk may have passed the check above while STOP_CMD was
+                    # still False, then waited for the lock while the previous chunk
+                    # was killed. Without this re-check it would start playing anyway.
+                    if STOP_CMD:
+                        _LOGGER.debug("Skipping aplay - stop command received (inside lock)")
+                        return True
                     _LOGGER.debug("Running aplay on " + output_path)
                     aplay_proc = await self.process_manager.get_aplay_process(output_path)
 
