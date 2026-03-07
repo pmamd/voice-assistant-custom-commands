@@ -6,6 +6,59 @@
 
 This guide will help you set up your development environment and understand the project structure.
 
+## Development Workflow
+
+**CRITICAL:** The dev machine (192.168.86.74) is the source of truth. All changes must be tested there.
+
+### Proper Development Cycle
+
+**DO NOT** claim something is "fixed" or "working" based only on local edits. You MUST:
+
+1. ✅ **Edit files locally** (WSL/local machine)
+2. ✅ **Copy to dev machine** immediately
+3. ✅ **Rebuild on dev machine** (if C++ changes)
+4. ✅ **Run tests on dev machine**
+5. ✅ **Verify tests pass**
+6. ✅ **ONLY THEN** claim it works
+
+**Example workflow:**
+```bash
+# 1. Edit locally
+vim custom/talk-llama/talk-llama.cpp
+
+# 2. IMMEDIATELY copy to dev machine
+scp custom/talk-llama/talk-llama.cpp paul@192.168.86.74:~/Projects/git/talk-llama-fast/custom/talk-llama/
+
+# 3. IMMEDIATELY rebuild on dev machine
+ssh paul@192.168.86.74 "cd ~/Projects/git/talk-llama-fast && cmake --build build -j"
+
+# 4. IMMEDIATELY test on dev machine
+ssh paul@192.168.86.74 "cd ~/Projects/git/talk-llama-fast && python3 tests/run_tool_tests.py"
+
+# 5. ONLY NOW can you claim "it works"
+```
+
+### Why This Matters
+
+- ❌ **Local edits alone prove nothing** - the code hasn't been compiled or tested
+- ❌ **Saying "this should work" without testing is speculation** - you don't know if it works
+- ❌ **Files on dev machine may be stale** - if you didn't copy, your changes aren't there
+- ✅ **Only passing tests on dev machine prove it works**
+
+### Common Mistakes to Avoid
+
+1. **Making local edits and saying "fixed"** without copying to dev machine
+2. **Assuming builds succeed** without actually building on dev machine
+3. **Claiming tests pass** without running them on dev machine
+4. **Forgetting to copy updated files** before testing
+
+The dev machine has:
+- All dependencies installed (Piper, Wyoming-Piper, models)
+- Proper environment for testing
+- The actual runtime environment
+
+The local machine (WSL) is just for editing and git operations.
+
 ## Prerequisites
 
 ### System Dependencies

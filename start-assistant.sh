@@ -16,9 +16,9 @@ echo "=========================================="
 echo ""
 
 # Configuration
-# Use Wyoming-Piper-Custom with custom files installed (aplay support, no audio streaming)
-WYOMING_PIPER_CMD="/home/paul/.local/bin/wyoming-piper-custom"
-WYOMING_PIPER_DIR=""
+# Run Wyoming-Piper from project directory (uses modified handler.py with tool support)
+WYOMING_PIPER_DIR="./wyoming-piper"
+WYOMING_PIPER_CMD="python3 -m wyoming_piper"
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
@@ -36,49 +36,50 @@ if pgrep -f "talk-llama-custom" > /dev/null; then
     echo ""
 fi
 
-# Check if Wyoming-Piper-Custom is already running
-if pgrep -f "wyoming-piper-custom" > /dev/null; then
-    echo -e "${YELLOW}⚠ Wyoming-Piper-Custom is already running${NC}"
+# Check if Wyoming-Piper is already running
+if pgrep -f "wyoming_piper" > /dev/null; then
+    echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
     read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Stopping Wyoming-Piper-Custom..."
-        pkill -f "wyoming-piper-custom" || true
+        echo "Stopping Wyoming-Piper..."
+        pkill -f "wyoming_piper" || true
         sleep 2
     else
-        echo "Continuing with existing Wyoming-Piper-Custom instance..."
+        echo "Continuing with existing Wyoming-Piper instance..."
     fi
 fi
 
-# Start Wyoming-Piper-Custom if not running
-if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
-    echo -e "${GREEN}Starting Wyoming-Piper-Custom TTS server (custom version with aplay)...${NC}"
+# Start Wyoming-Piper if not running
+if ! pgrep -f "wyoming_piper" > /dev/null; then
+    echo -e "${GREEN}Starting Wyoming-Piper TTS server (modified version with tool support)...${NC}"
 
     # Create data directory if it doesn't exist
     mkdir -p "$PIPER_DATA_DIR"
 
-    # Start Wyoming-Piper (with custom files installed)
-    $WYOMING_PIPER_CMD \
+    # Start Wyoming-Piper from project directory (uses modified handler.py)
+    # Must run from wyoming-piper directory to use local module
+    bash -c "cd $WYOMING_PIPER_DIR && exec $WYOMING_PIPER_CMD \
         --piper /home/paul/.local/bin/piper \
-        --voice "$PIPER_VOICE" \
-        --data-dir "$PIPER_DATA_DIR" \
-        --uri "tcp://0.0.0.0:$WYOMING_PORT" \
+        --voice $PIPER_VOICE \
+        --data-dir ../$PIPER_DATA_DIR \
+        --uri tcp://0.0.0.0:$WYOMING_PORT" \
         > /tmp/wyoming-piper.log 2>&1 &
-    
+
     WYOMING_PID=$!
-    echo "Wyoming-Piper-Custom started (PID: $WYOMING_PID)"
+    echo "Wyoming-Piper started (PID: $WYOMING_PID)"
     echo "Log: /tmp/wyoming-piper.log"
 
     # Wait for server to be ready
     echo "Waiting for TTS server to start..."
     sleep 3
 
-    if ! pgrep -f "wyoming-piper-custom" > /dev/null; then
-        echo -e "${RED}✗ Failed to start Wyoming-Piper-Custom${NC}"
+    if ! pgrep -f "wyoming_piper" > /dev/null; then
+        echo -e "${RED}✗ Failed to start Wyoming-Piper${NC}"
         echo "Check log: cat /tmp/wyoming-piper.log"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✓ TTS server ready${NC}"
     echo ""
 fi
@@ -194,6 +195,8 @@ $TALK_LLAMA_BIN \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
     -vth 1.2 \
+    -n 300 \
+    --allow-newline \
     -c "$CAPTURE_DEVICE"
 
 # Cleanup on exit
@@ -202,15 +205,15 @@ echo "=========================================="
 echo "Shutting down..."
 echo "=========================================="
 
-# Ask if user wants to stop Wyoming-Piper-Custom
-read -p "Stop Wyoming-Piper-Custom TTS server? (y/N) [default: N] " -n 1 -r
+# Ask if user wants to stop Wyoming-Piper
+read -p "Stop Wyoming-Piper TTS server? (y/N) [default: N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "Stopping Wyoming-Piper-Custom..."
-    pkill -f "wyoming-piper-custom" || true
+    echo "Stopping Wyoming-Piper..."
+    pkill -f "wyoming_piper" || true
     echo -e "${GREEN}✓ TTS server stopped${NC}"
 else
-    echo "Wyoming-Piper-Custom left running in background"
+    echo "Wyoming-Piper left running in background"
 fi
 
 echo "Goodbye!"

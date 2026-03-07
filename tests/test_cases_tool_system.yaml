@@ -1,0 +1,400 @@
+# Test cases for Mistral tool calling system
+# These extend the existing test suite with tool-specific tests
+
+test_cases:
+  # ========================================
+  # Fast Path Tool Tests (Keyword Matching)
+  # ========================================
+
+  - name: "tool_stop_fast_path"
+    description: "Test stop command via fast path tool system"
+    input: "Stop"
+    expected_behavior: "fast_path_tool_execution"
+    tool_name: "stop_speaking"
+    verify_wyoming_event: "audio-stop"
+    max_execution_time_ms: 100
+    test_type: "tool_fast_path"
+
+  - name: "tool_stop_variations"
+    description: "Test stop command keyword variations"
+    inputs:
+      - "stop"
+      - "Stop"
+      - "quiet"
+      - "silence"
+      - "shut up"
+    expected_behavior: "fast_path_tool_execution"
+    tool_name: "stop_speaking"
+    verify_wyoming_event: "audio-stop"
+    test_type: "tool_fast_path"
+
+  - name: "tool_pause_fast_path"
+    description: "Test pause command via fast path"
+    input: "Pause"
+    expected_behavior: "fast_path_tool_execution"
+    tool_name: "pause_speaking"
+    verify_wyoming_event: "audio-pause"
+    max_execution_time_ms: 100
+    test_type: "tool_fast_path"
+
+  - name: "tool_pause_variations"
+    description: "Test pause command keyword variations"
+    inputs:
+      - "pause"
+      - "hold on"
+      - "wait"
+      - "hold up"
+    expected_behavior: "fast_path_tool_execution"
+    tool_name: "pause_speaking"
+    verify_wyoming_event: "audio-pause"
+    test_type: "tool_fast_path"
+
+  - name: "tool_resume_fast_path"
+    description: "Test resume command via fast path"
+    input: "Resume"
+    expected_behavior: "fast_path_tool_execution"
+    tool_name: "resume_speaking"
+    verify_wyoming_event: "audio-resume"
+    max_execution_time_ms: 100
+    test_type: "tool_fast_path"
+
+  - name: "tool_resume_variations"
+    description: "Test resume command keyword variations"
+    inputs:
+      - "resume"
+      - "continue"
+      - "go ahead"
+      - "go on"
+    expected_behavior: "fast_path_tool_execution"
+    tool_name: "resume_speaking"
+    verify_wyoming_event: "audio-resume"
+    test_type: "tool_fast_path"
+
+  # ========================================
+  # Pause/Resume Sequence Tests
+  # ========================================
+
+  - name: "tool_pause_resume_sequence"
+    description: "Test pause then resume during long response"
+    test_type: "multi_step"
+    sequence:
+      - step: 1
+        action: "send_input"
+        input: "Tell me a long story about robots"
+        wait_for: "tts_start"
+        timeout_ms: 5000
+
+      - step: 2
+        action: "wait"
+        duration_ms: 2000
+        description: "Wait for TTS playback to start"
+
+      - step: 3
+        action: "send_input"
+        input: "pause"
+        expected_behavior: "fast_path_tool"
+        verify_wyoming_event: "audio-pause"
+        max_tool_time_ms: 100
+
+      - step: 4
+        action: "wait"
+        duration_ms: 3000
+        description: "Verify TTS stays paused"
+        verify_tts_paused: true
+
+      - step: 5
+        action: "send_input"
+        input: "resume"
+        expected_behavior: "fast_path_tool"
+        verify_wyoming_event: "audio-resume"
+        verify_tts_resumed: true
+
+  # ========================================
+  # LLM-Driven Tool Tests (Automotive)
+  # ========================================
+
+  - name: "tool_set_temperature_basic"
+    description: "Test temperature control via LLM tool calling"
+    input: "Make it warmer"
+    expected_behavior: "llm_tool_call"
+    tool_name: "set_temperature"
+    verify_tool_call_format: true
+    expected_tool_args:
+      - "value"
+    expected_response_contains: ["temperature", "set"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_set_temperature_specific"
+    description: "Test temperature with specific value"
+    input: "Set temperature to 72 degrees"
+    expected_behavior: "llm_tool_call"
+    tool_name: "set_temperature"
+    verify_tool_call_format: true
+    expected_tool_args:
+      value: 72
+    test_type: "tool_llm_driven"
+
+  - name: "tool_set_fan_speed"
+    description: "Test fan speed control"
+    input: "Turn the fan to high"
+    expected_behavior: "llm_tool_call"
+    tool_name: "set_fan_speed"
+    expected_tool_args:
+      level: "high"
+    expected_response_contains: ["fan", "high"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_enable_defrost"
+    description: "Test defrost control"
+    input: "Turn on the front defrost"
+    expected_behavior: "llm_tool_call"
+    tool_name: "enable_defrost"
+    expected_tool_args:
+      location: "front"
+    expected_response_contains: ["defrost", "front"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_navigate_to_home"
+    description: "Test navigation to preset location"
+    input: "Navigate home"
+    expected_behavior: "llm_tool_call"
+    tool_name: "navigate_to"
+    expected_tool_args:
+      preset: "home"
+    expected_response_contains: ["navigation", "home"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_navigate_to_address"
+    description: "Test navigation to specific address"
+    input: "Navigate to 123 Main Street"
+    expected_behavior: "llm_tool_call"
+    tool_name: "navigate_to"
+    expected_tool_args:
+      - "destination"
+    expected_response_contains: ["navigation", "started"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_find_nearby_gas"
+    description: "Test finding nearby POI"
+    input: "Find nearby gas stations"
+    expected_behavior: "llm_tool_call"
+    tool_name: "find_nearby"
+    expected_tool_args:
+      category: "gas_station"
+    expected_response_contains: ["found", "gas"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_get_eta"
+    description: "Test getting ETA"
+    input: "What's my ETA"
+    expected_behavior: "llm_tool_call"
+    tool_name: "get_eta"
+    expected_response_contains: ["minutes", "eta", "arrive"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_check_tire_pressure"
+    description: "Test tire pressure check"
+    input: "Check my tire pressure"
+    expected_behavior: "llm_tool_call"
+    tool_name: "check_tire_pressure"
+    expected_response_contains: ["tire", "pressure"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_get_fuel_range"
+    description: "Test fuel range query"
+    input: "How much fuel do I have"
+    expected_behavior: "llm_tool_call"
+    tool_name: "get_fuel_range"
+    expected_response_contains: ["fuel", "range", "miles"]
+    test_type: "tool_llm_driven"
+
+  - name: "tool_check_vehicle_status"
+    description: "Test vehicle status check"
+    input: "Check vehicle status"
+    expected_behavior: "llm_tool_call"
+    tool_name: "check_vehicle_status"
+    expected_response_contains: ["vehicle", "status"]
+    test_type: "tool_llm_driven"
+
+  # ========================================
+  # Tool Call Parser Tests
+  # ========================================
+
+  - name: "tool_call_parser_valid"
+    description: "Test parser handles valid tool call format"
+    test_type: "parser_unit"
+    input_tokens: [
+      "<", "tool", "_", "call", ">",
+      '{"name":"set_temperature","arguments":{"value":72},"id":"0"}',
+      "</", "tool", "_", "call", ">"
+    ]
+    expected_parsed:
+      name: "set_temperature"
+      arguments:
+        value: 72
+      id: "0"
+    verify_clean_text_empty: true
+
+  - name: "tool_call_parser_with_text"
+    description: "Test parser separates tool calls from normal text"
+    test_type: "parser_unit"
+    input_tokens: [
+      "Sure", ",", " I'll", " set", " that", " for", " you",
+      "<", "tool", "_", "call", ">",
+      '{"name":"set_temperature","arguments":{"value":72},"id":"0"}',
+      "</", "tool", "_", "call", ">",
+      " The", " temperature", " is", " set", "."
+    ]
+    expected_normal_text: "Sure, I'll set that for you The temperature is set."
+    expected_tool_call:
+      name: "set_temperature"
+
+  # ========================================
+  # Error Handling Tests
+  # ========================================
+
+  - name: "tool_invalid_arguments"
+    description: "Test tool handles invalid arguments gracefully"
+    input: "Set temperature to 200 degrees"
+    expected_behavior: "llm_tool_call"
+    tool_name: "set_temperature"
+    expected_tool_execution: "failure"
+    expected_response_contains: ["error", "valid", "range"]
+    test_type: "tool_error_handling"
+
+  - name: "tool_missing_required_arg"
+    description: "Test tool handles missing required argument"
+    input: "Enable defrost"
+    expected_behavior: "llm_tool_call"
+    tool_name: "enable_defrost"
+    # LLM should infer location or ask
+    test_type: "tool_error_handling"
+
+  # ========================================
+  # Multi-Tool Scenarios
+  # ========================================
+
+  - name: "tool_multiple_actions"
+    description: "Test multiple tool calls in sequence"
+    test_type: "multi_turn"
+    turns:
+      - input: "Set temperature to 70"
+        expected_tool: "set_temperature"
+        expected_response_contains: ["temperature", "70"]
+      - input: "Now turn the fan to high"
+        expected_tool: "set_fan_speed"
+        expected_response_contains: ["fan", "high"]
+      - input: "Navigate home"
+        expected_tool: "navigate_to"
+        expected_response_contains: ["navigation", "home"]
+
+  # ========================================
+  # Regression Tests (Ensure Normal Operation)
+  # ========================================
+
+  - name: "tool_no_false_positives"
+    description: "Ensure normal conversation doesn't trigger tools"
+    input: "Hello, how are you today?"
+    expected_behavior: "normal_response"
+    verify_no_tool_call: true
+    expected_response_contains: ["hello", "help"]
+    test_type: "tool_regression"
+
+  - name: "tool_stop_in_sentence"
+    description: "Ensure 'stop' in normal sentence doesn't trigger fast path"
+    input: "I need to stop by the store later"
+    expected_behavior: "normal_response"
+    verify_no_fast_path_tool: true
+    test_type: "tool_regression"
+
+# Test configuration
+config:
+  # Tool system specific settings
+  tool_system:
+    fast_path_max_latency_ms: 100  # Fast path must execute within 100ms
+    llm_tool_call_timeout_ms: 10000  # LLM has 10s to generate tool call
+    verify_wyoming_events: true  # Check Wyoming events are actually sent
+    verify_tool_execution: true  # Check tool executors run
+
+  # Parser testing
+  parser:
+    verify_token_by_token: true  # Test incremental parsing
+    verify_text_separation: true  # Ensure tool tags separated from text
+
+  # Execution settings
+  execution:
+    timeout_per_test: 60  # Tool tests should be faster than full e2e
+    retry_on_llm_variance: 2  # LLM may phrase tool calls differently
+
+# Test groups
+test_groups:
+  tool_fast_path:
+    - "tool_stop_fast_path"
+    - "tool_stop_variations"
+    - "tool_pause_fast_path"
+    - "tool_pause_variations"
+    - "tool_resume_fast_path"
+    - "tool_resume_variations"
+
+  tool_pause_resume:
+    - "tool_pause_fast_path"
+    - "tool_resume_fast_path"
+    - "tool_pause_resume_sequence"
+
+  tool_automotive:
+    - "tool_set_temperature_basic"
+    - "tool_set_temperature_specific"
+    - "tool_set_fan_speed"
+    - "tool_enable_defrost"
+    - "tool_navigate_to_home"
+    - "tool_navigate_to_address"
+    - "tool_find_nearby_gas"
+    - "tool_get_eta"
+    - "tool_check_tire_pressure"
+    - "tool_get_fuel_range"
+    - "tool_check_vehicle_status"
+
+  tool_parser:
+    - "tool_call_parser_valid"
+    - "tool_call_parser_with_text"
+
+  tool_error_handling:
+    - "tool_invalid_arguments"
+    - "tool_missing_required_arg"
+
+  tool_regression:
+    - "tool_no_false_positives"
+    - "tool_stop_in_sentence"
+
+  tool_smoke:
+    - "tool_stop_fast_path"
+    - "tool_pause_fast_path"
+    - "tool_resume_fast_path"
+    - "tool_set_temperature_basic"
+    - "tool_navigate_to_home"
+
+  tool_all:
+    - "tool_stop_fast_path"
+    - "tool_stop_variations"
+    - "tool_pause_fast_path"
+    - "tool_pause_variations"
+    - "tool_resume_fast_path"
+    - "tool_resume_variations"
+    - "tool_pause_resume_sequence"
+    - "tool_set_temperature_basic"
+    - "tool_set_temperature_specific"
+    - "tool_set_fan_speed"
+    - "tool_enable_defrost"
+    - "tool_navigate_to_home"
+    - "tool_navigate_to_address"
+    - "tool_find_nearby_gas"
+    - "tool_get_eta"
+    - "tool_check_tire_pressure"
+    - "tool_get_fuel_range"
+    - "tool_check_vehicle_status"
+    - "tool_call_parser_valid"
+    - "tool_call_parser_with_text"
+    - "tool_invalid_arguments"
+    - "tool_multiple_actions"
+    - "tool_no_false_positives"
+    - "tool_stop_in_sentence"

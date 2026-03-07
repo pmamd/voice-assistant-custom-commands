@@ -48,6 +48,11 @@
 #include "tts-socket.h"
 #include "tts-request.h"
 
+// For tool calling system
+#include "tool-system.h"
+#include "tool-parser.h"
+#include "wyoming-client.h"
+
 // Signal handling for graceful shutdown
 volatile sig_atomic_t g_sigint_received = 0;
 
@@ -1456,6 +1461,9 @@ int run(int argc, const char **argv)
 	std::vector<std::thread> threads;
 	std::thread t;
 	int thread_i = 0;
+	std::atomic<bool> g_stop_generation{false}; // signal background generation to stop
+	std::atomic<bool> g_generation_running{false}; // true while LLM generation thread is live
+	std::thread g_llm_thread; // background generation thread
 	int reply_part = 0;
 	std::string text_to_speak_arr[150];
 	int reply_part_arr[150];
@@ -1600,6 +1608,28 @@ int run(int argc, const char **argv)
 	// construct the initial prompt for LLaMA inference
 	std::string prompt_llama = params.prompt.empty() ? k_prompt_llama : params.prompt;
 
+	// Initialize tool calling system early (needed for prompt injection)
+	tool_system::ToolRegistry& tool_registry = tool_system::ToolRegistry::getInstance();
+	std::string tools_json_path = "custom/talk-llama/tools/tools.json";
+	if (!tool_registry.loadFromFile(tools_json_path)) {
+		fprintf(stderr, "WARNING: Failed to load tools from %s\n", tools_json_path.c_str());
+	} else {
+		tool_system::registerBuiltinExecutors(tool_registry);
+		fprintf(stdout, "[Tool System] Loaded %zu tools from %s\n", tool_registry.getAllTools().size(), tools_json_path.c_str());
+	}
+
+	// Initialize Wyoming client for voice control tools
+	std::string wyoming_host;
+	int wyoming_port;
+	tool_system::WyomingClient* wyoming_client = nullptr;
+	if (tool_system::parseWyomingUrl(params.xtts_url, wyoming_host, wyoming_port)) {
+		wyoming_client = new tool_system::WyomingClient(wyoming_host, wyoming_port);
+		tool_system::g_wyoming_client = wyoming_client;
+		fprintf(stdout, "[Wyoming Client] Initialized for %s:%d\n", wyoming_host.c_str(), wyoming_port);
+	} else {
+		fprintf(stderr, "WARNING: Failed to parse Wyoming URL: %s\n", params.xtts_url.c_str());
+	}
+
 	// instruct mode
 	if (!params.instruct_preset.empty())
 	{
@@ -1669,6 +1699,13 @@ int run(int argc, const char **argv)
 	}
 
 	prompt_llama = ::replace(prompt_llama, "{4}", chat_symb);
+
+	// Inject tool definitions into prompt (for Mistral tool calling)
+	if (tool_registry.getAllTools().size() > 0) {
+		std::string tools_prompt = tool_registry.getToolsPrompt();
+		prompt_llama += "\n\n" + tools_prompt;
+		fprintf(stdout, "[Tool System] Injected %zu tools into system prompt\n", tool_registry.getAllTools().size());
+	}
 
 	// init session
 	std::string path_session = params.path_session;
@@ -1908,6 +1945,22 @@ int run(int argc, const char **argv)
 		audio.resume();
 		printf("(Microphone resumed)\n");
 	}
+
+	// Display tool system status
+	printf("\n=========================================\n");
+	printf("Tool Calling System Status\n");
+	printf("=========================================\n");
+	if (tool_registry.getAllTools().size() > 0) {
+		printf("Tool system initialized with %zu tools\n", tool_registry.getAllTools().size());
+
+		// List available tools
+		for (const auto& tool : tool_registry.getAllTools()) {
+			printf("  - %s%s\n", tool.name.c_str(), tool.fast_path ? " (fast path)" : "");
+		}
+	} else {
+		printf("No tools loaded (tool calling disabled)\n");
+	}
+	printf("=========================================\n\n");
 
 	if (params.push_to_talk)
 		printf("Type anything or hold 'Alt' to speak:\n");
@@ -2150,7 +2203,11 @@ int run(int argc, const char **argv)
 					speech_len = 1.10; // whisper doesn't like sentences < 1.10s
 				// audio.get((int)(speech_len*1000), pcmf32_cur);	// was 10000 ms
 				if (!test_mode) {
-					audio.get(10000, pcmf32_cur); // was 10000 ms
+					// While generation is running, TTS audio fills the buffer.
+					// Use a short window so Whisper sees recent audio (the user's
+					// command) rather than seconds of story content with "stop" buried in it.
+					int audio_window_ms = g_generation_running.load() ? 2000 : 10000;
+					audio.get(audio_window_ms, pcmf32_cur);
 				}
 				// In test mode, pcmf32_cur already has the test data from earlier injection
 				std::string all_heard;
@@ -2472,25 +2529,8 @@ int run(int argc, const char **argv)
 				// 	audio.clear();
 				// 	continue;
 				// }
-				// STOP
-				//else 
-				if (user_command == "stop")
-				{
-					printf(" [Stopped!]\n");
-
-					// CRITICAL FIX: Send stop command to Wyoming-Piper to actually terminate TTS
-					send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
-
-					text_heard = "";
-					text_heard_trimmed = "";
-					audio.clear();
-#ifdef XTTS_FILE
-					allow_xtts_file(params.xtts_control_path, 0);
-#endif
-					user_typed = "";
-					user_typed_this = false;
-					continue;
-				}
+				// STOP - now handled by tool system fast path
+				// Old hardcoded stop detection removed - using tool system instead
 				// // GOOGLE
 				// else if (user_command == "google")
 				// {
@@ -2537,11 +2577,58 @@ int run(int argc, const char **argv)
 				// 		fprintf(stdout, "\nError: can't find bot name in text_heard_trimmed: %s\n", text_heard_trimmed.c_str());
 				// }
 
+				reply_part = 0;
+
+				// FAST PATH TOOL EXECUTION (pre-LLaMA)
+				// Check if the user said a fast-path command (e.g., "stop")
+				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
+				if (matched && tool_def.fast_path) {
+					fprintf(stdout, "\n[Fast Path Tool: %s]\n", tool_def.name.c_str());
+
+					// Execute the tool
+					tool_system::ToolResult result = tool_registry.execute(tool_def.name, json::object());
+
+					if (result.success) {
+						// Stop any background generation
+						g_stop_generation = true;
+						// Skip LLaMA processing for fast-path commands
+						// (Tool executors handle Wyoming events)
+						audio.clear();
+						g_hotkey_pressed = "";
+						test_audio_injected = false;
+						continue;
+					} else {
+						fprintf(stderr, "Fast path tool execution failed: %s\n", result.message.c_str());
+						// Fall through to normal LLaMA processing
+					}
+				}
+
+				// If generation is already running, only fast-path commands are accepted above
+				if (g_generation_running.load()) {
+					audio.clear();
+					continue;
+				}
+
+				// Join previous generation thread before starting a new one
+				if (g_llm_thread.joinable()) {
+					g_llm_thread.join();
+				}
+
+				// Spawn generation + TTS in a background thread.
+				// text_heard is captured by value (it goes out of scope on the main thread).
+				// All persistent LLM state (embd_inp, n_past, ctx_llama, etc.) by reference.
+				g_stop_generation = false;
+				g_generation_running = true;
+				// Tell Wyoming-Piper a new response is starting so it resets STOP_CMD.
+				// Must happen before any TTS chunks are dispatched.
+				if (tool_system::g_wyoming_client)
+					tool_system::g_wyoming_client->sendNewResponse();
+				g_llm_thread = std::thread([&, text_heard]() mutable {
+				// Local vars that were previously declared before the fast path:
 				int translation_is_going = 0;
 				int n_embd_inp_before_trans = 0;
 				int tokens_in_reply = 0;
 				std::string current_voice_tmp = "";
-				reply_part = 0;
 
 				// LLAMA
 				llama_start_time = get_current_time_ms();
@@ -2550,11 +2637,10 @@ int run(int argc, const char **argv)
 				if (text_heard.empty() || tokens.empty() || force_speak)
 				{
 					fprintf(stdout, "%s: Heard nothing, skipping ...\n", __func__);
-					audio.clear();
 					g_hotkey_pressed = "";
 					test_audio_injected = false; // Reset even if nothing heard
-
-					continue;
+					g_generation_running = false;
+					return; // exit lambda - nothing to generate
 				}
 
 				force_speak = false;
@@ -2646,6 +2732,10 @@ int run(int argc, const char **argv)
 
 				float temp_next = params.temp;
 
+				// Initialize tool call parser for this generation
+				static tool_system::ToolCallParser tool_parser;
+				tool_parser.reset();
+
 				// text inference
 				bool done = false;
 				std::string text_to_speak;
@@ -2653,8 +2743,8 @@ int run(int argc, const char **argv)
 				while (true)
 				{
 					// predict
-					if (new_tokens > params.n_predict)
-						break; // 64 default
+					if (new_tokens > params.n_predict || g_stop_generation.load())
+						break;
 					new_tokens++;
 					if (embd.size() > 0)
 					{
@@ -2809,9 +2899,38 @@ int run(int argc, const char **argv)
 							// add it to the context
 							embd.push_back(id);
 							out_token_str = llama_token_to_piece(ctx_llama, id);
-							text_to_speak += out_token_str;
-							// printf("[%s]", out_token_str.c_str());
-							printf("%s", out_token_str.c_str());
+
+							// Feed token to tool call parser
+							bool tool_detected = tool_parser.feedToken(out_token_str);
+
+							if (tool_detected && tool_parser.hasToolCall()) {
+								// Extract and execute the tool call
+								tool_system::ToolCall call = tool_parser.getToolCall();
+								fprintf(stdout, "\n[Tool Call: %s]\n", call.name.c_str());
+
+								tool_system::ToolResult result = tool_registry.execute(call.name, call.arguments);
+
+								if (result.success) {
+									// Tool executors handle Wyoming events
+									fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
+								} else {
+									fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
+								}
+
+								// Reset parser for potential next tool call
+								tool_parser.reset();
+							}
+
+							// Use the parser's normal text (excluding tool tags)
+							std::string clean_text = tool_parser.getText();
+							// Replace newlines with spaces: multi-line LLM responses should flow
+							// as continuous speech rather than sending bare \n to TTS.
+							std::replace(clean_text.begin(), clean_text.end(), '\n', ' ');
+							if (!clean_text.empty()) {
+								text_to_speak += clean_text;
+								printf("%s", clean_text.c_str());
+							}
+
 							tokens_in_reply++;
 
 							// detect sequence repetition (llama stuck in a loop) https://github.com/ggerganov/llama.cpp/pull/2593
@@ -2858,7 +2977,7 @@ int run(int argc, const char **argv)
 								translation_is_going = 0;
 								// fprintf(stdout, " Found person name. translation_is_going: %d, text_to_speak: (%s)\n", translation_is_going, text_to_speak.c_str());
 							}
-							else if (text_to_speak[0] == '\n' && text_to_speak[text_to_speak.size() - 1] == ':' && text_to_speak.size() < 10) // \nName:
+							else if (text_to_speak[0] == '\n' && text_to_speak[text_to_speak.size() - 1] == ':' && text_to_speak.size() < 10 && text_to_speak.find(' ') == std::string::npos) // \nName: (single word only)
 							{
 								bot_name_is_found = 1;
 								bot_name_current = text_to_speak.substr(1, text_to_speak.size() - 2);
@@ -2904,11 +3023,7 @@ int run(int argc, const char **argv)
 							// 	}
 							// }
 							//	clear mic
-							if (new_tokens == 20 && !llama_interrupted)
-							{
-								audio.clear();
-								// printf("\n [audio cleared after 20t]\n");
-							}
+							// audio.clear() at token 20 removed: main thread owns audio capture
 
 							// splitting for tts
 							if (text_len >= 2 && new_tokens >= 2 && !person_name_is_found && ((new_tokens == split_after && params.split_after && text_to_speak[text_len - 1] != '\'') || text_to_speak[text_len - 1] == '.' || text_to_speak[text_len - 1] == '(' || text_to_speak[text_len - 1] == ')' || (text_to_speak[text_len - 1] == ',' && n_comas == 1 && new_tokens > split_after && params.split_after) || (text_to_speak[text_len - 2] == ' ' && text_to_speak[text_len - 1] == '-') || text_to_speak[text_len - 1] == '?' || text_to_speak[text_len - 1] == '!' || text_to_speak[text_len - 1] == ';' || text_to_speak[text_len - 1] == ':' || text_to_speak[text_len - 1] == '\n'))
@@ -3180,16 +3295,9 @@ int run(int argc, const char **argv)
 				}
 				// if ((embd_inp.size() % 10) == 0) printf("\n [t: %zu]\n", embd_inp.size());
 
-				if (llama_interrupted /*&& llama_interrupted_time - llama_start_time < 2.0*/)
-				{
-					1;
-					// printf(" \n[continue speech] (%f)", (llama_interrupted_time - llama_start_time));
-				}
-				else
-				{
-					audio.clear();
-					// printf("\n [audio cleared fin]\n");
-				}
+				// audio.clear() removed: main thread owns audio capture.
+				// When generation finishes, g_generation_running goes false and
+				// the main listen loop will naturally handle audio from that point.
 
 				llama_end_time = get_current_time_ms();
 				if (params.verbose)
@@ -3216,7 +3324,10 @@ int run(int argc, const char **argv)
 					}
 					_exit(0);
 				}
-			}
+				g_generation_running = false;
+			}); // end g_llm_thread lambda
+			continue; // main thread returns to listen loop
+			} // end if(vad_result >= 2) - main thread path
 		}
 	}
 
@@ -3237,6 +3348,13 @@ int run(int argc, const char **argv)
 		shortcut_thread.join(); // shortcuts
 #endif
 	}
+
+	// Cleanup Wyoming client
+	if (wyoming_client) {
+		delete wyoming_client;
+		tool_system::g_wyoming_client = nullptr;
+	}
+
 	return 0;
 }
 

@@ -37,6 +37,9 @@ if (WHISPER_SDL2)
         custom/talk-llama/unicode-data.cpp
         custom/talk-llama/tts-socket.c
         custom/talk-llama/tts-request.c
+        custom/talk-llama/tool-system.cpp
+        custom/talk-llama/tool-parser.cpp
+        custom/talk-llama/wyoming-client.cpp
     )
 
     # Include directories (order matters - local files before system)
@@ -74,4 +77,13 @@ if (WHISPER_SDL2)
     endif()
 
     include(whisper.cpp/cmake/DefaultTargetOptions.cmake)
+
+    # Wyoming client test program
+    add_executable(test-wyoming-client
+        custom/talk-llama/test-wyoming-client.cpp
+        custom/talk-llama/wyoming-client.cpp
+    )
+    set_target_properties(test-wyoming-client PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
 endif()
