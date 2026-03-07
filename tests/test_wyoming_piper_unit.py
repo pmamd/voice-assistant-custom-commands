@@ -202,3 +202,110 @@ async def main():
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
+
+
+# ---------------------------------------------------------------------------
+# Binary-level LLM output tests (unittest-based)
+# These run talk-llama-custom in test mode and inspect its output.
+# Run with: python3 -m unittest tests/test_wyoming_piper_unit.py -v
+# ---------------------------------------------------------------------------
+
+import re
+import subprocess
+import unittest
+
+_PROJECT_ROOT = Path(__file__).parent.parent
+_BINARY = _PROJECT_ROOT / "build/bin/talk-llama-custom"
+_WHISPER_MODEL = _PROJECT_ROOT / "whisper.cpp/models/ggml-tiny.en.bin"
+_LLAMA_MODEL = _PROJECT_ROOT / "models/llama-2-7b-chat.Q4_K_M.gguf"
+_STORY_AUDIO = _PROJECT_ROOT / "tests/audio/inputs/story_request.wav"
+_WYOMING_URL = "http://localhost:10200/"
+
+
+def _run_binary(audio_file, timeout=120):
+    cmd = [
+        str(_BINARY), "-ml", str(_LLAMA_MODEL), "-mw", str(_WHISPER_MODEL),
+        "--xtts-url", _WYOMING_URL, "--xtts-voice", "en_US-lessac-medium",
+        "--temp", "0.5", "-n", "300", "--allow-newline",
+        "--test-input", str(audio_file),
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.stdout + r.stderr
+    except subprocess.TimeoutExpired:
+        return "[TIMEOUT]"
+
+
+def _extract_response(output):
+    lines, resp, active = output.split('\n'), [], False
+    for line in lines:
+        if 'LLaMA:' in line or 'llama:' in line.lower():
+            active = True
+            idx = line.lower().find('llama:')
+            resp.append(line[idx + 6:].strip())
+        elif active and line.strip() and not line.startswith('[') and not line.startswith('whisper'):
+            resp.append(line.strip())
+    return ' '.join(resp).strip()
+
+
+class TestLLMOutputQuality(unittest.TestCase):
+    """
+    Tests that verify the binary produces correct LLM output.
+
+    Covers regressions from the newline-stripping fix:
+    - Multi-line responses must not be silenced by the \\n antiprompt
+    - VAD must not fire during test mode (no real mic)
+    """
+
+    def setUp(self):
+        for f in [_BINARY, _WHISPER_MODEL, _LLAMA_MODEL, _STORY_AUDIO]:
+            if not f.exists():
+                self.skipTest(f'Required file not found: {f}')
+
+    def tearDown(self):
+        subprocess.run(['pkill', '-9', 'aplay'], capture_output=True)
+
+    def test_story_response_not_truncated(self):
+        """
+        'Tell me a story' must produce substantially more than an intro phrase.
+
+        Regression: the \\n after "Here is an adventure story for you:" was
+        firing the antiprompt and stopping generation before story content
+        could be produced. Fixed by --allow-newline and replacing \\n with
+        spaces in clean_text before TTS dispatch.
+        """
+        output = _run_binary(_STORY_AUDIO)
+        self.assertNotIn('[TIMEOUT]', output, 'Binary timed out')
+
+        response = _extract_response(output)
+        word_count = len(response.split())
+
+        truncation_patterns = [
+            r"here is.*story.*for you\s*$",
+            r"of course\s*$",
+            r"great\s*$",
+        ]
+        for pattern in truncation_patterns:
+            self.assertFalse(
+                re.search(pattern, response.lower().strip()),
+                f'Response ends at intro phrase — newline antiprompt may still be firing. '
+                f'Response: "{response[:200]}"')
+
+        self.assertGreaterEqual(word_count, 20,
+            f'Response only {word_count} words — story content was cut off. '
+            f'Response: "{response[:200]}"')
+
+    def test_no_false_vad_in_test_mode(self):
+        """
+        [Speech/Stop!] must not appear when running with injected test audio.
+
+        Regression: the per-token VAD check was triggering on TTS audio
+        bleed-through, causing responses to be cut to ~2 words.
+        """
+        output = _run_binary(_STORY_AUDIO)
+        self.assertNotIn('[TIMEOUT]', output, 'Binary timed out')
+
+        for pattern in ['[Speech/Stop!]', '[Speech detected']:
+            self.assertNotIn(pattern, output,
+                f'False VAD trigger in test mode: "{pattern}" found in output. '
+                f'VAD is firing when it should not.')
