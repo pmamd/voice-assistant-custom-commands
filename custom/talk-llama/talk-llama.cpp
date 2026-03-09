@@ -767,40 +767,6 @@ inline void trim(std::string &s)
 	ltrim(s);
 }
 
-// Returns true if the character is a standard punctuation mark (, . ? : !).
-bool IsPunctuationMark(char c)
-{
-	switch (static_cast<unsigned char>(c))
-	{
-	case ',':
-		[[fallthrough]];
-	case '.':
-		[[fallthrough]];
-	case '?':
-		return true;
-	case ':':
-		return true;
-	case '!':
-		return true;
-	default:
-		return false;
-	}
-}
-
-// Returns a copy of the string with all punctuation marks removed.
-std::string StripPunctuationMarks(const std::string &text)
-{
-	std::string cleanText;
-	for (const auto &c : text)
-	{
-		if (!IsPunctuationMark(c))
-		{
-			cleanText += c;
-		}
-	}
-	return cleanText;
-}
-
 // Returns a lowercased copy of the string using the current locale.
 // Note: does not handle non-Latin UTF-8 characters correctly.
 std::string LowerCase(const std::string &text)
@@ -811,79 +777,6 @@ std::string LowerCase(const std::string &text)
 		lowerCasedText += std::tolower(c, std::locale());
 	}
 	return lowerCasedText;
-}
-
-// get part of the string that is after the @command (please google weather in london -> weather in london)
-// Extracts the keyword/argument that follows a recognized voice command prefix.
-// For example, given "google weather in london", returns "weather in london".
-// Strips common filler phrases (please, can you, etc.) before matching.
-std::string ParseCommandAndGetKeyword(std::string textHeardTrimmed, const std::string &command = "google")
-{
-
-	textHeardTrimmed = StripPunctuationMarks(textHeardTrimmed);
-	std::string sanitizedInput = textHeardTrimmed;
-	std::size_t pos = 0;
-	bool startsWithPrefix = false;
-	static const std::unordered_set<std::string> please_needles{"can you hear me", "Can you hear me", "Are you here", "are you here", "Do you hear me", "do you hear me", "Пожалуйста", "пожалуйста", "Позови", "позови", "ты тут", "Ты тут", "ты здесь", "Ты здесь", "Ты слышишь меня", "ты слышишь меня", "ты меня слышишь", "Ты меня слышишь", "Hey", "hey", "please", "Please", "can you", "Can you", "let's", "Let's", "What do you think", "Что ты думаешь", "что ты думаешь", "Что ты об этом думаешь", "что ты об этом думаешь"};
-	std::string result_param = "";
-
-	// remove please_needles
-	for (const auto &prefix : please_needles)
-	{
-		sanitizedInput = ::replace(sanitizedInput, prefix, "");
-	}
-	trim(sanitizedInput);
-
-	if (command == "google")
-	{
-		static const std::unordered_set<std::string> prefixNeedles{"Погугли", "погугли", "угли", "углe", "По гугле", "По угли"};
-		// find start prefixNeedles
-		for (const auto &prefix : prefixNeedles)
-		{
-			if (sanitizedInput.compare(0, prefix.length(), prefix) == 0)
-			{
-				pos = prefix.length() + 1;
-				startsWithPrefix = true;
-				break;
-			}
-		}
-	}
-
-	// if not starts with prefixNeedles, find exact command
-	if (!startsWithPrefix || pos == std::string::npos)
-	{
-		pos = sanitizedInput.find(command); // call
-		if (pos != std::string::npos)
-			pos = pos + command.size() + 1;
-		else
-		{
-			pos = sanitizedInput.find("Call");
-			if (pos != std::string::npos)
-				pos = pos + command.size() + 1;
-			pos = 0; // command not found
-		}
-	}
-
-	if (command == "call")
-	{
-		// russian name fixes: Позови Алису -> Алиса
-		int last_n = sanitizedInput.size() - 1;
-		if (sanitizedInput[last_n - 1] == static_cast<char>(0xD1) && sanitizedInput[last_n] == static_cast<char>(0x83))
-		{
-			sanitizedInput[last_n - 1] = 0xD0;
-			sanitizedInput[last_n] = 0xB0;
-		} // у -> а
-		else if (sanitizedInput[last_n - 1] == static_cast<char>(0xD1) && sanitizedInput[last_n] == static_cast<char>(0x8E))
-		{
-			sanitizedInput[last_n - 1] = 0xD0;
-			sanitizedInput[last_n] = 0x8F;
-		} // ю -> я
-		textHeardTrimmed = sanitizedInput;
-	}
-
-	result_param = textHeardTrimmed.substr(pos);
-
-	return result_param;
 }
 
 // libcurl write callback: appends received HTTP response data to a std::string buffer.
@@ -1069,42 +962,6 @@ std::string utf8_substr(const std::string &str, unsigned int start, unsigned int
 	}
 	return str.substr(min, max);
 }
-#ifdef TRANSLATE
-// Transliterates English letters to approximate Russian Cyrillic equivalents.
-// Used to produce Russian phonetic spellings for TTS voice synthesis.
-std::string translit_en_ru(IN const std::string &str)
-{
-	std::string strRes;
-	std::string szEngABC = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	std::string szRusABC = "абцдефгхийклмнопкрстуввхйзАБЦДЕФГХИЙКЛМНОПКРСТУВВХЙЗ";
-
-	char szRusABC_arr[104];
-	int lastIndex = 0;
-	for (char ch : szRusABC)
-	{
-		szRusABC_arr[lastIndex] = ch;
-		lastIndex++;
-	}
-
-	for (int i = 0; i < str.size(); i++)
-	{
-		size_t pCh = szEngABC.find_first_of(str[i]);
-		if (pCh != std::string::npos)
-		{
-			strRes += szRusABC_arr[2 * pCh];
-			strRes += szRusABC_arr[2 * pCh + 1];
-			}
-		else
-		{
-			strRes += str[i];
-		}
-	}
-
-	// for (char ch : strRes) printf("%X ", ch);
-
-	return strRes;
-}
-#endif
 
 // returns name or ""
 // Searches for a character name pattern (\nName: ) in the given string.
@@ -2506,10 +2363,6 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				std::string bot_name_current = params.bot_name;
 				std::string bot_name_current_ru = params.bot_name;
 				std::string text_heard_with_instruct = text_heard;
-#ifdef TRANSLATE
-				if (params.translate)
-					bot_name_current_ru = translit_en_ru(params.bot_name);
-#endif
 				int n_comas = 0; // comas counter
 
 				if (last_output_has_username && !user_typed_this) // last model output has user name
