@@ -71,8 +71,11 @@
 #include "wyoming-client.h"
 
 // Signal handling for graceful shutdown
+// Global flag set by the SIGINT/SIGTERM signal handler to request a graceful shutdown.
 volatile sig_atomic_t g_sigint_received = 0;
 
+// Signal handler for SIGINT/SIGTERM.
+// First signal sets g_sigint_received for a graceful exit; second signal force-exits.
 void sigint_handler(int sig) {
 	static int sigint_count = 0;
 	sigint_count++;
@@ -87,8 +90,12 @@ void sigint_handler(int sig) {
 }
 
 // global
+// Stores the name of the most recently pressed hotkey (e.g. "Ctrl+Space", "Escape").
+// Read by the main loop; written by the hotkey background thread.
 std::string g_hotkey_pressed = "";
 
+// Tokenizes a UTF-8 text string into a vector of llama tokens.
+// add_bos controls whether a beginning-of-sequence token is prepended.
 std::vector<llama_token> llama_tokenize(struct llama_context *ctx, const std::string &text, bool add_bos)
 {
 	auto *model = llama_get_model(ctx);
@@ -110,6 +117,7 @@ std::vector<llama_token> llama_tokenize(struct llama_context *ctx, const std::st
 	return result;
 }
 
+// Converts a single llama token back to its UTF-8 string representation.
 std::string llama_token_to_piece(const struct llama_context *ctx, llama_token token)
 {
 	std::vector<char> result(8, 0);
@@ -128,6 +136,8 @@ std::string llama_token_to_piece(const struct llama_context *ctx, llama_token to
 	return std::string(result.data(), result.size());
 }
 
+// Parses a comma-separated string of floats into a heap-allocated array.
+// Used for the --tensor-split flag to distribute model layers across GPUs.
 const float *parse_float_list(const std::string &s)
 {
 	std::vector<float> temp;
@@ -154,6 +164,9 @@ const float *parse_float_list(const std::string &s)
 }
 
 // command-line parameters
+// All runtime configuration parameters parsed from command-line arguments.
+// Covers Whisper STT settings, LLM sampling parameters, TTS config, VAD thresholds,
+// model paths, instruct presets, and test/debug flags.
 struct whisper_params
 {
 	int32_t n_threads = std::min(4, (int32_t)std::thread::hardware_concurrency());
@@ -227,8 +240,11 @@ struct whisper_params
 	int repeat_last_n = 256;
 };
 
+// Prints the full help/usage message listing every CLI option and its default value.
 void whisper_print_usage(int argc, const char **argv, const whisper_params &params);
 
+// Parses command-line arguments into a whisper_params struct.
+// Returns false and prints usage if an unknown argument is encountered.
 bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 {
 	for (int i = 1; i < argc; i++)
@@ -555,6 +571,7 @@ void whisper_print_usage(int /*argc*/, const char **argv, const whisper_params &
 }
 
 // returns seconds since epoch with microsecond precision. e.g. 15244.575123 (15244 s and 575.123 ms)
+// Returns the current wall-clock time in seconds (with microsecond precision).
 double get_current_time_ms()
 {
 	auto now = std::chrono::high_resolution_clock::now();
@@ -566,6 +583,9 @@ double get_current_time_ms()
 	return micros;
 }
 
+// Runs Whisper speech-to-text on a PCM float audio buffer.
+// Returns the transcribed text; sets prob0 to the average token probability
+// and t_ms to the inference time in milliseconds.
 std::string transcribe(
 	whisper_context *ctx,
 	const whisper_params &params,
@@ -647,6 +667,7 @@ std::string transcribe(
 	return result;
 }
 
+// Splits a string into a vector of whitespace-delimited words.
 std::vector<std::string> get_words(const std::string &txt)
 {
 	std::vector<std::string> words;
@@ -721,6 +742,7 @@ void allow_xtts_file(std::string path, int xtts_play_allowed)
 }
 #endif
 // trim from start (in place)
+// Removes leading whitespace from a string in place.
 inline void ltrim(std::string &s)
 {
 	s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch)
@@ -728,6 +750,7 @@ inline void ltrim(std::string &s)
 }
 
 // trim from end (in place)
+// Removes trailing whitespace from a string in place.
 inline void rtrim(std::string &s)
 {
 	s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
@@ -737,12 +760,14 @@ inline void rtrim(std::string &s)
 }
 
 // trim from both ends (in place)
+// Removes leading and trailing whitespace from a string in place.
 inline void trim(std::string &s)
 {
 	rtrim(s);
 	ltrim(s);
 }
 
+// Returns true if the character is a standard punctuation mark (, . ? : !).
 bool IsPunctuationMark(char c)
 {
 	switch (static_cast<unsigned char>(c))
@@ -762,6 +787,7 @@ bool IsPunctuationMark(char c)
 	}
 }
 
+// Returns a copy of the string with all punctuation marks removed.
 std::string StripPunctuationMarks(const std::string &text)
 {
 	std::string cleanText;
@@ -775,6 +801,8 @@ std::string StripPunctuationMarks(const std::string &text)
 	return cleanText;
 }
 
+// Returns a lowercased copy of the string using the current locale.
+// Note: does not handle non-Latin UTF-8 characters correctly.
 std::string LowerCase(const std::string &text)
 {
 	std::string lowerCasedText;
@@ -786,6 +814,9 @@ std::string LowerCase(const std::string &text)
 }
 
 // get part of the string that is after the @command (please google weather in london -> weather in london)
+// Extracts the keyword/argument that follows a recognized voice command prefix.
+// For example, given "google weather in london", returns "weather in london".
+// Strips common filler phrases (please, can you, etc.) before matching.
 std::string ParseCommandAndGetKeyword(std::string textHeardTrimmed, const std::string &command = "google")
 {
 
@@ -855,12 +886,14 @@ std::string ParseCommandAndGetKeyword(std::string textHeardTrimmed, const std::s
 	return result_param;
 }
 
+// libcurl write callback: appends received HTTP response data to a std::string buffer.
 static size_t WriteCallback(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	((std::string *)userdata)->append((const char *)ptr, size * nmemb);
 	return size * nmemb;
 }
 
+// Removes all trailing occurrences of a specific character from a string.
 std::string RemoveTrailingCharacters(const std::string &inputString, const char targetCharacter)
 {
 	auto lastNonTargetPosition = std::find_if(inputString.rbegin(), inputString.rend(), [targetCharacter](auto ch)
@@ -868,6 +901,7 @@ std::string RemoveTrailingCharacters(const std::string &inputString, const char 
 	return std::string(inputString.begin(), lastNonTargetPosition.base());
 }
 
+// Removes trailing occurrences of any character in a UTF-32 set from a UTF-8 string.
 std::string RemoveTrailingCharactersUtf8(const std::string &inputString, const std::u32string &targetCharacter)
 {
 	std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
@@ -880,6 +914,7 @@ std::string RemoveTrailingCharactersUtf8(const std::string &inputString, const s
 	return result;
 }
 
+// URL-encodes a string using libcurl's curl_easy_escape.
 std::string UrlEncode(const std::string &str)
 {
 	CURL *curl = curl_easy_init();
@@ -894,6 +929,8 @@ std::string UrlEncode(const std::string &str)
 	return {};
 }
 
+// Sends an HTTP POST request with a JSON body built from a key-value map.
+// Returns the response body as a string.
 std::string send_curl_json(const std::string &url, const std::map<std::string, std::string> &params)
 {
 	CURL *curl;
@@ -947,6 +984,8 @@ std::string send_curl_json(const std::string &url, const std::map<std::string, s
 	return readBuffer;
 }
 
+// Sends a simple HTTP GET request to the given URL.
+// Returns the response body as a string.
 std::string send_curl(std::string url)
 {
 	CURL *curl;
@@ -966,6 +1005,7 @@ std::string send_curl(std::string url)
 	return readBuffer;
 }
 
+// Returns the number of Unicode code points (characters) in a UTF-8 string.
 int utf8_length(const std::string &str)
 {
 	int c, i, ix, q;
@@ -986,6 +1026,8 @@ int utf8_length(const std::string &str)
 	return q;
 }
 
+// Returns a substring using Unicode code-point indices rather than byte indices,
+// correctly handling multi-byte UTF-8 characters.
 std::string utf8_substr(const std::string &str, unsigned int start, unsigned int leng)
 {
 	if (leng == 0)
@@ -1028,6 +1070,8 @@ std::string utf8_substr(const std::string &str, unsigned int start, unsigned int
 	return str.substr(min, max);
 }
 #ifdef TRANSLATE
+// Transliterates English letters to approximate Russian Cyrillic equivalents.
+// Used to produce Russian phonetic spellings for TTS voice synthesis.
 std::string translit_en_ru(IN const std::string &str)
 {
 	std::string strRes;
@@ -1063,6 +1107,8 @@ std::string translit_en_ru(IN const std::string &str)
 #endif
 
 // returns name or ""
+// Searches for a character name pattern (\nName: ) in the given string.
+// Returns the name if found, used for multi-character voice switching in TTS.
 std::string find_name(const std::string &str)
 {
 	if (str.size() >= 4)
@@ -1104,6 +1150,7 @@ std::string find_name(const std::string &str)
 }
 
 // Function to convert embedding vector to a concatenated string
+// Converts a vector of llama tokens back to a human-readable concatenated string.
 std::string emb_to_str(llama_context *ctx_llama, const std::vector<llama_token> &embd)
 {
 	std::string ss;
@@ -1115,6 +1162,9 @@ std::string emb_to_str(llama_context *ctx_llama, const std::vector<llama_token> 
 	return ss;
 }
 
+// Cleans and normalises text (strips parenthetical/HTML/bracket content,
+// normalises punctuation), then sends it to the Wyoming-Piper TTS server
+// via a raw TCP socket connection. Called from worker threads during generation.
 void send_tts_async(std::string text, std::string speaker_wav = "emma_1", std::string language = "en", std::string tts_url = "http://localhost:8020/", int reply_part = 0, bool debug = false)
 {
 int hSocket, read_size;
@@ -1230,10 +1280,14 @@ int hSocket, read_size;
 	}
 }
 
+// Queue for keyboard input lines typed by the user.
+// Written by input_thread_func(), read by the main loop.
 std::queue<std::string> input_queue; // global
 // std::mutex input_mutex;
 bool keyboard_input_running = true; // global, not used yet
 
+// Background thread that reads lines from stdin and pushes them onto input_queue.
+// Allows the user to type commands in addition to speaking them.
 void input_thread_func()
 {
 	std::string line;
@@ -1266,6 +1320,8 @@ bool IsConsoleWindowFocused(HWND cur_window_handle)
 
 // Stop: Ctrl+Space or Escape (Escape bypasses VAD/Whisper for immediate stop)
 // modifies global var string g_hotkey_pressed
+// Background thread (Windows only) that polls for global hotkeys.
+// Sets g_hotkey_pressed to the matching command name when a hotkey fires.
 void keyboard_shortcut_func(HWND cur_window_handle)
 {
 	bool b_ctr_space_processed = false;
@@ -1398,9 +1454,13 @@ void keyboard_shortcut_func(HWND cur_window_handle)
 }
 #endif
 
+// Default Whisper transcription prompt templates.
+// Primes Whisper to expect conversational speech directed at a named person.
 const std::string k_prompt_whisper = R"(A conversation with a person called {1}.)";
 const std::string k_prompt_whisper_ru = R"({1}, Алиса.)";
 
+// Default LLaMA system prompt template.
+// Placeholders: {0}=person name, {1}=bot name, {2}=time, {3}=date, {4}=year.
 const std::string k_prompt_llama = R"(Text transcript of a never ending dialog, where {0} interacts with an AI assistant named {1}.
 {1} is helpful, kind, honest, friendly, good at writing and never fails to answer {0}’s requests immediately and with details and precision.
 There are no annotations like (30 seconds passed...) or (to himself), just what {0} and {1} say aloud to each other.
@@ -1417,6 +1477,11 @@ The transcript only includes text, it does not include markup like HTML and Mark
 {1}{4} Blue
 {0}{4})";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Main application entry point.
+// Initialises all subsystems (Whisper, LLaMA, Wyoming TTS, tool system, audio),
+// then runs the listen → transcribe → generate → speak loop until shutdown.
+// ─────────────────────────────────────────────────────────────────────────────
 int run(int argc, const char **argv)
 {
 	// Set up signal handlers
@@ -1454,7 +1519,9 @@ int run(int argc, const char **argv)
 #ifdef XTTS_FILE
 	allow_xtts_file(params.xtts_control_path, 1); // xtts can play
 #endif
-	// whisper init
+	// ── Whisper STT initialisation ───────────────────────────────────────────────
+// Loads the Whisper model from disk and creates the inference context.
+// whisper init
 	struct whisper_context_params cparams = whisper_context_default_params();
 	cparams.use_gpu = params.use_gpu;
 
@@ -1465,7 +1532,10 @@ int run(int argc, const char **argv)
         return 1;
     }
 	
-	// llama init
+	// ── LLaMA LLM initialisation ─────────────────────────────────────────────────
+// Loads the LLM model with GPU/CPU split settings and creates the inference
+// context with the requested context size, batch size, and thread count.
+// llama init
 
 	llama_backend_init();
 
@@ -1529,7 +1599,10 @@ int run(int argc, const char **argv)
 #endif
 	printf("finished: print some info about the processing\n");
 
-	// init audio
+	// ── Audio capture initialisation ─────────────────────────────────────────────
+// Sets up the SDL audio capture device with a 15-second ring buffer,
+// or loads a WAV file for automated test mode.
+// init audio
 
 	// Test mode: load audio from file instead of microphone
 	bool test_mode = !params.test_input_file.empty();
@@ -1596,7 +1669,10 @@ int run(int argc, const char **argv)
 		fprintf(stderr, "WARNING: Failed to parse Wyoming URL: %s\n", params.xtts_url.c_str());
 	}
 
-	// instruct mode
+	// ── Instruct preset loading ───────────────────────────────────────────────────
+// Loads a JSON preset file that defines system/user/bot message formatting,
+// stop sequences, and other instruct-tuned model parameters.
+// instruct mode
 	if (!params.instruct_preset.empty())
 	{
 		try
@@ -1673,7 +1749,10 @@ int run(int argc, const char **argv)
 		fprintf(stdout, "[Tool System] Injected %zu tools into system prompt\n", tool_registry.getAllTools().size());
 	}
 
-	// init session
+	// ── Session initialisation ────────────────────────────────────────────────────
+// Tokenises the initial prompt and optionally loads a cached session file
+// to resume a previous conversation without re-processing the full prompt.
+// init session
 	std::string path_session = params.path_session;
 	std::vector<llama_token> session_tokens;
 	auto embd_inp = ::llama_tokenize(ctx_llama, prompt_llama, true);
@@ -1716,7 +1795,10 @@ int run(int argc, const char **argv)
 
 	double llama_start_time = get_current_time_ms();
 
-	// NEW prompt eval
+	// ── Initial prompt evaluation ────────────────────────────────────────────────
+// Feeds the full initial prompt through the LLM in batches to prime the KV
+// cache before the first user turn begins.
+// NEW prompt eval
 	int n_past = 0;
 	// Calculate the number of chunks needed
 	size_t num_chunks = (embd_inp.size() + lcparams.n_batch - 1) / lcparams.n_batch;
@@ -1827,7 +1909,10 @@ int run(int argc, const char **argv)
 	int eot_antiprompt_id_2 = 0;
 	std::string current_voice = params.xtts_voice;
 
-	// reverse prompts for detecting when it's time to stop speaking
+	// ── Antiprompt / stop-word setup ─────────────────────────────────────────────
+// Builds the list of strings that signal the end of a bot turn (person name,
+// newline, instruct suffix, EOT tokens, and any custom --stop-words).
+// reverse prompts for detecting when it's time to stop speaking
 	std::vector<std::string> antiprompts = {
 		params.person + chat_symb,
 		params.person + " " + chat_symb,
@@ -1882,7 +1967,10 @@ int run(int argc, const char **argv)
 #endif
 	printf("\nVoice commands: Stop(Ctrl+Space or Escape), Regenerate(Ctrl+Right), Delete(Ctrl+Delete), Reset(Ctrl+R)\n");
 
-	// Test Wyoming-Piper TTS connection
+	// ── TTS connection warmup ────────────────────────────────────────────────────
+// Sends an initialisation phrase to Wyoming-Piper to verify connectivity
+// and warm up the TTS pipeline before the first user interaction.
+// Test Wyoming-Piper TTS connection
 	printf("\n=========================================\n");
 	printf("Testing Wyoming-Piper TTS Connection...\n");
 	printf("=========================================\n");
@@ -1912,7 +2000,9 @@ int run(int argc, const char **argv)
 		printf("(Microphone resumed)\n");
 	}
 
-	// Display tool system status
+	// ── Tool system status display ───────────────────────────────────────────────
+// Lists all loaded tools and whether each supports fast-path (pre-LLM) execution.
+// Display tool system status
 	printf("\n=========================================\n");
 	printf("Tool Calling System Status\n");
 	printf("=========================================\n");
@@ -1951,7 +2041,11 @@ int run(int argc, const char **argv)
 	std::string user_typed = "";
 	bool user_typed_this = false;
 
-	// main loop
+	// ═════════════════════════════════════════════════════════════════════════════
+// Main listen → transcribe → generate → speak loop.
+// Runs continuously until SIGINT, SIGTERM, or SDL quit event.
+// ═════════════════════════════════════════════════════════════════════════════
+// main loop
 	while (is_running)
 	{
 		// Check for signal
@@ -2028,7 +2122,9 @@ int run(int argc, const char **argv)
 			}
 		}
 #endif
-		// audio
+		// ── Audio capture ───────────────────────────────────────────────────────────
+// Gets the latest 1-second chunk of microphone audio (or injects test audio).
+// audio
 		{
 			// In test mode, inject the test audio data once
 			if (test_mode && !test_audio_data.empty()) {
@@ -2043,7 +2139,10 @@ int run(int argc, const char **argv)
 			// WHISPER_SAMPLE_RATE 16000
 			// vad_last_ms default 1250
 
-			// VAD processing - in test mode, simulate speech start then end
+			// ── Voice Activity Detection (VAD) ───────────────────────────────────────────
+// Determines whether speech has started or ended in the captured audio.
+// Includes smart early-stop detection for short high-energy commands like "stop".
+// VAD processing - in test mode, simulate speech start then end
 			int vad_result;
 			if (test_mode && test_audio_injected && !pcmf32_cur.empty()) {
 				// Simulate VAD: speech started then ended
@@ -2136,7 +2235,10 @@ int run(int argc, const char **argv)
 				}
 #endif
 			}
-			if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
+			// ── Speech ended: transcribe and process ─────────────────────────────────────
+// Triggered when VAD detects end-of-speech, force_speak flag, or typed input.
+// Runs Whisper transcription then dispatches the result to the command/LLM pipeline.
+if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
 				speech_end_ms = get_current_time_ms(); // double with microsecond precision
 				speech_len = speech_end_ms - speech_start_ms;
@@ -2318,7 +2420,10 @@ int run(int argc, const char **argv)
 					}
 				}
 
-				// FAST PATH TOOL EXECUTION (pre-LLaMA)
+				// ── Fast-path tool execution ─────────────────────────────────────────────────
+// Checks if the heard text matches a registered fast-path tool (e.g. "stop").
+// If matched, executes the tool immediately and skips LLM generation entirely.
+// FAST PATH TOOL EXECUTION (pre-LLaMA)
 				// Check if the user said a fast-path command (e.g., "stop")
 				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
 				if (matched && tool_def.fast_path) {
@@ -2353,7 +2458,10 @@ int run(int argc, const char **argv)
 					g_llm_thread.join();
 				}
 
-				// Spawn generation + TTS in a background thread.
+				// ── Background generation thread ─────────────────────────────────────────────
+// Spawns g_llm_thread to run LLM inference and TTS dispatch concurrently,
+// allowing the main thread to return immediately to listening for new commands.
+// Spawn generation + TTS in a background thread.
 				// text_heard is captured by value (it goes out of scope on the main thread).
 				// All persistent LLM state (embd_inp, n_past, ctx_llama, etc.) by reference.
 				g_stop_generation = false;
@@ -2480,7 +2588,10 @@ int run(int argc, const char **argv)
 				int new_tokens = 0;
 				while (true)
 				{
-					// predict
+					// ── Token generation loop ────────────────────────────────────────────────────
+// Generates one token per iteration. Exits when n_predict is reached,
+// g_stop_generation is set, an antiprompt is matched, or EOS is sampled.
+// predict
 					if (new_tokens > params.n_predict || g_stop_generation.load())
 						break;
 					new_tokens++;
@@ -2644,7 +2755,10 @@ int run(int argc, const char **argv)
 								tool_parser.reset();
 							}
 
-							// Use the parser's normal text (excluding tool tags)
+							// ── Tool call detection & text extraction ────────────────────────────────────
+// Feeds each token to the streaming ToolCallParser. If a complete <tool_call>
+// block is detected, executes the tool. Otherwise extracts clean text for TTS.
+// Use the parser's normal text (excluding tool tags)
 							std::string clean_text = tool_parser.getText();
 							// Replace newlines with spaces: multi-line LLM responses should flow
 							// as continuous speech rather than sending bare \n to TTS.
@@ -2686,7 +2800,10 @@ int run(int argc, const char **argv)
 										}
 									}
 								}
-								// fill buffer for seqrep
+								// ── Sequence repetition detection ────────────────────────────────────────────
+// Detects if the model is repeating itself by searching for a recent substring
+// in a rolling output buffer. On detection, rolls back tokens and raises temperature.
+// fill buffer for seqrep
 								if (utf8_length(last_output_buffer) > 1000)
 									last_output_buffer = utf8_substr(last_output_buffer, 100, last_output_buffer.size() - 100); // in symbols not tokens, non-latin symbols takes 2x more
 								last_output_buffer += out_token_str;
@@ -2717,7 +2834,10 @@ int run(int argc, const char **argv)
 							if (text_to_speak.size() >= 3 && text_to_speak.substr(text_to_speak.size() - 3, 3) == "Mr.")
 								text_to_speak[text_len - 1] = ' '; // no splitting on mr.
 
-							// splitting for tts
+							// ── TTS sentence splitting & dispatch ────────────────────────────────────────
+// Accumulates generated text until a sentence boundary is reached (. ? ! ; : \n),
+// then dispatches the chunk to send_tts_async in a worker thread.
+// splitting for tts
 							if (text_len >= 2 && new_tokens >= 2 && !person_name_is_found && ((new_tokens == split_after && params.split_after && text_to_speak[text_len - 1] != '\'') || text_to_speak[text_len - 1] == '.' || text_to_speak[text_len - 1] == '(' || text_to_speak[text_len - 1] == ')' || (text_to_speak[text_len - 1] == ',' && n_comas == 1 && new_tokens > split_after && params.split_after) || (text_to_speak[text_len - 2] == ' ' && text_to_speak[text_len - 1] == '-') || text_to_speak[text_len - 1] == '?' || text_to_speak[text_len - 1] == '!' || text_to_speak[text_len - 1] == ';' || text_to_speak[text_len - 1] == ':' || text_to_speak[text_len - 1] == '\n'))
 							{
 								if (translation_is_going == 1)
@@ -2848,7 +2968,10 @@ int run(int argc, const char **argv)
 								}
 							}
 
-							// stop words
+							// ── Antiprompt / stop-word detection ─────────────────────────────────────────
+// Checks the recent output against all antiprompts. On match, ends generation
+// and sends remaining text to TTS. Enforces min_tokens by rolling back if needed.
+// stop words
 							if (last_output.length() > antiprompt.length() && last_output.find(antiprompt.c_str(), last_output.length() - antiprompt.length(), antiprompt.length()) != std::string::npos)
 							{
 								done = true;
@@ -2927,7 +3050,9 @@ int run(int argc, const char **argv)
 					}
 				}
 
-				// final part of the sentence, if any
+				// ── Final TTS dispatch ────────────────────────────────────────────────────────
+// After the generation loop exits, sends any remaining buffered text to TTS.
+// final part of the sentence, if any
 				text_to_speak = ::replace(text_to_speak, "\"", "'");
 				if (text_to_speak.size())
 				{
@@ -3018,6 +3143,9 @@ int run(int argc, const char **argv)
 	return 0;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Platform entry points
+// ─────────────────────────────────────────────────────────────────────────────
 #if _WIN32
 int wmain(int argc, const wchar_t **argv_UTF16LE)
 {
