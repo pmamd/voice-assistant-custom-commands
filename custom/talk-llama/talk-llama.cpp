@@ -1,5 +1,30 @@
-// talk-llama-fast
-// based on https://github.com/ggerganov/whisper.cpp
+// =============================================================================
+// talk-llama-custom
+// Voice assistant combining Whisper STT, Mistral LLM, and Piper TTS
+// with Wyoming protocol integration and LLM-bypass custom commands.
+//
+// Based on whisper.cpp/examples/talk-llama by Georgi Gerganov
+//   https://github.com/ggerganov/whisper.cpp
+//
+// Original talk-llama-fast modifications by Mozer
+//   https://github.com/Mozer/talk-llama-fast
+//
+// Further modifications by Paul Mobbs (2024-2026)
+//   https://github.com/pmamd/voice-assistant-custom-commands
+//
+// Credits:
+//   Whisper STT        - OpenAI
+//   whisper.cpp        - Georgi Gerganov and contributors (MIT License)
+//   LLaMA / llama.cpp  - Meta AI / Georgi Gerganov (MIT License)
+//   Mistral models     - Mistral AI
+//   Piper TTS          - Rhasspy project
+//   Wyoming Protocol   - Rhasspy project
+//
+// License:
+//   Custom code (this file and custom/):  see repository LICENSE
+//   whisper.cpp:  MIT License - see whisper.cpp/LICENSE
+//   LLaMA models: Meta AI license - see individual model terms
+// =============================================================================
 
 #include "common-sdl.h"
 #include "common.h"
