@@ -38,12 +38,12 @@
   <text x="150" y="200" text-anchor="middle" class="text">Whisper</text>
   <text x="150" y="220" text-anchor="middle" class="text">STT</text>
 
-  <!-- LLaMA LLM -->
+  <!-- Mistral LLM -->
   <rect x="320" y="170" width="140" height="80" rx="5" class="component"/>
-  <text x="390" y="200" text-anchor="middle" class="text">LLaMA</text>
+  <text x="390" y="200" text-anchor="middle" class="text">Mistral</text>
   <text x="390" y="220" text-anchor="middle" class="text">LLM</text>
 
-  <!-- Arrow: Whisper to LLaMA -->
+  <!-- Arrow: Whisper to Mistral -->
   <path d="M 220 210 L 320 210" class="arrow"/>
   <text x="270" y="205" text-anchor="middle" class="text-small">(normal text)</text>
 
@@ -52,7 +52,7 @@
   <text x="390" y="320" text-anchor="middle" class="text">TTS</text>
   <text x="390" y="340" text-anchor="middle" class="text">Client</text>
 
-  <!-- Arrow: LLaMA to TTS -->
+  <!-- Arrow: Mistral to TTS -->
   <path d="M 390 250 L 390 290" class="arrow"/>
 
   <!-- Arrow: Whisper to TTS (bypass) -->

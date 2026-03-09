@@ -51,7 +51,7 @@
   <text x="440" y="175" class="small-text">1. Whisper STT → Transcribe</text>
 
   <rect x="330" y="190" width="220" height="30" class="box" rx="3"/>
-  <text x="440" y="210" class="small-text">2. LLaMA → Generate Response</text>
+  <text x="440" y="210" class="small-text">2. Mistral → Generate Response</text>
 
   <rect x="330" y="225" width="220" height="30" class="box" rx="3"/>
   <text x="440" y="245" class="small-text">3. Send to Wyoming-Piper TTS</text>
@@ -143,7 +143,7 @@
 
   <text x="390" y="650" class="label" font-size="12" font-weight="bold">2. Processing:</text>
   <text x="400" y="670" class="small-text">WAV → Whisper → Text</text>
-  <text x="400" y="685" class="small-text">Text → LLaMA → Response</text>
+  <text x="400" y="685" class="small-text">Text → Mistral → Response</text>
   <text x="400" y="700" class="small-text">Response → Piper → WAV</text>
 
   <text x="390" y="725" class="label" font-size="12" font-weight="bold">3. Verification:</text>
