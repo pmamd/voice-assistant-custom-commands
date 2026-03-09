@@ -1,177 +1,229 @@
-# Quick Start Guide
+# Quick Start
 
-## Running the Voice Assistant
+## Critical Requirements
 
-### Prerequisites
+Before you begin:
 
-1. **Models downloaded**:
-   - Whisper model: `whisper.cpp/models/ggml-tiny.en.bin`
-   - LLaMA model: `models/llama-2-7b-chat.Q4_K_M.gguf`
+- **Piper TTS version**: must be `piper-tts==1.4.1` (Python package via pipx), **not** the C++ binary
+- **Port**: Wyoming-Piper listens on **10200** (not 8020)
+- **System package**: `libcjson-dev` — often forgotten, causes build failure
 
-2. **Wyoming-Piper installed**:
-   ```bash
-   pip install wyoming-piper
-   ```
+---
 
-3. **Voice assistant built**:
-   ```bash
-   cmake -B build -DWHISPER_SDL2=ON
-   cmake --build build -j
-   ```
+## Installation
 
-### Easy Start
+```bash
+# 1. Clone repository
+git clone --recursive https://github.com/pmamd/voice-assistant-custom-commands.git
+cd voice-assistant-custom-commands
 
-Simply run:
+# 2. System dependencies
+sudo apt-get update && sudo apt-get install -y \
+    build-essential cmake git \
+    libsdl2-dev libcurl4-openssl-dev libcjson-dev \
+    alsa-utils python3 python3-pip pipx
+
+# 3. Build
+cmake -B build -DWHISPER_SDL2=ON
+cmake --build build -j
+
+# 4. Install Piper TTS (exact version required)
+pipx install piper-tts==1.4.1
+pipx inject piper-tts pathvalidate
+
+# 5. Install Wyoming-Piper (custom version from this repo)
+cd wyoming-piper
+pipx install -e .
+cd ..
+
+# 6. Add pipx binaries to PATH
+export PATH="$HOME/.local/bin:$PATH"
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
+# 7. Download Whisper model
+cd whisper.cpp/models && bash download-ggml-model.sh tiny.en && cd ../..
+
+# 8. Download LLM (Mistral recommended)
+mkdir -p models
+wget -P models https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_0.gguf
+```
+
+---
+
+## Verify Before Starting
+
+```bash
+# Piper must be the Python version, not C++ binary
+file $(which piper)            # → "Python script" (not "ELF")
+pipx list | grep piper-tts    # → version 1.4.1
+
+# Builds present
+ls build/bin/talk-llama-custom
+ls whisper.cpp/models/*.bin
+ls models/*.gguf
+```
+
+---
+
+## Starting the Assistant
+
 ```bash
 ./start-assistant.sh
 ```
 
-This will:
-1. Check if Wyoming-Piper TTS server is running (start if needed)
-2. Verify all required files exist
-3. Start the voice assistant with optimal settings
+The script handles everything: starts Wyoming-Piper on port 10200, waits for it to be ready, detects available microphones, and launches the voice assistant. Press **Ctrl+C** to exit cleanly.
 
-### Manual Start
+**Expected output:**
+```
+==========================================
+Voice Assistant with Custom Commands
+==========================================
+Starting Wyoming-Piper TTS server...
+✓ TTS server ready
 
-If you prefer to start components manually:
+✓ All required files found
+✓ Using microphone 0: ...
 
-**1. Start TTS Server (Terminal 1):**
+==========================================
+Start speaking or type your message...
+```
+
+---
+
+## Manual Start
+
+If you need to start components separately:
+
+**Terminal 1 — TTS server:**
 ```bash
-# Create data directory for voice models
-mkdir -p ./piper-data
-
-wyoming-piper \
+cd wyoming-piper
+python3 -m wyoming_piper \
+    --piper ~/.local/bin/piper \
     --voice en_US-lessac-medium \
-    --data-dir ./piper-data \
+    --data-dir ../piper-data \
     --uri tcp://0.0.0.0:10200
 ```
 
-**2. Start Voice Assistant (Terminal 2):**
+**Terminal 2 — Voice assistant:**
 ```bash
 ./build/bin/talk-llama-custom \
-    -ml ./models/llama-2-7b-chat.Q4_K_M.gguf \
+    -ml ./models/mistral-7b-instruct-v0.2.Q5_0.gguf \
     -mw ./whisper.cpp/models/ggml-tiny.en.bin \
     --xtts-url http://localhost:10200/ \
     --xtts-voice en_US-lessac-medium \
-    --temp 0.5
+    --temp 0.5 \
+    -n 300 \
+    --allow-newline
 ```
 
-### Usage
+---
 
-- **Speak** into your microphone
-- The assistant will **listen**, **process**, and **respond** with speech
-- Say **"stop"** to interrupt the AI while it's speaking
-- Press **Ctrl+C** to exit
+## Usage
 
-### Configuration Options
+| Action | How |
+|--------|-----|
+| Ask something | Speak into your microphone |
+| Interrupt the AI | Say **"stop"** while it's talking |
+| Exit | Press **Ctrl+C** |
 
-Edit `start-assistant.sh` to customize:
-- `PIPER_VOICE`: TTS voice (default: en_US-lessac-medium)
-- `PIPER_DATA_DIR`: Where Piper stores voice models (default: ./piper-data)
-- `WYOMING_PORT`: TTS server port (default: 10200)
-- `WHISPER_MODEL`: STT model path
-- `LLAMA_MODEL`: LLM model path
+---
 
-For more voice options:
+## Configuration
+
+Edit `start-assistant.sh` to change:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PIPER_VOICE` | `en_US-lessac-medium` | TTS voice |
+| `PIPER_DATA_DIR` | `./piper-data` | Voice model cache |
+| `WYOMING_PORT` | `10200` | TTS server port |
+| `WHISPER_MODEL` | `ggml-tiny.en.bin` | STT model |
+| `LLAMA_MODEL` | *(set in script)* | LLM model path |
+
+**Better Whisper accuracy** (larger model, slower):
 ```bash
-wyoming-piper --list-voices
+cd whisper.cpp/models && bash download-ggml-model.sh base.en
+# Then update WHISPER_MODEL in start-assistant.sh
 ```
 
-### Monitoring Wyoming-Piper TTS Server
-
-**View TTS logs in real-time:**
+**Custom system prompt:**
 ```bash
-# In a separate terminal
+./build/bin/talk-llama-custom ... -p "You are a helpful driving assistant. Be concise."
+```
+
+---
+
+## Monitoring
+
+```bash
+# TTS server logs
 tail -f /tmp/wyoming-piper.log
-```
 
-**Watch TTS requests:**
-```bash
-# See only synthesis requests and errors
+# TTS requests only
 tail -f /tmp/wyoming-piper.log | grep -i 'synthesize\|error'
+
+# Check Wyoming-Piper is running
+pgrep -fa wyoming_piper
+
+# Check port
+ss -tuln | grep 10200
 ```
 
-**Check server status:**
-```bash
-# See if Wyoming-Piper is running
-ps aux | grep wyoming-piper
+---
 
-# Check if it's listening on port 10200
-netstat -tuln | grep 10200
+## Troubleshooting
+
+**Wrong Piper version** — logs show `FileNotFoundError` with a timestamp as the path:
+```bash
+sudo rm -f /usr/local/bin/piper /opt/piper/piper   # remove C++ binary
+pipx install --force piper-tts==1.4.1
+pipx inject piper-tts pathvalidate
+file $(which piper)   # must say "Python script"
 ```
 
-### Troubleshooting
-
-**TTS server won't start:**
+**Build fails: `cJSON.h not found`:**
 ```bash
-# Check if port is in use
-netstat -tuln | grep 10200
+sudo apt-get install libcjson-dev
+cmake --build build -j
+```
 
-# View TTS server logs
-cat /tmp/wyoming-piper.log
+**`wyoming-piper: command not found`:**
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+source ~/.bashrc
+```
 
-# Kill existing instance if needed
-pkill -f wyoming-piper
+**Wyoming-Piper exits immediately:**
+```bash
+cd wyoming-piper
+python3 -m wyoming_piper --piper ~/.local/bin/piper \
+    --voice en_US-lessac-medium --data-dir ../piper-data \
+    --uri tcp://0.0.0.0:10200 --debug
+# Look for the error in the output
 ```
 
 **No audio output:**
 ```bash
-# Test audio playback
-aplay -l  # List devices
-aplay /usr/share/sounds/alsa/Front_Center.wav  # Test sound
+aplay -l                                          # list devices
+aplay /usr/share/sounds/alsa/Front_Center.wav     # test playback
 ```
 
-**Microphone not working:**
+**Microphone not detected:**
 ```bash
-# Test microphone
-arecord -d 5 test.wav  # Record 5 seconds
-aplay test.wav  # Play it back
+arecord -d 3 test.wav && aplay test.wav           # record and play back
 ```
 
-**Model not found:**
-- Whisper: `cd whisper.cpp/models && bash download-ggml-model.sh tiny.en`
-- LLaMA: Download from Hugging Face and place in `models/` directory
+---
 
-### Running Tests
+## Running Tests
 
-To run the automated test suite:
 ```bash
-cd tests
-python3 run_tests.py --config test_cases.yaml --group all
+# Wyoming stop mechanics
+python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics -v
+
+# LLM output quality (requires models and Wyoming-Piper running)
+python3 tests/test_wyoming_piper_unit.py
+
+# Full test suite
+python3 tests/run_tests.py --config tests/test_cases.yaml --group all
 ```
-
-See `tests/README.md` for more details.
-
-### Advanced Usage
-
-**Custom prompt:**
-```bash
-./build/bin/talk-llama-custom \
-    -m ./models/llama-2-7b-chat.Q4_K_M.gguf \
-    --model-whisper ./whisper.cpp/models/ggml-tiny.en.bin \
-    --xtts-url http://localhost:10200/ \
-    -p "You are a pirate. Speak like a pirate in all responses. Arr!"
-```
-
-**Lower temperature for more deterministic responses:**
-```bash
-# Add --temp 0.3 for more consistent responses
-# Add --temp 0.8 for more creative responses
-```
-
-**Different Whisper model for better accuracy:**
-```bash
-# Download better model
-cd whisper.cpp/models
-bash download-ggml-model.sh base.en  # 150MB, better accuracy
-bash download-ggml-model.sh medium   # 1.5GB, best accuracy
-
-# Use it
---model-whisper ./whisper.cpp/models/ggml-base.en.bin
-```
-
-## Next Steps
-
-- See `README.md` for complete documentation
-- See `tests/README.md` for testing documentation
-- See `tests/SESSION_STATE_FINAL.md` for test results and known limitations
