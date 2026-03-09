@@ -1,6 +1,5 @@
 // talk-llama-fast
 // based on https://github.com/ggerganov/whisper.cpp
-// XTTS + wav2lip support by Mozer
 
 #include "common-sdl.h"
 #include "common.h"
@@ -27,11 +26,7 @@
 #include <codecvt>
 #include <queue>
 
-// for xtts_play_allowed.txt
-// #include <Windows.h> // for win.
 #include <fstream>
-// #include <sys/types.h>
-// #pragma comment(lib,"ws2_32.lib")
 
 #include <clocale>
 #include <curl/curl.h>
@@ -783,8 +778,6 @@ std::string ParseCommandAndGetKeyword(std::string textHeardTrimmed, const std::s
 	}
 	trim(sanitizedInput);
 
-	// fprintf(stdout, "sanitizedInput: %s\n", sanitizedInput.c_str());
-
 	if (command == "google")
 	{
 		static const std::unordered_set<std::string> prefixNeedles{"Погугли", "погугли", "угли", "углe", "По гугле", "По угли"};
@@ -876,7 +869,6 @@ std::string UrlEncode(const std::string &str)
 	return {};
 }
 
-// blocking
 std::string send_curl_json(const std::string &url, const std::map<std::string, std::string> &params)
 {
 	CURL *curl;
@@ -930,7 +922,6 @@ std::string send_curl_json(const std::string &url, const std::map<std::string, s
 	return readBuffer;
 }
 
-// simple curl
 std::string send_curl(std::string url)
 {
 	CURL *curl;
@@ -990,7 +981,6 @@ std::string utf8_substr(const std::string &str, unsigned int start, unsigned int
 
 		c = (unsigned char)str[i];
 		if (
-			// c>=0   &&
 			c <= 127)
 			i += 0;
 		else if ((c & 0xE0) == 0xC0)
@@ -1041,9 +1031,7 @@ std::string translit_en_ru(IN const std::string &str)
 		}
 	}
 
-	// printf hex
 	// for (char ch : strRes) printf("%X ", ch);
-	// printf("\n\n");
 
 	return strRes;
 }
@@ -1102,9 +1090,6 @@ std::string emb_to_str(llama_context *ctx_llama, const std::vector<llama_token> 
 	return ss;
 }
 
-// async curl, but it's still blocking for some reason
-// use in a new thread for non-blocking
-// doesn't wait for responce
 void send_tts_async(std::string text, std::string speaker_wav = "emma_1", std::string language = "en", std::string tts_url = "http://localhost:8020/", int reply_part = 0, bool debug = false)
 {
 int hSocket, read_size;
@@ -1188,18 +1173,6 @@ int hSocket, read_size;
 		// std::string data = "{\"text\":\"" + text + "\"}"; // modified for piper
 		char *json = TTS_RequestEncode(text.c_str());
 
-		// curl_easy_setopt(http_handle, CURLOPT_HTTPHEADER, curl_slist_append(nullptr, "Content-Type:application/json"));
-		// curl_easy_setopt(http_handle, CURLOPT_URL, tts_url.c_str());
-		// curl_easy_setopt(http_handle, CURLOPT_POSTFIELDS, data.c_str());
-		// curl_easy_setopt(http_handle, CURLOPT_VERBOSE, 0L);
-
-		// std::string responseData;
-		// curl_easy_setopt(http_handle, CURLOPT_WRITEDATA, &responseData);
-		// curl_easy_setopt(http_handle, CURLOPT_WRITEFUNCTION, WriteCallback);
-
-		// multi_handle = curl_multi_init();
-		// curl_multi_add_handle(multi_handle, http_handle);
-
 		//Create socket
 		hSocket = TTS_SocketCreate();
 		if(hSocket == -1)
@@ -1267,9 +1240,6 @@ bool IsConsoleWindowFocused(HWND cur_window_handle)
 }
 
 // Stop: Ctrl+Space or Escape (Escape bypasses VAD/Whisper for immediate stop)
-// Regenerate: Ctrl+Right
-// Delete: Ctrl+Delete
-// Reset: Ctrl+R
 // modifies global var string g_hotkey_pressed
 void keyboard_shortcut_func(HWND cur_window_handle)
 {
@@ -2282,7 +2252,6 @@ int run(int argc, const char **argv)
 					text_heard = "";
 				text_heard = std::regex_replace(text_heard, std::regex("\\s+$"), ""); // trailing whitespace
 
-
 				text_heard_trimmed = text_heard; // no periods or spaces
 				trim(text_heard_trimmed);
 				if (text_heard_trimmed[0] == '.')
@@ -2536,7 +2505,6 @@ int run(int argc, const char **argv)
 							n_session_consumed = session_tokens.size();
 						}
 
-
 						// NEW prompt eval
 						size_t total_size = embd.size();
 						// size_t batch_size = lcparams.n_batch;
@@ -2724,31 +2692,6 @@ int run(int argc, const char **argv)
 							if (text_to_speak.size() >= 3 && text_to_speak.substr(text_to_speak.size() - 3, 3) == "Mr.")
 								text_to_speak[text_len - 1] = ' '; // no splitting on mr.
 
-							// STOP on speech or hotkey for llama, every 2 tokens
-							// DISABLED: This was causing TTS audio to be detected as user speech,
-							// prematurely stopping LLM generation. Baseline whisper.cpp doesn't have this.
-							// if (!test_mode && new_tokens % 2 == 0)
-							// {
-							// 	// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
-							// 	audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
-							// 	int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
-
-							// 	if (!params.push_to_talk && vad_result == 1 || g_hotkey_pressed == "Ctrl+Space" || g_hotkey_pressed == "Alt") // speech started
-							// 	{
-							// 		llama_interrupted = 1;
-							// 		llama_interrupted_time = get_current_time_ms();
-							// 		printf(" [Speech/Stop!]\n");
-							// #ifdef XTTS_FILE
-							// 		allow_xtts_file(params.xtts_control_path, 0); // xtts stop
-							// #endif
-							// 		done = true; // llama generation stop
-							// 		g_hotkey_pressed = "";
-							// 		break;
-							// 	}
-							// }
-							//	clear mic
-							// audio.clear() at token 20 removed: main thread owns audio capture
-
 							// splitting for tts
 							if (text_len >= 2 && new_tokens >= 2 && !person_name_is_found && ((new_tokens == split_after && params.split_after && text_to_speak[text_len - 1] != '\'') || text_to_speak[text_len - 1] == '.' || text_to_speak[text_len - 1] == '(' || text_to_speak[text_len - 1] == ')' || (text_to_speak[text_len - 1] == ',' && n_comas == 1 && new_tokens > split_after && params.split_after) || (text_to_speak[text_len - 2] == ' ' && text_to_speak[text_len - 1] == '-') || text_to_speak[text_len - 1] == '?' || text_to_speak[text_len - 1] == '!' || text_to_speak[text_len - 1] == ';' || text_to_speak[text_len - 1] == ':' || text_to_speak[text_len - 1] == '\n'))
 							{
@@ -2762,8 +2705,6 @@ int run(int argc, const char **argv)
 
 								if (text_to_speak.size()) // first and mid parts of the sentence
 								{
-									// int ret = system(("start /B "+params.speak + " " + std::to_string(voice_id) + " \"" + text_to_speak + "\" & exit").c_str()); // for windows
-									// int ret = system((params.speak + " " + std::to_string(voice_id) + " \"" + text_to_speak + "\" &").c_str()); // for linux
 
 									// translate
 									// each generated sentence is translated by the same llama model, in the same ctx
@@ -2804,24 +2745,6 @@ int run(int argc, const char **argv)
 										if (params.sleep_before_xtts)
 											std::this_thread::sleep_for(std::chrono::milliseconds(params.sleep_before_xtts)); // 1s pause to speed up xtts/wav2lip inference
 
-										// check energy level, if user is speaking (it doesn't call whisper recognition, just a loud noise will stop everything)
-										// DISABLED: Same issue - TTS audio triggers false detection
-										// if (!params.push_to_talk || params.push_to_talk && g_hotkey_pressed == "Alt")
-										// {
-										// 	audio.get(2000, pcmf32_cur); // non-blocking, 2000 step_ms
-										// 	int vad_result = ::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
-										// 	if (vad_result == 1) // speech started
-										// 	{
-										// 		llama_interrupted = 1;
-										// 		llama_interrupted_time = get_current_time_ms();
-										// 		printf(" [Speech!]\n");
-										// #ifdef XTTS_FILE
-										// 		allow_xtts_file(params.xtts_control_path, 0); // xtts stop
-										// #endif
-										// 		done = true; // llama generation stop
-										// 		break;
-										// 	}
-										// }
 									}
 									catch (const std::exception &ex)
 									{
@@ -2927,7 +2850,6 @@ int run(int argc, const char **argv)
 									printf("\n");
 									fflush(stdout);
 								}
-
 
 								// min tokens in reply
 								if (params.min_tokens && tokens_in_reply < params.min_tokens)
