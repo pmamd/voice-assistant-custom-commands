@@ -2671,10 +2671,6 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 							{
 								bot_name_is_found = 1;
 								bot_name_current = text_to_speak.substr(1, text_to_speak.size() - 2);
-#ifdef TRANSLATE
-								if (params.translate)
-									bot_name_current_ru = translit_en_ru(bot_name_current);
-#endif
 								translation_full = "";
 								text_to_speak = "";
 							}
