@@ -10,6 +10,18 @@ This guide will help you set up your development environment and understand the 
 
 **CRITICAL:** The dev machine (192.168.86.74) is the source of truth. All changes must be tested there.
 
+## Machines
+
+| Role | Address | Purpose |
+|------|---------|---------|
+| **Dev machine** | `192.168.86.74` | Build, test, iterate. All dependencies installed. |
+| **Target machine** | `192.168.86.22` | Final deployment and real-world testing. Deploy here after dev machine tests pass. |
+
+Deploy to target after dev machine tests pass:
+```bash
+ssh paul@192.168.86.22 "cd ~/Projects/git/talk-llama-fast && git pull && cmake --build build -j"
+```
+
 ### Proper Development Cycle
 
 **DO NOT** claim something is "fixed" or "working" based only on local edits. You MUST:
