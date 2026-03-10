@@ -16,9 +16,6 @@ echo "=========================================="
 echo ""
 
 # Configuration
-# Run Wyoming-Piper from project directory (uses modified handler.py with tool support)
-WYOMING_PIPER_DIR="./wyoming-piper"
-WYOMING_PIPER_CMD="python3 -m wyoming_piper"
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
@@ -57,13 +54,12 @@ if ! pgrep -f "wyoming_piper" > /dev/null; then
     # Create data directory if it doesn't exist
     mkdir -p "$PIPER_DATA_DIR"
 
-    # Start Wyoming-Piper from project directory (uses modified handler.py)
-    # Must run from wyoming-piper directory to use local module
-    bash -c "cd $WYOMING_PIPER_DIR && exec $WYOMING_PIPER_CMD \
-        --piper /home/paul/.local/bin/piper \
-        --voice $PIPER_VOICE \
-        --data-dir ../$PIPER_DATA_DIR \
-        --uri tcp://0.0.0.0:$WYOMING_PORT" \
+    # Start Wyoming-Piper using the pipx entry point (works regardless of user/system Python)
+    "$HOME/.local/bin/wyoming-piper-custom" \
+        --piper "$HOME/.local/bin/piper" \
+        --voice "$PIPER_VOICE" \
+        --data-dir "$PIPER_DATA_DIR" \
+        --uri "tcp://0.0.0.0:$WYOMING_PORT" \
         > /tmp/wyoming-piper.log 2>&1 &
 
     WYOMING_PID=$!
