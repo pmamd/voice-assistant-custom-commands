@@ -20,7 +20,7 @@ PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
 WHISPER_MODEL="./whisper.cpp/models/ggml-tiny.en.bin"
-LLAMA_MODEL="./models/llama-2-7b-chat.Q4_K_M.gguf"
+LLAMA_MODEL="./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
 TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
 
 # Check if talk-llama-custom is already running and kill it
