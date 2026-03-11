@@ -1,370 +1,124 @@
 # Development Setup Guide
 
-**NOTE: DO NOT RENAME THIS FILE.** This file is referenced in Claude Code's custom summarization instructions and must remain as `DEV_SETUP.md` to ensure proper context restoration after compaction events.
+**NOTE: DO NOT RENAME THIS FILE.** Claude Code reads this file at session start and after compaction to restore context.
 
 ---
 
-This guide will help you set up your development environment and understand the project structure.
+## Runtime Context
 
-## Development Workflow
+**Claude Code runs directly on the dev machine (192.168.86.74).**
 
-**CRITICAL:** The dev machine (192.168.86.74) is the source of truth. All changes must be tested there.
+There is no WSL intermediary. Edit, build, and test all happen locally. No SSH, no scp, no paramiko needed for dev work.
 
 ## Machines
 
-| Role | Address | Purpose |
-|------|---------|---------|
-| **Dev machine** | `192.168.86.74` | Build, test, iterate. All dependencies installed. |
-| **Target machine** | `192.168.86.22` | Final deployment and real-world testing. Deploy here after dev machine tests pass. |
+| Role | Address | User | Project path |
+|------|---------|------|-------------|
+| **Dev machine** (here) | `192.168.86.74` | `paul` | `~/git/voice-assistant-custom-commands` |
+| **Target machine** | `192.168.86.22` | `amd` | `~/Projects/git/talk-llama-fast` |
 
-Deploy to target after dev machine tests pass:
-```bash
-ssh paul@192.168.86.22 "cd ~/git/voice-assistant-custom-commands && git pull && cmake --build build -j"
+## Development Workflow
+
+```
+Edit file
+    │
+    ▼
+cmake --build build -j          ← run directly, no SSH
+    │
+    ▼
+python3 -m unittest tests.X -v  ← run directly, no SSH
+    │
+    ▼
+Tests pass → commit → push → deploy to target
 ```
 
-### Proper Development Cycle
+### Deploy to target after tests pass
 
-**DO NOT** claim something is "fixed" or "working" based only on local edits. You MUST:
-
-1. ✅ **Edit files locally** (WSL/local machine)
-2. ✅ **Copy to dev machine** immediately
-3. ✅ **Rebuild on dev machine** (if C++ changes)
-4. ✅ **Run tests on dev machine**
-5. ✅ **Verify tests pass**
-6. ✅ **ONLY THEN** claim it works
-
-**Example workflow:**
 ```bash
-# 1. Edit locally
-vim custom/talk-llama/talk-llama.cpp
-
-# 2. IMMEDIATELY copy to dev machine
-scp custom/talk-llama/talk-llama.cpp paul@192.168.86.74:~/git/voice-assistant-custom-commands/custom/talk-llama/
-
-# 3. IMMEDIATELY rebuild on dev machine
-ssh paul@192.168.86.74 "cd ~/git/voice-assistant-custom-commands && cmake --build build -j"
-
-# 4. IMMEDIATELY test on dev machine
-ssh paul@192.168.86.74 "cd ~/git/voice-assistant-custom-commands && python3 tests/run_tool_tests.py"
-
-# 5. ONLY NOW can you claim "it works"
+ssh amd@192.168.86.22 "cd ~/Projects/git/talk-llama-fast && git pull && cmake --build build -j"
 ```
 
-### Why This Matters
-
-- ❌ **Local edits alone prove nothing** - the code hasn't been compiled or tested
-- ❌ **Saying "this should work" without testing is speculation** - you don't know if it works
-- ❌ **Files on dev machine may be stale** - if you didn't copy, your changes aren't there
-- ✅ **Only passing tests on dev machine prove it works**
-
-### Common Mistakes to Avoid
-
-1. **Making local edits and saying "fixed"** without copying to dev machine
-2. **Assuming builds succeed** without actually building on dev machine
-3. **Claiming tests pass** without running them on dev machine
-4. **Forgetting to copy updated files** before testing
-
-The dev machine has:
-- All dependencies installed (Piper, Wyoming-Piper, models)
-- Proper environment for testing
-- The actual runtime environment
-
-The local machine (WSL) is just for editing and git operations.
-
-## Prerequisites
-
-### System Dependencies
-
-- **CMake** (>= 3.12)
-- **SDL2** development libraries
-- **CURL** development libraries
-- **Git**
-- **Python 3** (for build/test scripts)
-
-Install on Ubuntu/Debian:
-```bash
-sudo apt-get update
-sudo apt-get install -y \
-    build-essential \
-    cmake \
-    git \
-    libsdl2-dev \
-    libcurl4-openssl-dev \
-    libcjson-dev \
-    alsa-utils \
-    python3 \
-    python3-pip \
-    pipx
-```
-
-## Building the Project
-
-### Local Build
+## Build
 
 ```bash
-# Clone with submodules
-git clone --recursive https://github.com/YOUR_USERNAME/voice-assistant-custom-commands.git
-cd voice-assistant-custom-commands
+cd ~/git/voice-assistant-custom-commands
 
-# Configure
+# Configure (only needed once or after CMakeLists changes)
 cmake -B build -DWHISPER_SDL2=ON
 
 # Build
 cmake --build build -j
 
-# Executable will be at: build/bin/talk-llama-custom
+# Binary at: build/bin/talk-llama-custom
 ```
 
-### GPU Build (Optional - AMD ROCm)
+## Test
 
-For AMD GPU acceleration:
-```bash
-cmake -B build -DWHISPER_SDL2=ON -DGGML_HIPBLAS=ON
-cmake --build build -j
-```
-
-## Git Submodules
-
-This project uses git submodules for whisper.cpp and Piper TTS.
-
-### Initialize submodules after cloning:
-```bash
-git submodule update --init --recursive
-```
-
-### Building Piper TTS (Optional - for self-contained setup)
-
-The project includes Piper TTS as a submodule. You can build it locally for a fully self-contained setup:
+Wyoming-Piper must be running before running tests:
 
 ```bash
-# Build Piper from submodule
-./scripts/build_piper.sh
+# Start Wyoming-Piper (if not already running)
+$HOME/.local/bin/wyoming-piper-custom \
+    --piper $HOME/.local/bin/piper \
+    --voice en_US-lessac-medium \
+    --data-dir ~/git/voice-assistant-custom-commands/piper-data \
+    --uri tcp://0.0.0.0:10200 >> /tmp/wyoming-piper.log 2>&1 &
+
+# Run tests
+cd ~/git/voice-assistant-custom-commands
+python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics -v
+python3 -m unittest tests.test_wyoming_piper_unit.TestLLMOutputQuality -v
+
+# Run both together
+python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics \
+                    tests.test_wyoming_piper_unit.TestLLMOutputQuality -v
 ```
 
-This creates a Python virtual environment at `external/piper/.venv` with Piper installed.
+## Key Paths on Dev Machine
 
-**Using the built Piper:**
-```bash
-# Direct execution
-external/piper/.venv/bin/piper --help
+| Item | Path |
+|------|------|
+| Project | `~/git/voice-assistant-custom-commands/` |
+| Binary | `~/git/voice-assistant-custom-commands/build/bin/talk-llama-custom` |
+| LLM model | `~/git/voice-assistant-custom-commands/models/mistral-7b-instruct-v0.2.Q5_0.gguf` |
+| Whisper model | `~/git/voice-assistant-custom-commands/whisper.cpp/models/ggml-tiny.en.bin` |
+| Piper binary | `~/.local/bin/piper` |
+| Wyoming-Piper | `~/.local/bin/wyoming-piper-custom` |
+| TTS log | `/tmp/wyoming-piper.log` |
+| Piper data | `~/git/voice-assistant-custom-commands/piper-data/` |
 
-# Or activate venv
-source external/piper/.venv/bin/activate
-python3 -m piper --help
-```
+## Testing Discipline
 
-**Update test configuration** (test_cases.yaml):
-```yaml
-config:
-  audio_generator:
-    piper_bin: "./external/piper/.venv/bin/piper"
-    model_dir: "./external/piper-voices"  # Download voices separately
-```
-
-### Update submodule to latest upstream:
-```bash
-cd whisper.cpp
-git checkout d207c6882247984689091ae9d780d2e51eab1df7
-cd ..
-git add whisper.cpp
-git commit -m "Update whisper.cpp submodule"
-```
-
-## Project Structure
-
-```
-.
-├── custom/
-│   └── talk-llama/           # Custom modified talk-llama files
-│       ├── talk-llama.cpp    # Main application with tool system
-│       ├── tool-system.cpp   # Tool registry and executors
-│       ├── tool-system.h     # Tool framework
-│       ├── tool-parser.cpp   # Mistral tool call parser
-│       ├── tool-parser.h     # Parser interface
-│       ├── wyoming-client.cpp # Wyoming protocol client
-│       ├── wyoming-client.h  # Client interface
-│       ├── tools/
-│       │   └── tools.json    # Tool definitions (12 tools)
-│       ├── llama.cpp         # Standalone llama.cpp inference engine
-│       ├── llama.h
-│       ├── console.cpp       # Console handling
-│       ├── console.h
-│       ├── unicode.cpp       # Unicode support
-│       ├── unicode-data.cpp
-│       ├── unicode.h
-│       ├── unicode-data.h
-│       ├── tts-request.c     # TTS request handling
-│       ├── tts-request.h
-│       ├── tts-socket.c      # TTS socket communication
-│       ├── tts-socket.h
-│       └── MODIFICATIONS.md  # Detailed modification notes
-├── wyoming-piper/            # Modified Wyoming-Piper TTS server
-│   └── wyoming_piper/
-│       └── handler.py        # Event handlers (stop/pause/resume)
-├── whisper.cpp/              # Upstream whisper.cpp (git submodule)
-├── tests/                    # Test infrastructure
-│   ├── run_tests.py          # Main test runner
-│   ├── run_tool_tests.py     # Tool system test runner
-│   ├── test_tool_system.py   # Tool integration tests
-│   ├── test_tool_audio.py    # Audio-based tool tests
-│   ├── audio_generator.py    # Piper TTS audio generation
-│   ├── audio_verifier.py     # Whisper STT verification
-│   ├── test_cases.yaml       # Original test specifications
-│   ├── test_cases_tool_system.yaml # Tool system test specs (31 tests)
-│   ├── TEST_INFRASTRUCTURE.md # Test infrastructure docs
-│   ├── README.md             # Test harness overview
-│   └── README_TOOL_TESTS.md  # Tool test documentation
-├── docs/                     # Additional documentation
-├── scripts/                  # Build and utility scripts
-├── external/                 # External dependencies (git submodules)
-├── CMakeLists.txt            # Root build configuration
-├── DEV_SETUP.md              # This file (DO NOT RENAME)
-├── README.md                 # User-facing documentation
-├── TOOL_SYSTEM_IMPLEMENTATION.md # Tool system architecture
-├── TOOL_SYSTEM_TEST_RESULTS.md   # Test results
-└── start-assistant.sh        # Launch script
-```
+- **Never** claim something works without running tests
+- **Never** ask the user to test code that hasn't been built and tested locally first
+- **Never** merge untested code to main
+- Only after `python3 -m unittest` shows all green is it valid to claim it works
 
 ## Common Issues
 
-### SDL2 Not Found
-```
-CMake Error: Could NOT find SDL2
-```
-**Solution**: Install SDL2 development package
+**Wyoming-Piper not running:**
 ```bash
-sudo apt-get install libsdl2-dev
+pgrep -fa wyoming_piper | grep -v grep
+ss -tuln | grep 10200
 ```
 
-### Wrong llama.h Found
-```
-error: 'llama_eval' was not declared in this scope
-```
-**Solution**: This is fixed in CMakeLists.txt by using `BEFORE PRIVATE` in include directories to prioritize local headers over system headers.
-
-### Multiple Definition Errors
-If you see errors like:
-```
-multiple definition of 'console::init(bool, bool)'
-```
-**Solution**: Make sure `console.cpp` is NOT `#include`d in talk-llama.cpp. It should only be listed in CMakeLists.txt as a separate source file.
-
-## Testing
-
-**IMPORTANT**: All tests must be run on the development machine (192.168.86.74), not on WSL. The dev machine has Piper TTS, models, and all required dependencies installed.
-
-### Running Tests on Dev Machine
-
-**From WSL**, use the Python venv with paramiko to execute commands on the dev machine:
-
+**Port 10200 already in use:**
 ```bash
-# Activate venv (required for paramiko)
-source /tmp/build-venv/bin/activate
-
-# Use Python scripts with paramiko to run tests remotely
-# Example script structure:
-import paramiko
-
-hostname = "192.168.86.74"
-username = "paul"
-
-client = paramiko.SSHClient()
-client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(hostname, username=username)  # Uses SSH key authentication
-
-# Execute test commands
-stdin, stdout, stderr = client.exec_command(
-    "cd ~/git/voice-assistant-custom-commands/tests && python3 run_tests.py --config test_cases.yaml --group smoke"
-)
-print(stdout.read().decode())
-client.close()
+kill $(lsof -ti tcp:10200) && sleep 1
+# then restart Wyoming-Piper
 ```
 
-**Do NOT use direct SSH commands** - always use paramiko from the venv as shown above.
-
-### Manual Testing
-
-After building, test the executable:
-
+**Build fails:**
 ```bash
-# Check help output
-./build/bin/talk-llama-custom --help
+# Check for errors
+cmake --build build -j 2>&1 | grep "error:"
 
-# Run with models (requires model files)
-./build/bin/talk-llama-custom \
-  -m /path/to/llama-model.gguf \
-  --model-whisper /path/to/whisper-model.bin
+# Full reconfigure if needed
+cmake -B build -DWHISPER_SDL2=ON
+cmake --build build -j
 ```
 
-## Next Steps
-
-- See `custom/talk-llama/MODIFICATIONS.md` for details on code modifications
-- See `wyoming-piper/MODIFICATIONS.md` for TTS modifications
-- See `README.md` for usage instructions
-
-## Making Contributions
-
-### Workflow
-
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
-   ```bash
-   git clone --recursive https://github.com/YOUR_USERNAME/voice-assistant-custom-commands.git
-   cd voice-assistant-custom-commands
-   ```
-3. **Create a feature branch**:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-4. **Make your changes** in the appropriate directory:
-   - Talk-llama changes: `custom/talk-llama/`
-   - Wyoming-Piper changes: `wyoming-piper/wyoming_piper/`
-   - Tests: `tests/`
-5. **Test thoroughly**:
-   ```bash
-   # Build
-   cmake --build build -j
-
-   # Run tests (if available)
-   make test
-   ```
-6. **Commit your changes**:
-   ```bash
-   git add .
-   git commit -m "Description of your changes"
-   ```
-7. **Push to your fork**:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-8. **Submit a pull request** on GitHub
-
-### Code Style
-
-- **C/C++**: Follow existing code style in the project
-- **Python**: Follow PEP 8
-- **Commit messages**: Clear, descriptive messages in imperative mood
-
-### Areas for Contribution
-
-- **Custom commands**: Add more LLM-bypass commands beyond "stop"
-- **Test coverage**: Expand test harness with more test cases
-- **Documentation**: Improve setup guides and troubleshooting
-- **Performance**: Optimize audio processing or TTS latency
-- **Platform support**: macOS or Windows compatibility
-- **Bug fixes**: Check issues on GitHub
-
-### Documentation
-
-If you add features, please update:
-- `README.md` - User-facing documentation
-- `MODIFICATIONS.md` - Technical changes in modified files
-- Code comments - For complex logic
-
-### Questions?
-
-Open an issue on GitHub for:
-- Feature requests
-- Bug reports
-- Setup help
-- General questions
+**aplay left running after tests:**
+```bash
+pkill -9 aplay
+```
