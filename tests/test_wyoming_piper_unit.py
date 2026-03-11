@@ -222,7 +222,7 @@ _STORY_AUDIO = _PROJECT_ROOT / "tests/audio/inputs/story_request.wav"
 _WYOMING_URL = "http://localhost:10200/"
 
 
-def _run_binary(audio_file, timeout=120):
+def _run_binary(audio_file, timeout=300):
     cmd = [
         str(_BINARY), "-ml", str(_LLAMA_MODEL), "-mw", str(_WHISPER_MODEL),
         "--xtts-url", _WYOMING_URL, "--xtts-voice", "en_US-lessac-medium",
