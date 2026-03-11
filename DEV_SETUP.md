@@ -19,7 +19,7 @@ This guide will help you set up your development environment and understand the 
 
 Deploy to target after dev machine tests pass:
 ```bash
-ssh paul@192.168.86.22 "cd ~/Projects/git/talk-llama-fast && git pull && cmake --build build -j"
+ssh paul@192.168.86.22 "cd ~/git/voice-assistant-custom-commands && git pull && cmake --build build -j"
 ```
 
 ### Proper Development Cycle
@@ -39,13 +39,13 @@ ssh paul@192.168.86.22 "cd ~/Projects/git/talk-llama-fast && git pull && cmake -
 vim custom/talk-llama/talk-llama.cpp
 
 # 2. IMMEDIATELY copy to dev machine
-scp custom/talk-llama/talk-llama.cpp paul@192.168.86.74:~/Projects/git/talk-llama-fast/custom/talk-llama/
+scp custom/talk-llama/talk-llama.cpp paul@192.168.86.74:~/git/voice-assistant-custom-commands/custom/talk-llama/
 
 # 3. IMMEDIATELY rebuild on dev machine
-ssh paul@192.168.86.74 "cd ~/Projects/git/talk-llama-fast && cmake --build build -j"
+ssh paul@192.168.86.74 "cd ~/git/voice-assistant-custom-commands && cmake --build build -j"
 
 # 4. IMMEDIATELY test on dev machine
-ssh paul@192.168.86.74 "cd ~/Projects/git/talk-llama-fast && python3 tests/run_tool_tests.py"
+ssh paul@192.168.86.74 "cd ~/git/voice-assistant-custom-commands && python3 tests/run_tool_tests.py"
 
 # 5. ONLY NOW can you claim "it works"
 ```
@@ -274,7 +274,7 @@ client.connect(hostname, username=username)  # Uses SSH key authentication
 
 # Execute test commands
 stdin, stdout, stderr = client.exec_command(
-    "cd ~/Projects/git/talk-llama-fast/tests && python3 run_tests.py --config test_cases.yaml --group smoke"
+    "cd ~/git/voice-assistant-custom-commands/tests && python3 run_tests.py --config test_cases.yaml --group smoke"
 )
 print(stdout.read().decode())
 client.close()
