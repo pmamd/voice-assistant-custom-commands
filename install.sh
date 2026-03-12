@@ -38,6 +38,22 @@ echo "=========================================="
 echo ""
 
 # ---------------------------------------------------------------------------
+# 0. Python version check (wyoming-piper requires >= 3.9)
+# ---------------------------------------------------------------------------
+info "Checking Python version..."
+
+PYTHON_BIN="$(command -v python3 2>/dev/null)" || fail "python3 not found. Install it first: sudo apt-get install python3"
+
+PYTHON_MAJOR=$("$PYTHON_BIN" -c 'import sys; print(sys.version_info.major)')
+PYTHON_MINOR=$("$PYTHON_BIN" -c 'import sys; print(sys.version_info.minor)')
+
+if [[ "$PYTHON_MAJOR" -lt 3 ]] || { [[ "$PYTHON_MAJOR" -eq 3 ]] && [[ "$PYTHON_MINOR" -lt 9 ]]; }; then
+    fail "Python 3.9+ required (found $PYTHON_MAJOR.$PYTHON_MINOR). Upgrade Python before running this installer."
+fi
+
+ok "Python $PYTHON_MAJOR.$PYTHON_MINOR"
+
+# ---------------------------------------------------------------------------
 # 1. Verify pre-built binaries are present
 # ---------------------------------------------------------------------------
 info "Checking pre-built binaries..."
