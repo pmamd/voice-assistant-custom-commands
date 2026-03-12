@@ -1,0 +1,242 @@
+#!/bin/bash
+# Voice Assistant Installer
+# Sets up a new target board with the pre-built binary and all dependencies.
+#
+# Usage: ./install.sh
+# Requirements: Ubuntu/Debian, x86-64, AMD GPU (gfx1153 / RDNA3)
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# --- colours ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+ok()   { echo -e "${GREEN}✓${NC} $*"; }
+info() { echo -e "${CYAN}→${NC} $*"; }
+warn() { echo -e "${YELLOW}⚠${NC} $*"; }
+fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
+
+prompt_yes_no() {
+    local question="$1"
+    local default="${2:-n}"
+    local yn_hint
+    [[ "$default" == "y" ]] && yn_hint="Y/n" || yn_hint="y/N"
+    read -r -p "$question [$yn_hint] " answer
+    answer="${answer:-$default}"
+    [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+echo ""
+echo "=========================================="
+echo " Voice Assistant — Installer"
+echo "=========================================="
+echo ""
+
+# ---------------------------------------------------------------------------
+# 1. Verify pre-built binaries are present
+# ---------------------------------------------------------------------------
+info "Checking pre-built binaries..."
+
+DIST_BIN="$SCRIPT_DIR/dist/bin/talk-llama-custom"
+DIST_LIBWHISPER="$SCRIPT_DIR/dist/lib/libwhisper.so.1.6.2"
+DIST_LIBGGML="$SCRIPT_DIR/dist/lib/libggml.so"
+
+[[ -f "$DIST_BIN" ]]        || fail "dist/bin/talk-llama-custom not found. Is the repo up to date?"
+[[ -f "$DIST_LIBWHISPER" ]] || fail "dist/lib/libwhisper.so.1.6.2 not found."
+[[ -f "$DIST_LIBGGML" ]]    || fail "dist/lib/libggml.so not found."
+ok "Pre-built binaries present"
+
+# ---------------------------------------------------------------------------
+# 2. System packages
+# ---------------------------------------------------------------------------
+info "Installing runtime system packages..."
+
+sudo apt-get update -qq
+sudo apt-get install -y \
+    libsdl2-2.0-0 \
+    libcurl4 \
+    libcjson1 \
+    alsa-utils \
+    python3 \
+    pipx
+
+ok "System packages installed"
+
+# ---------------------------------------------------------------------------
+# 3. Install the binary and shared libraries
+# ---------------------------------------------------------------------------
+info "Installing binary to build/bin/..."
+
+mkdir -p "$SCRIPT_DIR/build/bin"
+cp "$DIST_BIN" "$SCRIPT_DIR/build/bin/talk-llama-custom"
+chmod +x "$SCRIPT_DIR/build/bin/talk-llama-custom"
+ok "Binary installed → build/bin/talk-llama-custom"
+
+info "Installing shared libraries to /usr/local/lib/..."
+sudo cp "$DIST_LIBWHISPER" /usr/local/lib/libwhisper.so.1.6.2
+sudo ln -sf /usr/local/lib/libwhisper.so.1.6.2 /usr/local/lib/libwhisper.so.1
+sudo ln -sf /usr/local/lib/libwhisper.so.1.6.2 /usr/local/lib/libwhisper.so
+sudo cp "$DIST_LIBGGML" /usr/local/lib/libggml.so
+sudo ldconfig
+ok "Shared libraries installed and ldconfig updated"
+
+# ---------------------------------------------------------------------------
+# 4. Piper TTS (Python package, exact version required)
+# ---------------------------------------------------------------------------
+info "Installing Piper TTS..."
+
+export PATH="$HOME/.local/bin:$PATH"
+
+if pipx list 2>/dev/null | grep -q "piper-tts"; then
+    ok "piper-tts already installed"
+else
+    pipx install 'piper-tts==1.4.1'
+    ok "piper-tts installed"
+fi
+
+if pipx runpip piper-tts show pathvalidate &>/dev/null; then
+    ok "pathvalidate already present"
+else
+    pipx inject piper-tts pathvalidate
+    ok "pathvalidate injected"
+fi
+
+# Verify it's the Python version not the C++ binary
+PIPER_PATH="$(command -v piper 2>/dev/null || echo "$HOME/.local/bin/piper")"
+if file "$PIPER_PATH" 2>/dev/null | grep -q "Python script"; then
+    ok "Piper is the correct Python version"
+else
+    warn "Piper binary type check inconclusive — ensure piper-tts==1.4.1 is installed, not the C++ binary"
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Wyoming-Piper (custom version from repo submodule)
+# ---------------------------------------------------------------------------
+info "Installing Wyoming-Piper (custom version)..."
+
+WYOMING_DIR="$SCRIPT_DIR/wyoming-piper"
+[[ -d "$WYOMING_DIR" ]] || fail "wyoming-piper/ directory not found. Did you clone with --recursive?"
+
+if pipx list 2>/dev/null | grep -q "wyoming-piper-custom"; then
+    ok "wyoming-piper-custom already installed"
+else
+    cd "$WYOMING_DIR"
+    pipx install -e .
+    cd "$SCRIPT_DIR"
+    ok "wyoming-piper-custom installed"
+fi
+
+# ---------------------------------------------------------------------------
+# 6. PATH
+# ---------------------------------------------------------------------------
+if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+    ok "Added ~/.local/bin to PATH in .bashrc"
+else
+    ok "PATH already includes ~/.local/bin"
+fi
+
+# ---------------------------------------------------------------------------
+# 7. Whisper model
+# ---------------------------------------------------------------------------
+echo ""
+WHISPER_MODEL="$SCRIPT_DIR/whisper.cpp/models/ggml-tiny.en.bin"
+if [[ -f "$WHISPER_MODEL" ]]; then
+    ok "Whisper model already present: ggml-tiny.en.bin"
+else
+    if prompt_yes_no "Download Whisper model (ggml-tiny.en, ~75MB)?" "y"; then
+        cd "$SCRIPT_DIR/whisper.cpp/models"
+        bash download-ggml-model.sh tiny.en
+        cd "$SCRIPT_DIR"
+        ok "Whisper model downloaded"
+    else
+        warn "Whisper model not downloaded. Place ggml-tiny.en.bin in whisper.cpp/models/ before running."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 8. LLM model
+# ---------------------------------------------------------------------------
+echo ""
+MISTRAL_MODEL="$SCRIPT_DIR/models/mistral-7b-instruct-v0.2.Q5_0.gguf"
+LLAMA_MODEL="$SCRIPT_DIR/models/llama-2-7b-chat.Q4_K_M.gguf"
+mkdir -p "$SCRIPT_DIR/models"
+
+if [[ -f "$MISTRAL_MODEL" ]]; then
+    ok "Mistral 7B model already present"
+elif prompt_yes_no "Download Mistral 7B Instruct Q5_0 (~4.6GB, recommended)?" "y"; then
+    info "Downloading Mistral 7B..."
+    wget --show-progress -P "$SCRIPT_DIR/models" \
+        "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_0.gguf"
+    ok "Mistral 7B downloaded"
+else
+    warn "No LLM model downloaded."
+    if [[ ! -f "$LLAMA_MODEL" ]]; then
+        if prompt_yes_no "Download LLaMA-2 7B Chat Q4_K_M instead (~3.8GB)?" "n"; then
+            wget --show-progress -P "$SCRIPT_DIR/models" \
+                "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf"
+            ok "LLaMA-2 7B downloaded"
+        else
+            warn "No LLM model downloaded. Place a .gguf model in models/ and update start-assistant.sh."
+        fi
+    else
+        ok "LLaMA-2 7B model already present"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 9. Voice data directory
+# ---------------------------------------------------------------------------
+mkdir -p "$SCRIPT_DIR/piper-data"
+ok "piper-data/ directory ready (voice model downloaded on first use)"
+
+# ---------------------------------------------------------------------------
+# 10. Final verification
+# ---------------------------------------------------------------------------
+echo ""
+echo "=========================================="
+echo " Verification"
+echo "=========================================="
+
+ERRORS=0
+
+check() {
+    local label="$1"; local path="$2"
+    if [[ -e "$path" ]]; then
+        ok "$label"
+    else
+        warn "MISSING: $label ($path)"
+        ERRORS=$((ERRORS + 1))
+    fi
+}
+
+check "Binary"           "$SCRIPT_DIR/build/bin/talk-llama-custom"
+check "libwhisper.so.1"  "/usr/local/lib/libwhisper.so.1"
+check "libggml.so"       "/usr/local/lib/libggml.so"
+check "piper"            "$HOME/.local/bin/piper"
+check "wyoming-piper-custom" "$HOME/.local/bin/wyoming-piper-custom"
+[[ -f "$WHISPER_MODEL" ]] && check "Whisper model" "$WHISPER_MODEL" || warn "Whisper model not present yet"
+ls "$SCRIPT_DIR"/models/*.gguf &>/dev/null && ok "LLM model present" || warn "No .gguf model in models/ yet"
+
+echo ""
+if [[ $ERRORS -eq 0 ]]; then
+    echo -e "${GREEN}=========================================="
+    echo " Installation complete"
+    echo -e "==========================================${NC}"
+    echo ""
+    echo "Start the assistant:"
+    echo "  source ~/.bashrc   # or open a new terminal"
+    echo "  ./start-assistant.sh"
+else
+    echo -e "${YELLOW}=========================================="
+    echo " Installation complete with $ERRORS warning(s)"
+    echo -e "==========================================${NC}"
+    echo ""
+    echo "Resolve warnings above before running ./start-assistant.sh"
+fi
+echo ""

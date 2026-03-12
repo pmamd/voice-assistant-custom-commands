@@ -1,11 +1,16 @@
 # Build artifacts
 build/
 *.o
-*.so
 *.a
 *.exe
 *.dll
 *.dylib
+
+# Shared libraries (except pre-built dist binaries)
+*.so
+*.so.*
+!dist/lib/*.so
+!dist/lib/*.so.*
 
 # Python
 __pycache__/
