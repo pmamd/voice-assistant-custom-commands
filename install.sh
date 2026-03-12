@@ -146,12 +146,13 @@ else
     ok "pathvalidate injected"
 fi
 
-# Verify it's the Python version not the C++ binary
+# Verify it's the Python version not the C++ binary (pipx installs a symlink
+# to a Python script, so use file -L to follow the symlink; check it's NOT ELF)
 PIPER_PATH="$(command -v piper 2>/dev/null || echo "$HOME/.local/bin/piper")"
-if file "$PIPER_PATH" 2>/dev/null | grep -q "Python script"; then
-    ok "Piper is the correct Python version"
+if file -L "$PIPER_PATH" 2>/dev/null | grep -q "ELF"; then
+    fail "piper at $PIPER_PATH is a C++ binary, not piper-tts. Remove it and re-run:\n  sudo rm -f $(which piper)\n  pipx install piper-tts==1.4.1"
 else
-    warn "Piper binary type check inconclusive — ensure piper-tts==1.4.1 is installed, not the C++ binary"
+    ok "Piper is the correct Python version (not C++ binary)"
 fi
 
 # ---------------------------------------------------------------------------
