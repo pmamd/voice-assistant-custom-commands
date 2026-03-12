@@ -54,6 +54,23 @@ fi
 ok "Python $PYTHON_MAJOR.$PYTHON_MINOR"
 
 # ---------------------------------------------------------------------------
+# 0b. AMD GPU driver check
+# ---------------------------------------------------------------------------
+info "Checking AMD GPU driver..."
+
+AMDGPU_LIBDRM="/opt/amdgpu/lib/x86_64-linux-gnu/libdrm.so.2"
+
+if [[ ! -f "$AMDGPU_LIBDRM" ]]; then
+    fail "AMD GPU driver not found ($AMDGPU_LIBDRM missing). Install the amdgpu driver stack before running this installer."
+fi
+
+if ! lsmod | grep -q "^amdgpu"; then
+    warn "amdgpu kernel module is not loaded. The binary may not run correctly."
+else
+    ok "AMD GPU driver present (amdgpu module loaded, libdrm found)"
+fi
+
+# ---------------------------------------------------------------------------
 # 1. Verify pre-built binaries are present
 # ---------------------------------------------------------------------------
 info "Checking pre-built binaries..."
@@ -100,6 +117,13 @@ sudo ln -sf /usr/local/lib/libwhisper.so.1.6.2 /usr/local/lib/libwhisper.so
 sudo cp "$DIST_LIBGGML" /usr/local/lib/libggml.so
 sudo ldconfig
 ok "Shared libraries installed and ldconfig updated"
+
+info "Verifying binary links cleanly..."
+MISSING=$(ldd "$SCRIPT_DIR/build/bin/talk-llama-custom" 2>&1 | grep "not found" || true)
+if [[ -n "$MISSING" ]]; then
+    fail "Binary has unresolved library dependencies:\n$MISSING\nInstall the missing libraries and re-run."
+fi
+ok "All binary dependencies satisfied"
 
 # ---------------------------------------------------------------------------
 # 4. Piper TTS (Python package, exact version required)
