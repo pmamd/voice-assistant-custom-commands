@@ -82,8 +82,8 @@ for candidate in /opt/rocm /opt/rocm-*; do
 done
 
 if [[ -z "$ROCM_PATH" ]]; then
-    fail "ROCm not found. Install ROCm before running this installer."
-fi
+    warn "ROCm not found — GPU acceleration will not be available."
+else
 
 ROCM_VERSION=$(cat "$ROCM_PATH/.info/version" 2>/dev/null \
     || "$ROCM_PATH/bin/hipconfig" --version 2>/dev/null \
@@ -107,6 +107,8 @@ if [[ "$GPU_ARCH" == "gfx1153" ]]; then
 elif [[ -n "$GPU_ARCH" ]]; then
     ok "GPU: $GPU_ARCH detected"
 fi
+
+fi # end ROCm block
 
 # ---------------------------------------------------------------------------
 # 1. Verify pre-built binaries are present
