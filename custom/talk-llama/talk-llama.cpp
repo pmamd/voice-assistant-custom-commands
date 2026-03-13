@@ -1396,6 +1396,10 @@ int run(int argc, const char **argv)
 
 	llama_backend_init();
 
+	// Suppress llama.cpp internal log output during model load so it doesn't
+	// break the progress bar's \r rendering. Restored immediately after.
+	llama_log_set([](ggml_log_level, const char *, void *) {}, nullptr);
+
 	auto lmparams = llama_model_default_params();
 	if (!params.use_gpu)
 	{
@@ -1438,6 +1442,9 @@ int run(int argc, const char **argv)
 	lcparams.n_batch = params.batch_size; // 512 was default
 
 	struct llama_context *ctx_llama = llama_new_context_with_model(model_llama, lcparams);
+
+	// Restore default llama.cpp logging now that model load is complete.
+	llama_log_set(nullptr, nullptr);
 
 	printf("print some info about the processing\n");
 	// Just do no traslation for now
