@@ -192,9 +192,8 @@ if [[ -f "$WHISPER_MODEL" ]]; then
 else
     if prompt_yes_no "Download Whisper model (ggml-tiny.en, ~75MB)?" "y"; then
         mkdir -p "$SCRIPT_DIR/whisper.cpp/models"
-        cd "$SCRIPT_DIR/whisper.cpp/models"
-        bash download-ggml-model.sh tiny.en
-        cd "$SCRIPT_DIR"
+        wget --show-progress -O "$SCRIPT_DIR/whisper.cpp/models/ggml-tiny.en.bin" \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin"
         ok "Whisper model downloaded"
     else
         warn "Whisper model not downloaded. Place ggml-tiny.en.bin in whisper.cpp/models/ before running."
