@@ -15,6 +15,12 @@ echo "Voice Assistant with Custom Commands"
 echo "=========================================="
 echo ""
 
+# gfx1153 iGPU: rocBLAS has no precompiled kernels for this arch — override
+# to gfx1151 which is compatible. No-op on other GPUs.
+if rocminfo 2>/dev/null | grep -q "gfx1153"; then
+    export HSA_OVERRIDE_GFX_VERSION=11.5.1
+fi
+
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models

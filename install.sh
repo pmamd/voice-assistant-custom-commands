@@ -54,7 +54,7 @@ fi
 ok "Python $PYTHON_MAJOR.$PYTHON_MINOR"
 
 # ---------------------------------------------------------------------------
-# 0b. AMD GPU driver check
+# 0b. AMD GPU driver and ROCm check
 # ---------------------------------------------------------------------------
 info "Checking AMD GPU driver..."
 
@@ -68,6 +68,44 @@ if ! lsmod | grep -q "^amdgpu"; then
     warn "amdgpu kernel module is not loaded. The binary may not run correctly."
 else
     ok "AMD GPU driver present (amdgpu module loaded, libdrm found)"
+fi
+
+info "Checking ROCm..."
+
+# Find the active ROCm installation
+ROCM_PATH=""
+for candidate in /opt/rocm /opt/rocm-*; do
+    if [[ -f "$candidate/bin/rocminfo" ]]; then
+        ROCM_PATH="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$ROCM_PATH" ]]; then
+    fail "ROCm not found. Install ROCm before running this installer."
+fi
+
+ROCM_VERSION=$(cat "$ROCM_PATH/.info/version" 2>/dev/null \
+    || "$ROCM_PATH/bin/hipconfig" --version 2>/dev/null \
+    || echo "unknown")
+ok "ROCm found at $ROCM_PATH (version: $ROCM_VERSION)"
+
+# Warn if ROCm is older than 6.5 (required for gfx1153 / ROCm 7.x API)
+ROCM_MAJOR=$(echo "$ROCM_VERSION" | cut -d. -f1)
+if [[ "$ROCM_MAJOR" -lt 6 ]]; then
+    warn "ROCm $ROCM_VERSION detected. Version 6.5+ is recommended for gfx1153 support."
+fi
+
+# For gfx1153 iGPU: rocBLAS does not ship precompiled kernels for this arch.
+# HSA_OVERRIDE_GFX_VERSION=11.5.1 makes it fall back to compatible gfx1151 kernels.
+GPU_ARCH=$("$ROCM_PATH/bin/rocminfo" 2>/dev/null | grep "Name:.*gfx" | head -1 | awk '{print $2}')
+if [[ "$GPU_ARCH" == "gfx1153" ]]; then
+    ok "GPU: gfx1153 detected — adding HSA_OVERRIDE_GFX_VERSION=11.5.1 to ~/.bashrc"
+    if ! grep -q "HSA_OVERRIDE_GFX_VERSION" "$HOME/.bashrc" 2>/dev/null; then
+        echo 'export HSA_OVERRIDE_GFX_VERSION=11.5.1' >> "$HOME/.bashrc"
+    fi
+elif [[ -n "$GPU_ARCH" ]]; then
+    ok "GPU: $GPU_ARCH detected"
 fi
 
 # ---------------------------------------------------------------------------
