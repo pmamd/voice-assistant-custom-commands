@@ -163,11 +163,24 @@ info "Installing Wyoming-Piper (custom version)..."
 WYOMING_DIR="$SCRIPT_DIR/wyoming-piper"
 [[ -d "$WYOMING_DIR" ]] || fail "wyoming-piper/ directory not found. Did you clone with --recursive?"
 
-if pipx list 2>/dev/null | grep -q "wyoming-piper-custom"; then
-    ok "wyoming-piper-custom already installed"
+# Check if already installed AND pointing to the correct directory.
+# pipx editable installs record their source path in direct_url.json — if it
+# points somewhere else (e.g. a previous installation), force reinstall.
+WYOMING_DIRECT_URL=$(find "$HOME/.local/share/pipx/venvs/wyoming-piper-custom" \
+    -name "direct_url.json" 2>/dev/null | xargs cat 2>/dev/null)
+WYOMING_INSTALLED_PATH=$(echo "$WYOMING_DIRECT_URL" | grep -o '"url":"[^"]*"' | grep -o 'file://.*' | sed 's|file://||')
+
+if [[ "$WYOMING_INSTALLED_PATH" == "$WYOMING_DIR" ]]; then
+    ok "wyoming-piper-custom already installed (correct path)"
 else
+    if [[ -n "$WYOMING_INSTALLED_PATH" ]]; then
+        info "wyoming-piper-custom installed but points to wrong path:"
+        info "  installed: $WYOMING_INSTALLED_PATH"
+        info "  expected:  $WYOMING_DIR"
+        info "Reinstalling..."
+    fi
     cd "$WYOMING_DIR"
-    pipx install -e .
+    pipx install --force -e .
     cd "$SCRIPT_DIR"
     ok "wyoming-piper-custom installed"
 fi
