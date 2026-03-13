@@ -1669,28 +1669,30 @@ int run(int argc, const char **argv)
 	// evaluate the initial prompt
 
 	printf("\n");
-	printf("%s : initializing - please wait ...\n", __func__);
+	printf("%s : processing prompt (%d tokens)...\n", __func__, (int)embd_inp.size());
 
 	double llama_start_time = get_current_time_ms();
 
 	// ── Initial prompt evaluation ────────────────────────────────────────────────
 // Feeds the full initial prompt through the LLM in batches to prime the KV
 // cache before the first user turn begins.
-// NEW prompt eval
 	int n_past = 0;
-	// Calculate the number of chunks needed
 	size_t num_chunks = (embd_inp.size() + lcparams.n_batch - 1) / lcparams.n_batch;
-	// Iterate through the chunks and evaluate them
 	for (size_t i = 0; i < num_chunks; i++)
 	{
-		// Calculate the start and end indices for the current chunk
 		size_t start_idx = i * lcparams.n_batch;
 		size_t end_idx = std::min((i + 1) * lcparams.n_batch, embd_inp.size());
 		size_t chunk_size = end_idx - start_idx;
-		// Evaluate the current chunk
 		llama_eval(ctx_llama, embd_inp.data() + start_idx, chunk_size, n_past);
 		n_past += chunk_size;
+
+		int pct  = (int)(((float)(i + 1) / num_chunks) * 100.0f);
+		int done = pct / 5;
+		fprintf(stderr, "\r  Processing prompt: [%-20s] %3d%%",
+			std::string(done, '#').append(20 - done, '.').c_str(), pct);
+		fflush(stderr);
 	}
+	fprintf(stderr, "\n");
 
 	double llama_end_time = get_current_time_ms();
 	double llama_time_total = 0;
