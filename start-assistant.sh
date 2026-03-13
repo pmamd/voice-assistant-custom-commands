@@ -34,21 +34,29 @@ if pgrep -f "talk-llama-custom" > /dev/null; then
 fi
 
 # Check if Wyoming-Piper is already running
-if pgrep -f "wyoming_piper" > /dev/null; then
+if pgrep -f "wyoming.piper" > /dev/null; then
     echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
     read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "Stopping Wyoming-Piper..."
-        pkill -f "wyoming_piper" || true
-        sleep 2
+        pkill -f "wyoming.piper" || true
+        echo "Waiting for port $WYOMING_PORT to be released..."
+        for i in $(seq 1 10); do
+            ss -tlnp | grep -q ":$WYOMING_PORT " || break
+            sleep 1
+        done
+        if ss -tlnp | grep -q ":$WYOMING_PORT "; then
+            echo -e "${RED}✗ Port $WYOMING_PORT still in use after 10s${NC}"
+            exit 1
+        fi
     else
         echo "Continuing with existing Wyoming-Piper instance..."
     fi
 fi
 
 # Start Wyoming-Piper if not running
-if ! pgrep -f "wyoming_piper" > /dev/null; then
+if ! pgrep -f "wyoming.piper" > /dev/null; then
     echo -e "${GREEN}Starting Wyoming-Piper TTS server (modified version with tool support)...${NC}"
 
     # Create data directory if it doesn't exist
@@ -70,7 +78,7 @@ if ! pgrep -f "wyoming_piper" > /dev/null; then
     echo "Waiting for TTS server to start..."
     sleep 3
 
-    if ! pgrep -f "wyoming_piper" > /dev/null; then
+    if ! pgrep -f "wyoming.piper" > /dev/null; then
         echo -e "${RED}✗ Failed to start Wyoming-Piper${NC}"
         echo "Check log: cat /tmp/wyoming-piper.log"
         exit 1
@@ -206,7 +214,7 @@ read -p "Stop Wyoming-Piper TTS server? (y/N) [default: N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Stopping Wyoming-Piper..."
-    pkill -f "wyoming_piper" || true
+    pkill -f "wyoming.piper" || true
     echo -e "${GREEN}✓ TTS server stopped${NC}"
 else
     echo "Wyoming-Piper left running in background"
