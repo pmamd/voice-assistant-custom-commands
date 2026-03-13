@@ -85,7 +85,7 @@ void sigint_handler(int sig) {
 		g_sigint_received = 1;
 	} else {
 		fprintf(stderr, "\n\nForce quit! Exiting immediately...\n");
-		exit(1);
+		_exit(1);
 	}
 }
 
@@ -2975,8 +2975,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 	llama_print_timings(ctx_llama);
 	llama_free(ctx_llama);
 
-	// In test mode, don't wait for input threads (they'll never finish)
-	if (!test_mode) {
+	// In test mode, or on SIGINT, don't wait for input threads — they're
+	// blocked on stdin/SDL reads and won't return on their own.
+	if (!test_mode && !g_sigint_received) {
 		input_thread.join(); // kb input
 #ifdef HOTKEYS
 		shortcut_thread.join(); // shortcuts
