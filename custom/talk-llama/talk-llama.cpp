@@ -1413,6 +1413,20 @@ int run(int argc, const char **argv)
 		lmparams.split_mode = LLAMA_SPLIT_MODE_NONE;
 	lmparams.tensor_split = params.tensor_split;
 
+	// Progress bar displayed while the model file is being read from disk.
+	lmparams.progress_callback = [](float progress, void *) -> bool {
+		int pct  = (int)(progress * 100.0f);
+		int done = pct / 5;           // 20 segments, each = 5%
+		fprintf(stderr, "\r  Loading model: [%-20s] %3d%%",
+			std::string(done, '#').append(20 - done, '.').c_str(), pct);
+		if (pct >= 100)
+			fprintf(stderr, "\n");
+		fflush(stderr);
+		return true;
+	};
+	lmparams.progress_callback_user_data = nullptr;
+
+	fprintf(stderr, "\n");
 	struct llama_model *model_llama = llama_load_model_from_file(params.model_llama.c_str(), lmparams);
 
 	llama_context_params lcparams = llama_context_default_params();
