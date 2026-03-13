@@ -77,13 +77,17 @@ if pgrep -f "wyoming.piper" > /dev/null; then
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo "Stopping Wyoming-Piper..."
         pkill -f "wyoming.piper" || true
-        echo "Waiting for port $WYOMING_PORT to be released..."
-        for i in $(seq 1 10); do
-            ss -tlnp | grep -q ":$WYOMING_PORT " || break
-            sleep 1
-        done
+        sleep 1
+        # Force-kill anything still holding the port
         if ss -tlnp | grep -q ":$WYOMING_PORT "; then
-            echo -e "${RED}✗ Port $WYOMING_PORT still in use after 10s${NC}"
+            PORT_PIDS=$(ss -tlnp | grep ":$WYOMING_PORT " | grep -oP 'pid=\K[0-9]+')
+            for pid in $PORT_PIDS; do
+                kill -9 "$pid" 2>/dev/null || true
+            done
+            sleep 1
+        fi
+        if ss -tlnp | grep -q ":$WYOMING_PORT "; then
+            echo -e "${RED}✗ Port $WYOMING_PORT still in use — try: kill -9 \$(lsof -ti tcp:$WYOMING_PORT)${NC}"
             exit 1
         fi
     else
