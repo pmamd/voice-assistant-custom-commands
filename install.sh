@@ -191,6 +191,7 @@ if [[ -f "$WHISPER_MODEL" ]]; then
     ok "Whisper model already present: ggml-tiny.en.bin"
 else
     if prompt_yes_no "Download Whisper model (ggml-tiny.en, ~75MB)?" "y"; then
+        mkdir -p "$SCRIPT_DIR/whisper.cpp/models"
         cd "$SCRIPT_DIR/whisper.cpp/models"
         bash download-ggml-model.sh tiny.en
         cd "$SCRIPT_DIR"
