@@ -284,7 +284,6 @@ if [[ $ERRORS -eq 0 ]]; then
     echo -e "==========================================${NC}"
     echo ""
     echo "Start the assistant:"
-    echo "  source ~/.bashrc   # or open a new terminal"
     echo "  ./start-assistant.sh"
 else
     echo -e "${YELLOW}=========================================="
