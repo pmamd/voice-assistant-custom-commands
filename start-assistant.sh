@@ -15,11 +15,41 @@ echo "Voice Assistant with Custom Commands"
 echo "=========================================="
 echo ""
 
-# gfx1153 iGPU: rocBLAS has no precompiled kernels for this arch — override
-# to gfx1151 which is compatible. No-op on other GPUs.
-if rocminfo 2>/dev/null | grep -q "gfx1153"; then
-    export HSA_OVERRIDE_GFX_VERSION=11.5.1
-fi
+# If rocBLAS has no precompiled kernels for the current GPU arch, find the
+# nearest available one in the same subfamily and set HSA_OVERRIDE_GFX_VERSION.
+_setup_hsa_override() {
+    local rocm_lib
+    rocm_lib=$(ls -d /opt/rocm*/lib/rocblas/library 2>/dev/null | head -1)
+    [[ -z "$rocm_lib" ]] && return
+
+    local gpu_arch
+    gpu_arch=$(rocminfo 2>/dev/null | grep -m1 "Name:.*gfx" | awk '{print $2}')
+    [[ -z "$gpu_arch" ]] && return
+
+    # If a TensileLibrary already exists for this arch, no override needed.
+    ls "$rocm_lib"/TensileLibrary*"$gpu_arch"* &>/dev/null && return
+
+    # Extract subfamily prefix (e.g. "115" from "gfx1153") and find nearest match.
+    local digits="${gpu_arch#gfx}"
+    local prefix="${digits:0:${#digits}-1}"  # drop last digit
+    local nearest
+    nearest=$(ls "$rocm_lib"/TensileLibrary_lazy_gfx*.dat 2>/dev/null \
+        | grep -oE "gfx${prefix}[0-9]+" | sort | tail -1)
+    [[ -z "$nearest" ]] && return
+
+    # Convert gfxNNNN -> HSA major.minor.stepping (e.g. gfx1151 -> 11.5.1)
+    local n="${nearest#gfx}"
+    local hsa
+    if [[ ${#n} -eq 4 ]]; then
+        hsa="${n:0:2}.${n:2:1}.${n:3:1}"
+    else
+        hsa="${n:0:1}.${n:1:1}.${n:2:1}"
+    fi
+
+    echo "GPU $gpu_arch not in rocBLAS library — using override $nearest (HSA $hsa)"
+    export HSA_OVERRIDE_GFX_VERSION="$hsa"
+}
+_setup_hsa_override
 
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
