@@ -29,12 +29,19 @@ _setup_hsa_override() {
     # If a TensileLibrary already exists for this arch, no override needed.
     ls "$rocm_lib"/TensileLibrary*"$gpu_arch"* &>/dev/null && return
 
-    # Extract subfamily prefix (e.g. "115" from "gfx1153") and find nearest match.
+    # For gfx115x iGPUs: same-subfamily (gfx115x) kernels crash at runtime
+    # because iGPU/dGPU differ in CU count and wave properties. Use gfx1100
+    # (RDNA3 dGPU) which is more stable across the gfx11 family.
     local digits="${gpu_arch#gfx}"
-    local prefix="${digits:0:${#digits}-1}"  # drop last digit
     local nearest
-    nearest=$(ls "$rocm_lib"/TensileLibrary_lazy_gfx*.dat 2>/dev/null \
-        | grep -oE "gfx${prefix}[0-9]+" | sort | tail -1)
+    if [[ "$digits" == 115* ]]; then
+        nearest="gfx1100"
+    else
+        # For other unsupported arches, try nearest in same subfamily.
+        local prefix="${digits:0:${#digits}-1}"
+        nearest=$(ls "$rocm_lib"/TensileLibrary_lazy_gfx*.dat 2>/dev/null \
+            | grep -oE "gfx${prefix}[0-9]+" | sort | tail -1)
+    fi
     [[ -z "$nearest" ]] && return
 
     # Convert gfxNNNN -> HSA major.minor.stepping (e.g. gfx1151 -> 11.5.1)
