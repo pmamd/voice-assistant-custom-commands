@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 Tool System Test Runner
@@ -109,7 +110,7 @@ class ToolSystemTestRunner:
             proc = subprocess.Popen(
                 [
                     str(self.binary),
-                    "-ml", "./models/llama-2-7b-chat.Q4_K_M.gguf",
+                    "--llama-url", os.environ.get("LLAMA_URL", "http://127.0.0.1:8083"),
                     "-mw", "./whisper.cpp/models/ggml-tiny.en.bin",
                     "--xtts-url", "http://localhost:10200/",
                     "--xtts-voice", "en_US-lessac-medium",

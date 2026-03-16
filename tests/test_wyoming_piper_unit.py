@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 Unit test for Wyoming-Piper TTS output verification.
@@ -217,14 +218,14 @@ import unittest
 _PROJECT_ROOT = Path(__file__).parent.parent
 _BINARY = _PROJECT_ROOT / "build/bin/talk-llama-custom"
 _WHISPER_MODEL = _PROJECT_ROOT / "whisper.cpp/models/ggml-tiny.en.bin"
-_LLAMA_MODEL = _PROJECT_ROOT / "models/llama-2-7b-chat.Q4_K_M.gguf"
+_LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8083")
 _STORY_AUDIO = _PROJECT_ROOT / "tests/audio/inputs/story_request.wav"
 _WYOMING_URL = "http://localhost:10200/"
 
 
 def _run_binary(audio_file, timeout=300):
     cmd = [
-        str(_BINARY), "-ml", str(_LLAMA_MODEL), "-mw", str(_WHISPER_MODEL),
+        str(_BINARY), "--llama-url", _LLAMA_URL, "-mw", str(_WHISPER_MODEL),
         "--xtts-url", _WYOMING_URL, "--xtts-voice", "en_US-lessac-medium",
         "--temp", "0.5", "-n", "300", "--allow-newline",
         "--test-input", str(audio_file),
