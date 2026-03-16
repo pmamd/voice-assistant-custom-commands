@@ -160,22 +160,22 @@ config:
     # Note: Built Piper from submodule currently fails (espeak-ng build issue)
     # Using system-installed Piper until build is fixed
     piper_bin: "/home/paul/.local/bin/piper"
-    model_dir: "../external/piper-voices"  # Download voice models here
+    model_dir: "./external/piper-voices"  # Download voice models here
     default_voice: "en_US-lessac-medium"
     output_dir: "./audio/inputs"
 
   # System under test
   talk_llama:
-    binary: "../build/bin/talk-llama-custom"
-    whisper_model: "../whisper.cpp/models/ggml-tiny.en.bin"
+    binary: "./build/bin/talk-llama-custom"
+    whisper_model: "./whisper.cpp/models/ggml-tiny.en.bin"
     llama_model: "../models/llama-2-7b-chat.Q4_K_M.gguf"
     temperature: 0.5  # Lower temperature for more consistent responses
     test_mode: true
 
   # Verification settings
   audio_verifier:
-    whisper_bin: "../build/bin/main"
-    whisper_model: "../whisper.cpp/models/ggml-tiny.en.bin"
+    whisper_bin: "./build/bin/whisper-cli"
+    whisper_model: "./whisper.cpp/models/ggml-tiny.en.bin"
     output_dir: "./audio/outputs"
 
   # Wyoming-Piper TTS server settings
