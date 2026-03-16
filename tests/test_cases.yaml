@@ -160,7 +160,7 @@ config:
     # Note: Built Piper from submodule currently fails (espeak-ng build issue)
     # Using system-installed Piper until build is fixed
     piper_bin: "/home/paul/.local/bin/piper"
-    model_dir: "./external/piper-voices"  # Download voice models here
+    model_dir: "./piper-data"  # Download voice models here
     default_voice: "en_US-lessac-medium"
     output_dir: "./audio/inputs"
 
@@ -174,20 +174,25 @@ config:
 
   # Verification settings
   audio_verifier:
-    whisper_bin: "./build/bin/whisper-cli"
+    whisper_bin: "./build/bin/main"
     whisper_model: "./whisper.cpp/models/ggml-tiny.en.bin"
     output_dir: "./audio/outputs"
 
   # Wyoming-Piper TTS server settings
   wyoming_piper:
-    command: "/home/paul/.local/bin/wyoming-piper"
+    command: "/home/paul/.local/bin/wyoming-piper-custom"
     args:
+      - "--piper"
+      - "/home/paul/.local/bin/piper"
       - "--voice"
       - "en_US-lessac-medium"
       - "--data-dir"
-      - "./external/piper-voices"
+      - "./piper-data"
       - "--uri"
       - "tcp://0.0.0.0:10200"
+      - "--test-mode"
+      - "--test-output-dir"
+      - "./audio/outputs"
     port: 10200
     auto_start: true  # Automatically start if not running
 
