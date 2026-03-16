@@ -1,6 +1,6 @@
 // =============================================================================
 // talk-llama-custom
-// Voice assistant combining Whisper STT, Mistral LLM, and Piper TTS
+// Voice assistant combining Whisper STT, llama-server LLM, and Piper TTS
 // with Wyoming protocol integration and LLM-bypass custom commands.
 //
 // Based on whisper.cpp/examples/talk-llama by Georgi Gerganov
@@ -11,6 +11,11 @@
 //
 // Further modifications by Paul Mobbs (2024-2026)
 //   https://github.com/pmamd/voice-assistant-custom-commands
+//
+// llama-server HTTP backend:
+//   Replaces embedded llama.cpp with HTTP calls to llama-server's
+//   /completion endpoint. This enables GPU-accelerated inference on
+//   a separate process or remote machine over ethernet.
 //
 // Credits:
 //   Whisper STT        - OpenAI
@@ -31,7 +36,6 @@
 #include "console.h"
 #include "console.cpp"
 #include "whisper.h"
-#include "llama.h"
 #include "json.hpp"
 
 #include <cassert>
@@ -42,6 +46,7 @@
 #include <thread>
 #include <vector>
 #include <sstream>
+#include <atomic>
 
 #include <iostream>
 
@@ -94,75 +99,6 @@ void sigint_handler(int sig) {
 // Read by the main loop; written by the hotkey background thread.
 std::string g_hotkey_pressed = "";
 
-// Tokenizes a UTF-8 text string into a vector of llama tokens.
-// add_bos controls whether a beginning-of-sequence token is prepended.
-std::vector<llama_token> llama_tokenize(struct llama_context *ctx, const std::string &text, bool add_bos)
-{
-	auto *model = llama_get_model(ctx);
-
-	// upper limit for the number of tokens
-	int n_tokens = text.length() + add_bos;
-	std::vector<llama_token> result(n_tokens);
-	n_tokens = llama_tokenize(model, text.data(), text.length(), result.data(), result.size(), add_bos, false);
-	if (n_tokens < 0)
-	{
-		result.resize(-n_tokens);
-		int check = llama_tokenize(model, text.data(), text.length(), result.data(), result.size(), add_bos, false);
-		GGML_ASSERT(check == -n_tokens);
-	}
-	else
-	{
-		result.resize(n_tokens);
-	}
-	return result;
-}
-
-// Converts a single llama token back to its UTF-8 string representation.
-std::string llama_token_to_piece(const struct llama_context *ctx, llama_token token)
-{
-	std::vector<char> result(8, 0);
-	const int n_tokens = llama_token_to_piece(llama_get_model(ctx), token, result.data(), result.size(), 0, false);
-	if (n_tokens < 0)
-	{
-		result.resize(-n_tokens);
-		int check = llama_token_to_piece(llama_get_model(ctx), token, result.data(), result.size(), 0, false);
-		GGML_ASSERT(check == -n_tokens);
-	}
-	else
-	{
-		result.resize(n_tokens);
-	}
-
-	return std::string(result.data(), result.size());
-}
-
-// Parses a comma-separated string of floats into a heap-allocated array.
-// Used for the --tensor-split flag to distribute model layers across GPUs.
-const float *parse_float_list(const std::string &s)
-{
-	std::vector<float> temp;
-	std::stringstream ss(s);
-	std::string item;
-	while (std::getline(ss, item, ','))
-	{
-		if (!item.empty())
-		{
-			temp.push_back(std::stof(item));
-		}
-	}
-
-	int size = temp.size();
-	if (size == 0)
-	{
-		return nullptr; // Возвращаем nullptr для пустого массива
-	}
-
-	float *result = new float[size];
-	std::memcpy(result, temp.data(), size * sizeof(float));
-
-	return result;
-}
-
 // command-line parameters
 // All runtime configuration parameters parsed from command-line arguments.
 // Covers Whisper STT settings, LLM sampling parameters, TTS config, VAD thresholds,
@@ -174,7 +110,6 @@ struct whisper_params
 	int32_t capture_id = -1;
 	int32_t max_tokens = 32;
 	int32_t audio_ctx = 0;
-	int32_t n_gpu_layers = 999;
 
 	float vad_thold = 0.6f;
 	float vad_start_thold = 0.000270f; // 0 to turn off, you can see your current energy_last (loudness level) when running with --print-energy param
@@ -198,7 +133,6 @@ struct whisper_params
 	bool push_to_talk = false;
 	int split_after = 0;
 	int sleep_before_xtts = 0; // in ms
-	int main_gpu = 0;
 
 	std::string person = "Georgi";
 	std::string bot_name = "LLaMA";
@@ -207,15 +141,12 @@ struct whisper_params
 	std::string heard_ok = "";
 	std::string language = "en";
 	std::string model_wsp = "models/ggml-base.en.bin";
-	std::string model_llama = "models/ggml-llama-7B.bin";
 	std::string speak = "./examples/talk-llama/speak";
-	std::string xtts_control_path = "c:\\DATA\\LLM\\xtts\\xtts_play_allowed.txt";
-		std::string xtts_url = "http://0.0.0.0:10200"; // modified for wyoming piper
+	std::string xtts_control_path = "";
+	std::string xtts_url = "http://0.0.0.0:10200"; // modified for wyoming piper
 	std::string google_url = "http://localhost:8003/";
 	std::string prompt = "";
 	std::string instruct_preset = "";
-	std::string split_mode = "none";
-	const float *tensor_split = nullptr;
 	std::map<std::string, std::string> instruct_preset_data = {
 		{"system_prompt_prefix", ""},
 		{"system_prompt_suffix", ""},
@@ -225,19 +156,15 @@ struct whisper_params
 		{"bot_message_suffix", ""},
 		{"stop_sequence", ""}};
 	std::string fname_out;
-	std::string path_session = ""; // path to file for saving/loading model eval state
 	std::string stop_words = "";
 	std::string test_input_file = ""; // path to test audio input file (for automated testing)
-	int32_t ctx_size = 2048;
-	int32_t batch_size = 64;
-	int32_t n_predict = 64;
+	int32_t n_predict = 300;
 	int32_t min_tokens = 0;
-	float temp = 0.9;
-	float top_k = 40;
-	float top_p = 1.0f;
-	float min_p = 0.0f;
+	float temp = 0.5;
 	float repeat_penalty = 1.10;
-	int repeat_last_n = 256;
+
+	// llama-server HTTP backend
+	std::string llama_url = "http://localhost:8080";
 };
 
 // Prints the full help/usage message listing every CLI option and its default value.
@@ -275,10 +202,6 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		else if (arg == "-ac" || arg == "--audio-ctx")
 		{
 			params.audio_ctx = std::stoi(argv[++i]);
-		}
-		else if (arg == "-ngl" || arg == "--n-gpu-layers")
-		{
-			params.n_gpu_layers = std::stoi(argv[++i]);
 		}
 		else if (arg == "-vth" || arg == "--vad-thold")
 		{
@@ -340,10 +263,6 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		{
 			params.bot_name = argv[++i];
 		}
-		else if (arg == "--session")
-		{
-			params.path_session = argv[++i];
-		}
 		else if (arg == "-w" || arg == "--wake-command")
 		{
 			params.wake_cmd = argv[++i];
@@ -360,21 +279,9 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		{
 			params.model_wsp = argv[++i];
 		}
-		else if (arg == "-ml" || arg == "--model-llama")
-		{
-			params.model_llama = argv[++i];
-		}
 		else if (arg == "-s" || arg == "--speak")
 		{
 			params.speak = argv[++i];
-		}
-		else if (arg == "--ctx_size")
-		{
-			params.ctx_size = std::stoi(argv[++i]);
-		}
-		else if (arg == "-b" || arg == "--batch-size")
-		{
-			params.batch_size = std::stoi(argv[++i]);
 		}
 		else if (arg == "-n" || arg == "--n_predict")
 		{
@@ -384,37 +291,9 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		{
 			params.temp = std::stof(argv[++i]);
 		}
-		else if (arg == "--top_k")
-		{
-			params.top_k = std::stof(argv[++i]);
-		}
-		else if (arg == "--top_p")
-		{
-			params.top_p = std::stof(argv[++i]);
-		}
-		else if (arg == "--min_p")
-		{
-			params.min_p = std::stof(argv[++i]);
-		}
 		else if (arg == "--repeat_penalty")
 		{
 			params.repeat_penalty = std::stof(argv[++i]);
-		}
-		else if (arg == "--repeat_last_n")
-		{
-			params.repeat_last_n = std::stoi(argv[++i]);
-		}
-		else if (arg == "--main-gpu")
-		{
-			params.main_gpu = std::stoi(argv[++i]);
-		}
-		else if (arg == "--split-mode")
-		{
-			params.split_mode = argv[++i];
-		}
-		else if (arg == "--tensor-split")
-		{
-			params.tensor_split = parse_float_list(argv[++i]);
 		}
 		else if (arg == "--xtts-voice")
 		{
@@ -427,10 +306,6 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		else if (arg == "--google-url")
 		{
 			params.google_url = argv[++i];
-		}
-		else if (arg == "--xtts-control-path")
-		{
-			params.xtts_control_path = argv[++i];
 		}
 		else if (arg == "--allow-newline")
 		{
@@ -485,13 +360,13 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		{
 			params.fname_out = argv[++i];
 		}
-		else if (arg == "-ng" || arg == "--no-gpu")
-		{
-			params.use_gpu = false;
-		}
 		else if (arg == "--test-input")
 		{
 			params.test_input_file = argv[++i];
+		}
+		else if (arg == "--llama-url")
+		{
+			params.llama_url = argv[++i];
 		}
 		else
 		{
@@ -516,7 +391,6 @@ void whisper_print_usage(int /*argc*/, const char **argv, const whisper_params &
 	fprintf(stderr, "  -c ID,    --capture ID     [%-7d] capture device ID\n", params.capture_id);
 	fprintf(stderr, "  -mt N,    --max-tokens N   [%-7d] maximum number of tokens per audio chunk\n", params.max_tokens);
 	fprintf(stderr, "  -ac N,    --audio-ctx N    [%-7d] audio context size (0 - all)\n", params.audio_ctx);
-	fprintf(stderr, "  -ngl N,   --n-gpu-layers N [%-7d] number of layers to store in VRAM\n", params.n_gpu_layers);
 	fprintf(stderr, "  -vth N,   --vad-thold N    [%-7.2f] voice avg activity detection threshold\n", params.vad_thold);
 	fprintf(stderr, "  -vths N,  --vad-start-thold N [%-7.6f] vad min level to stop tts, 0: off, 0.000270: default\n", params.vad_start_thold);
 	fprintf(stderr, "  -vlm N,   --vad-last-ms N  [%-7d] vad min silence after speech, ms\n", params.vad_last_ms);
@@ -529,44 +403,33 @@ void whisper_print_usage(int /*argc*/, const char **argv, const whisper_params &
 	fprintf(stderr, "  --debug                    [%-7s] print debug info\n", params.debug ? "true" : "false");
 	fprintf(stderr, "  -vp,      --verbose-prompt [%-7s] print prompt at start\n", params.verbose_prompt ? "true" : "false");
 	fprintf(stderr, "  --verbose                  [%-7s] print speed\n", params.verbose ? "true" : "false");
-	fprintf(stderr, "  -ng,      --no-gpu         [%-7s] disable GPU\n", params.use_gpu ? "false" : "true");
+	fprintf(stderr, "  -ng,      --no-gpu         [%-7s] disable GPU (whisper only)\n", params.use_gpu ? "false" : "true");
 	fprintf(stderr, "  -p NAME,  --person NAME    [%-7s] person name (for prompt selection)\n", params.person.c_str());
 	fprintf(stderr, "  -bn NAME, --bot-name NAME  [%-7s] bot name (to display)\n", params.bot_name.c_str());
 	fprintf(stderr, "  -w TEXT,  --wake-command T [%-7s] wake-up command to listen for\n", params.wake_cmd.c_str());
 	fprintf(stderr, "  -ho TEXT, --heard-ok TEXT  [%-7s] said by TTS before generating reply\n", params.heard_ok.c_str());
 	fprintf(stderr, "  -l LANG,  --language LANG  [%-7s] spoken language\n", params.language.c_str());
 	fprintf(stderr, "  -mw FILE, --model-whisper  [%-7s] whisper model file\n", params.model_wsp.c_str());
-	fprintf(stderr, "  -ml FILE, --model-llama    [%-7s] llama model file\n", params.model_llama.c_str());
 	fprintf(stderr, "  -s FILE,  --speak TEXT     [%-7s] command for TTS\n", params.speak.c_str());
 	fprintf(stderr, "  --prompt-file FNAME        [%-7s] file with custom prompt to start dialog\n", "");
 	fprintf(stderr, "  --instruct-preset TEXT     [%-7s] instruct preset to use without .json \n", "");
-	fprintf(stderr, "  --session FNAME                   file to cache model state in (may be large!) (default: none)\n");
 	fprintf(stderr, "  -f FNAME, --file FNAME     [%-7s] text output file name\n", params.fname_out.c_str());
-	fprintf(stderr, "   --ctx_size N              [%-7d] Size of the prompt context\n", params.ctx_size);
-	fprintf(stderr, "  -b N,     --batch-size N   [%-7d] Size of input batch size\n", params.batch_size);
 	fprintf(stderr, "  -n N,     --n_predict N    [%-7d] Max number of tokens to predict\n", params.n_predict);
 	fprintf(stderr, "  --temp N                   [%-7.2f] Temperature \n", params.temp);
-	fprintf(stderr, "  --top_k N                  [%-7.2f] top_k \n", params.top_k);
-	fprintf(stderr, "  --top_p N                  [%-7.2f] top_p \n", params.top_p);
-	fprintf(stderr, "  --min_p N                  [%-7.2f] min_p \n", params.min_p);
 	fprintf(stderr, "  --repeat_penalty N         [%-7.2f] repeat_penalty \n", params.repeat_penalty);
-	fprintf(stderr, "  --repeat_last_n N          [%-7d] repeat_last_n \n", params.repeat_last_n);
-	fprintf(stderr, "  --main-gpu N               [%-7d] main GPU id, starting from 0 \n", params.main_gpu);
-	fprintf(stderr, "  --split-mode NAME          [%-7s] GPU split mode: 'none' or 'layer'\n", params.split_mode.c_str());
-	fprintf(stderr, "  --tensor-split NAME        [%-7s] Tensor split, list of floats: 0.5,0.5\n", params.tensor_split);
 	fprintf(stderr, "  --xtts-voice NAME          [%-7s] xtts voice without .wav\n", params.xtts_voice.c_str());
 	fprintf(stderr, "  --xtts-url TEXT            [%-7s] xtts/silero server URL, with trailing slash\n", params.xtts_url.c_str());
-	fprintf(stderr, "  --xtts-control-path FNAME  [%-7s] not used anymore\n", params.xtts_control_path.c_str());
 	fprintf(stderr, "  --xtts-intro               [%-7s] xtts instant short random intro like Hmmm.\n", params.xtts_intro ? "true" : "false");
 	fprintf(stderr, "  --sleep-before-xtts        [%-7d] sleep llama inference before xtts, ms.\n", params.sleep_before_xtts);
 	fprintf(stderr, "  --google-url TEXT          [%-7s] langchain google-serper server URL, with /\n", params.google_url.c_str());
 	fprintf(stderr, "  --allow-newline            [%-7s] allow new line in llama output\n", params.allow_newline ? "true" : "false");
 	fprintf(stderr, "  --multi-chars              [%-7s] xtts will use same wav name as in llama output\n", params.multi_chars ? "true" : "false");
 	fprintf(stderr, "  --push-to-talk             [%-7s] hold Alt to speak\n", params.push_to_talk ? "true" : "false");
-	fprintf(stderr, "  --seqrep                   [%-7s] sequence repetition penalty, search last 20 in 300\n", params.seqrep ? "true" : "false");
+	fprintf(stderr, "  --seqrep                   [%-7s] sequence repetition penalty\n", params.seqrep ? "true" : "false");
 	fprintf(stderr, "  --split-after N            [%-7d] split after first n tokens for tts\n", params.split_after);
 	fprintf(stderr, "  --min-tokens N             [%-7d] min new tokens to output\n", params.min_tokens);
 	fprintf(stderr, "  --stop-words TEXT          [%-7s] llama stop w: separated by ; \n", params.stop_words.c_str());
+	fprintf(stderr, "  --llama-url TEXT           [%-7s] llama-server URL\n", params.llama_url.c_str());
 	fprintf(stderr, "\n");
 }
 
@@ -662,8 +525,6 @@ std::string transcribe(
 	const auto t_end = std::chrono::high_resolution_clock::now();
 	t_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
 
-	// print hex
-
 	return result;
 }
 
@@ -682,65 +543,6 @@ std::vector<std::string> get_words(const std::string &txt)
 	return words;
 }
 
-#ifdef XTTS_FILE
-std::string getTempDir()
-{
-	TCHAR path_buf[MAX_PATH];
-	DWORD ret_val = GetTempPath(MAX_PATH, path_buf);
-	if (ret_val > MAX_PATH || (ret_val == 0))
-	{
-		printf("GetTempPath failed");
-		return "";
-	}
-	else
-	{
-		return path_buf;
-	}
-}
-
-// writes to file 0 or 1
-// @path: not used anymore, we store in temp
-// @xtts_play_allowed: 0=dont play xtts, 1=xtts can play
-void allow_xtts_file(std::string path, int xtts_play_allowed)
-{
-	try
-	{
-		std::string temp_path = getTempDir();
-		path = temp_path + "xtts_play_allowed.txt";
-		const std::string fileName{path};
-		std::ifstream readStream{fileName};
-		std::string singleLine;
-		bool doesExistAndIsReadable{readStream.good()};
-
-		if (!doesExistAndIsReadable)
-		{
-			printf("Notice: %s file not found. Let's create it.", path.c_str());
-			// Create the file with the given value
-			std::ofstream writeStream(fileName);
-			writeStream << xtts_play_allowed;
-			writeStream.flush();
-			writeStream.close();
-		}
-		else
-		{
-			// Read the existing value from the file
-			std::getline(readStream, singleLine);
-			readStream.close();
-			int stored_value = stoi(singleLine);
-			if (stored_value != xtts_play_allowed)
-			{
-				std::ofstream writeStream{fileName};
-				writeStream << xtts_play_allowed;
-				writeStream.flush();
-				writeStream.close();
-			}
-		}
-	}
-	catch (...)
-	{ // exception handler
-	}
-}
-#endif
 // trim from start (in place)
 // Removes leading whitespace from a string in place.
 inline void ltrim(std::string &s)
@@ -1006,19 +808,6 @@ std::string find_name(const std::string &str)
 	return "";
 }
 
-// Function to convert embedding vector to a concatenated string
-// Converts a vector of llama tokens back to a human-readable concatenated string.
-std::string emb_to_str(llama_context *ctx_llama, const std::vector<llama_token> &embd)
-{
-	std::string ss;
-	for (const auto &token : embd)
-	{
-		std::string token_str = llama_token_to_piece(ctx_llama, token);
-		ss += token_str;
-	}
-	return ss;
-}
-
 // Cleans and normalises text (strips parenthetical/HTML/bracket content,
 // normalises punctuation), then sends it to the Wyoming-Piper TTS server
 // via a raw TCP socket connection. Called from worker threads during generation.
@@ -1046,7 +835,7 @@ int hSocket, read_size;
 	trim(text);
 	text = ::replace(text, "...", ".");
 	text = ::replace(text, "..", ".");
-	text = ::replace(text, "…", ".");
+	text = ::replace(text, "...", ".");
 	text = ::replace(text, "??", "?");
 	text = ::replace(text, "!!!", "!");
 	text = ::replace(text, "!!", "!");
@@ -1099,10 +888,8 @@ int hSocket, read_size;
 		text = ::replace(text, "\n", " ");
 		text = ::replace(text, "\"", "");
 		text = ::replace(text, "..", ".");
-	
+
 		int still_running = 1;
-		// std::string data = "{\"text\":\"" + text + "\", \"language\":\"" + language + "\", \"speaker_wav\":\"" + speaker_wav + "\", \"reply_part\":\"" + std::to_string(reply_part) + "\"}";
-		// std::string data = "{\"text\":\"" + text + "\"}"; // modified for piper
 		char *json = TTS_RequestEncode(text.c_str());
 
 		//Create socket
@@ -1140,7 +927,6 @@ int hSocket, read_size;
 // Queue for keyboard input lines typed by the user.
 // Written by input_thread_func(), read by the main loop.
 std::queue<std::string> input_queue; // global
-// std::mutex input_mutex;
 bool keyboard_input_running = true; // global, not used yet
 
 // Background thread that reads lines from stdin and pushes them onto input_queue.
@@ -1162,164 +948,20 @@ void input_thread_func()
 		// if you paste multiple passages from clipboard, make sure to hit Enter after pasting
 		// otherwise last passage won't be pasted (bug). Alternatively you can manually add \n after last passage in copied text
 
-		// std::lock_guard<std::mutex> lock(input_mutex); // was blocking, TODO if really needed
 		input_queue.push(buffer);
 		buffer = "";
 	}
 }
 
-#ifdef HOTKEYS
-// windows only
-bool IsConsoleWindowFocused(HWND cur_window_handle)
-{
-	return (cur_window_handle == GetForegroundWindow());
-}
-
-// Stop: Ctrl+Space or Escape (Escape bypasses VAD/Whisper for immediate stop)
-// modifies global var string g_hotkey_pressed
-// Background thread (Windows only) that polls for global hotkeys.
-// Sets g_hotkey_pressed to the matching command name when a hotkey fires.
-void keyboard_shortcut_func(HWND cur_window_handle)
-{
-	bool b_ctr_space_processed = false;
-	bool b_ctr_right_processed = false;
-	bool b_ctr_delete_processed = false;
-	bool b_ctr_r_processed = false;
-	bool b_escape_processed = false;
-	bool b_ctr_space_prev = false;
-	bool b_ctr_right_prev = false;
-	bool b_ctr_delete_prev = false;
-	bool b_ctr_r_prev = false;
-	bool b_escape_prev = false;
-	bool b_ctr_space = false;
-	bool b_ctr_right = false;
-	bool b_ctr_delete = false;
-	bool b_ctr_r = false;
-	bool b_escape = false;
-	bool b_alt = false;
-	bool isFocused = false;
-	g_hotkey_pressed = "";
-
-	while (true)
-	{
-		isFocused = IsConsoleWindowFocused(cur_window_handle);
-		if (isFocused)
-		{
-			b_ctr_space = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState(VK_SPACE) & 0x8000;
-			b_ctr_right = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState(VK_RIGHT) & 0x8000;
-			b_ctr_delete = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState(VK_DELETE) & 0x8000;
-			b_ctr_r = GetAsyncKeyState(VK_CONTROL) & GetAsyncKeyState('R') & 0x8000;
-			b_escape = GetAsyncKeyState(VK_ESCAPE) & 0x8000;
-			b_alt = GetAsyncKeyState(VK_MENU) & 0x8000;
-
-			if (b_alt)
-			{
-				g_hotkey_pressed = "Alt";
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-				continue; // no further if-else for Alt PTT
-			}
-
-			if (b_ctr_space && !b_ctr_space_prev)
-			{
-				if (!b_ctr_space_processed)
-				{
-					fflush(stdout);
-					printf("\b"); // remove printed symbols
-					fflush(stdout);
-					g_hotkey_pressed = "Ctrl+Space";
-					b_ctr_space_processed = true;
-				}
-			}
-			else if (!b_ctr_space && b_ctr_space_prev && b_ctr_space_processed)
-			{
-				b_ctr_space_processed = false;
-			}
-
-			// Escape key for immediate stop (bypasses VAD and Whisper)
-			if (b_escape && !b_escape_prev)
-			{
-				if (!b_escape_processed)
-				{
-					fflush(stdout);
-					printf("\b"); // remove printed symbols
-					fflush(stdout);
-					g_hotkey_pressed = "Escape";
-					b_escape_processed = true;
-				}
-			}
-			else if (!b_escape && b_escape_prev && b_escape_processed)
-			{
-				b_escape_processed = false;
-			}
-
-			if (b_ctr_right && !b_ctr_right_prev)
-			{
-				if (!b_ctr_right_processed)
-				{
-					fflush(stdout);
-					printf("\b"); // remove printed symbols
-					fflush(stdout);
-					g_hotkey_pressed = "Ctrl+Right";
-					b_ctr_right_processed = true;
-				}
-			}
-			else if (!b_ctr_right && b_ctr_right_prev && b_ctr_right_processed)
-			{
-				b_ctr_right_processed = false;
-			}
-
-			if (b_ctr_delete && !b_ctr_delete_prev)
-			{
-				if (!b_ctr_delete_processed)
-				{
-					fflush(stdout);
-					printf("\b"); // remove printed symbols
-					fflush(stdout);
-					g_hotkey_pressed = "Ctrl+Delete";
-					b_ctr_delete_processed = true;
-				}
-			}
-			else if (!b_ctr_delete && b_ctr_delete_prev && b_ctr_delete_processed)
-			{
-				b_ctr_delete_processed = false;
-			}
-
-			if (b_ctr_r && !b_ctr_r_prev)
-			{
-				if (!b_ctr_r_processed)
-				{
-					fflush(stdout);
-					printf("\b\b"); // remove printed ^R
-					fflush(stdout);
-					g_hotkey_pressed = "Ctrl+R";
-					b_ctr_r_processed = true;
-				}
-			}
-			else if (!b_ctr_r && b_ctr_r_prev && b_ctr_r_processed)
-			{
-				b_ctr_r_processed = false;
-			}
-
-			b_ctr_space_prev = b_ctr_space;
-			b_ctr_right_prev = b_ctr_right;
-			b_ctr_delete_prev = b_ctr_delete;
-			b_ctr_r_prev = b_ctr_r;
-			b_escape_prev = b_escape;
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-	}
-}
-#endif
-
 // Default Whisper transcription prompt templates.
 // Primes Whisper to expect conversational speech directed at a named person.
 const std::string k_prompt_whisper = R"(A conversation with a person called {1}.)";
-const std::string k_prompt_whisper_ru = R"({1}, Алиса.)";
+const std::string k_prompt_whisper_ru = R"({1}, Alisa.)";
 
-// Default LLaMA system prompt template.
-// Placeholders: {0}=person name, {1}=bot name, {2}=time, {3}=date, {4}=year.
+// Default LLaMA system prompt.
+// Placeholders: {0}=person name, {1}=bot name, {2}=time, {3}=year, {4}=chat_symb, {5}=date.
 const std::string k_prompt_llama = R"(Text transcript of a never ending dialog, where {0} interacts with an AI assistant named {1}.
-{1} is helpful, kind, honest, friendly, good at writing and never fails to answer {0}’s requests immediately and with details and precision.
+{1} is helpful, kind, honest, friendly, good at writing and never fails to answer {0}'s requests immediately and with details and precision.
 There are no annotations like (30 seconds passed...) or (to himself), just what {0} and {1} say aloud to each other.
 The transcript only includes text, it does not include markup like HTML and Markdown.
 {1} responds with short and concise answers.
@@ -1334,11 +976,366 @@ The transcript only includes text, it does not include markup like HTML and Mark
 {1}{4} Blue
 {0}{4})";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// =============================================================================
+// llama-server HTTP streaming client
+// =============================================================================
+
+// Data passed to the CURL streaming write callback.
+// Accumulates SSE data, parses tokens, dispatches to TTS sentence-by-sentence.
+struct llama_stream_context {
+	std::atomic<bool>* stop_flag;  // pointer to g_stop_generation
+	std::string sse_buffer;        // partial SSE line buffer
+	std::string full_response;     // complete generated text
+	std::string text_to_speak;     // current sentence accumulator for TTS
+	int new_tokens;                // token counter
+	bool debug;
+
+	// TTS dispatch state
+	const whisper_params* params;
+	std::string current_voice;
+	std::vector<std::thread>* threads;
+	std::string* text_to_speak_arr;
+	int* reply_part_arr;
+	int* thread_i;
+	int* reply_part;
+
+	// Tool call parser
+	tool_system::ToolCallParser* tool_parser;
+	tool_system::ToolRegistry* tool_registry;
+
+	// Antiprompts for stop detection
+	std::vector<std::string>* antiprompts;
+	bool done;               // set when an antiprompt is detected
+
+	// Sequence repetition detection
+	std::string last_output_buffer;
+	std::string last_output_needle;
+};
+
+// Dispatch a completed sentence to TTS in a background thread.
+static void dispatch_tts_sentence(llama_stream_context* ctx, const std::string& sentence) {
+	if (sentence.empty()) return;
+
+	std::string text = sentence;
+	text = ::replace(text, "\"", "'");
+	if (ctx->antiprompts) {
+		for (const auto& ap : *ctx->antiprompts) {
+			text = ::replace(text, ap, "");
+		}
+	}
+	trim(text);
+	if (text.empty()) return;
+
+	int idx = *ctx->thread_i;
+	ctx->text_to_speak_arr[idx] = text;
+	ctx->reply_part_arr[idx] = *ctx->reply_part;
+	(*ctx->reply_part)++;
+
+	try {
+		int current_thread_idx = idx;
+		auto params = ctx->params;
+		auto current_voice = ctx->current_voice;
+		ctx->threads->emplace_back([params, current_thread_idx, current_voice,
+		                            text_arr = ctx->text_to_speak_arr,
+		                            rp_arr = ctx->reply_part_arr]() {
+			if (text_arr[current_thread_idx].size()) {
+				send_tts_async(text_arr[current_thread_idx], current_voice,
+				               params->language, params->xtts_url,
+				               rp_arr[current_thread_idx], params->debug);
+				text_arr[current_thread_idx] = "";
+				rp_arr[current_thread_idx] = 0;
+			}
+		});
+		(*ctx->thread_i)++;
+	} catch (const std::exception& ex) {
+		std::cerr << "[Exception]: Failed to dispatch TTS thread: " << ex.what() << '\n';
+	}
+}
+
+// Check if the recent output matches any antiprompt (stop word).
+static bool check_antiprompts(const std::string& recent_output, const std::vector<std::string>& antiprompts) {
+	for (const auto& ap : antiprompts) {
+		if (recent_output.length() >= ap.length()) {
+			size_t pos = recent_output.find(ap, recent_output.length() - ap.length());
+			if (pos != std::string::npos) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+// CURL write callback for SSE streaming from llama-server /completion endpoint.
+// Parses "data: {...}" lines, extracts token content, accumulates sentences,
+// dispatches to TTS, and checks stop conditions.
+static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+	llama_stream_context* ctx = (llama_stream_context*)userdata;
+
+	if (ctx->stop_flag->load() || ctx->done) {
+		return 0; // abort transfer
+	}
+
+	size_t total = size * nmemb;
+	ctx->sse_buffer.append(ptr, total);
+
+	// Process complete lines
+	size_t pos;
+	while ((pos = ctx->sse_buffer.find('\n')) != std::string::npos) {
+		std::string line = ctx->sse_buffer.substr(0, pos);
+		ctx->sse_buffer.erase(0, pos + 1);
+
+		// Remove trailing \r
+		if (!line.empty() && line.back() == '\r') {
+			line.pop_back();
+		}
+
+		// Skip empty lines and non-data lines
+		if (line.empty() || line.find("data: ") != 0) {
+			continue;
+		}
+
+		// Extract JSON after "data: "
+		std::string json_str = line.substr(6);
+
+		try {
+			auto j = nlohmann::json::parse(json_str);
+
+			// Check for stop
+			bool is_stop = false;
+			if (j.contains("stop") && j["stop"].is_boolean()) {
+				is_stop = j["stop"].get<bool>();
+			}
+
+			if (is_stop) {
+				// Flush remaining text to TTS
+				if (!ctx->text_to_speak.empty()) {
+					dispatch_tts_sentence(ctx, ctx->text_to_speak);
+					ctx->text_to_speak.clear();
+				}
+				ctx->done = true;
+				break;
+			}
+
+			// Extract token content - llama-server uses "content" at top level
+			std::string token_text;
+			if (j.contains("content") && j["content"].is_string()) {
+				token_text = j["content"].get<std::string>();
+			}
+
+			if (token_text.empty()) continue;
+
+			ctx->new_tokens++;
+			ctx->full_response += token_text;
+
+			// Feed to tool parser if available
+			if (ctx->tool_parser) {
+				bool tool_detected = ctx->tool_parser->feedToken(token_text);
+				if (tool_detected && ctx->tool_parser->hasToolCall()) {
+					tool_system::ToolCall call = ctx->tool_parser->getToolCall();
+					fprintf(stdout, "\n[Tool Call: %s]\n", call.name.c_str());
+					if (ctx->tool_registry) {
+						tool_system::ToolResult result = ctx->tool_registry->execute(call.name, call.arguments);
+						if (result.success) {
+							fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
+						} else {
+							fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
+						}
+					}
+					ctx->tool_parser->reset();
+					continue;
+				}
+
+				// Get clean text (excluding tool tags)
+				std::string clean_text = ctx->tool_parser->getText();
+				std::replace(clean_text.begin(), clean_text.end(), '\n', ' ');
+				if (!clean_text.empty()) {
+					token_text = clean_text;
+				} else {
+					continue;
+				}
+			}
+
+			// Print token
+			printf("%s", token_text.c_str());
+			fflush(stdout);
+
+			// Accumulate for TTS
+			ctx->text_to_speak += token_text;
+
+			// Check antiprompts on recent output
+			if (ctx->antiprompts && check_antiprompts(ctx->full_response, *ctx->antiprompts)) {
+				// Remove the antiprompt text from text_to_speak
+				for (const auto& ap : *ctx->antiprompts) {
+					ctx->text_to_speak = ::replace(ctx->text_to_speak, ap, "");
+				}
+				if (!ctx->text_to_speak.empty()) {
+					dispatch_tts_sentence(ctx, ctx->text_to_speak);
+					ctx->text_to_speak.clear();
+				}
+				ctx->done = true;
+				break;
+			}
+
+			// Sequence repetition detection (simplified string-based version)
+			if (ctx->params->seqrep) {
+				ctx->last_output_needle += token_text;
+				if (utf8_length(ctx->last_output_needle) > 25) {
+					ctx->last_output_needle = utf8_substr(ctx->last_output_needle, 5,
+						utf8_length(ctx->last_output_needle) - 5);
+				}
+
+				char last_char = token_text.back();
+				if (last_char == ' ' || last_char == '.' || last_char == ',' ||
+				    last_char == '!' || last_char == '?') {
+					if (utf8_length(ctx->last_output_buffer) > 300 &&
+					    utf8_length(ctx->last_output_needle) >= 20 &&
+					    ctx->last_output_buffer.find(ctx->last_output_needle) != std::string::npos) {
+						printf(" [LOOP detected - stopping]\n");
+						ctx->done = true;
+						break;
+					}
+				}
+				if (utf8_length(ctx->last_output_buffer) > 1000) {
+					ctx->last_output_buffer = utf8_substr(ctx->last_output_buffer, 100,
+						utf8_length(ctx->last_output_buffer) - 100);
+				}
+				ctx->last_output_buffer += token_text;
+			}
+
+			// Check for sentence boundary -> dispatch to TTS
+			int text_len = ctx->text_to_speak.size();
+			if (text_len >= 2 && ctx->new_tokens >= 2) {
+				char last = ctx->text_to_speak[text_len - 1];
+				bool is_boundary = (last == '.' || last == '?' || last == '!' ||
+				                    last == ';' || last == ':' || last == '\n');
+
+				// Also split on " - " (dash with spaces)
+				if (text_len >= 3 && ctx->text_to_speak[text_len - 2] == ' ' && last == '-') {
+					is_boundary = true;
+				}
+
+				// split_after logic
+				if (ctx->params->split_after && ctx->new_tokens == ctx->params->split_after) {
+					is_boundary = true;
+				}
+
+				if (is_boundary) {
+					dispatch_tts_sentence(ctx, ctx->text_to_speak);
+					ctx->text_to_speak.clear();
+
+					if (ctx->params->sleep_before_xtts) {
+						std::this_thread::sleep_for(
+							std::chrono::milliseconds(ctx->params->sleep_before_xtts));
+					}
+				}
+			}
+		} catch (const nlohmann::json::exception& e) {
+			if (ctx->debug) {
+				fprintf(stderr, "[JSON parse error: %s] line: %s\n", e.what(), json_str.c_str());
+			}
+		}
+	}
+
+	return ctx->done ? 0 : total;
+}
+
+// Send a prompt to llama-server's /completion endpoint with SSE streaming.
+// Returns the full response text. Tokens are dispatched to TTS in real-time
+// via the streaming callback.
+std::string llama_server_generate(
+	const std::string& prompt,
+	const std::string& llama_url,
+	const whisper_params& params,
+	std::atomic<bool>& stop_flag,
+	std::vector<std::string>& stop_words,
+	llama_stream_context& stream_ctx)
+{
+	CURL* curl = curl_easy_init();
+	if (!curl) {
+		fprintf(stderr, "Failed to init CURL for llama-server\n");
+		return "";
+	}
+
+	// Build JSON request body
+	nlohmann::json request_body;
+	request_body["prompt"] = prompt;
+	request_body["n_predict"] = params.n_predict;
+	request_body["temperature"] = params.temp;
+	request_body["stream"] = true;
+	request_body["repeat_penalty"] = params.repeat_penalty;
+
+	// Build stop array
+	nlohmann::json stop_arr = nlohmann::json::array();
+	for (const auto& sw : stop_words) {
+		stop_arr.push_back(sw);
+	}
+	request_body["stop"] = stop_arr;
+
+	std::string body = request_body.dump();
+	std::string url = llama_url + "/completion";
+
+	if (params.debug) {
+		fprintf(stderr, "[llama-server] POST %s\n", url.c_str());
+		fprintf(stderr, "[llama-server] Body: %s\n", body.c_str());
+	}
+
+	struct curl_slist* headers = nullptr;
+	headers = curl_slist_append(headers, "Content-Type: application/json");
+	headers = curl_slist_append(headers, "Accept: text/event-stream");
+
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, llama_stream_write_callback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &stream_ctx);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+	// No timeout - streaming can take a while
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+
+	CURLcode res = curl_easy_perform(curl);
+
+	if (res != CURLE_OK && res != CURLE_WRITE_ERROR) {
+		// CURLE_WRITE_ERROR is expected when we abort via returning 0 from callback
+		fprintf(stderr, "[llama-server] CURL error: %s\n", curl_easy_strerror(res));
+	}
+
+	curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
+
+	return stream_ctx.full_response;
+}
+
+// Check if llama-server is reachable by hitting /health endpoint.
+bool llama_server_health_check(const std::string& llama_url) {
+	CURL* curl = curl_easy_init();
+	if (!curl) return false;
+
+	std::string url = llama_url + "/health";
+	std::string response;
+
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+
+	CURLcode res = curl_easy_perform(curl);
+	long http_code = 0;
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+	curl_easy_cleanup(curl);
+
+	if (res == CURLE_OK && http_code == 200) {
+		return true;
+	}
+	return false;
+}
+
+// -------------------------------------------------------------------------
 // Main application entry point.
-// Initialises all subsystems (Whisper, LLaMA, Wyoming TTS, tool system, audio),
-// then runs the listen → transcribe → generate → speak loop until shutdown.
-// ─────────────────────────────────────────────────────────────────────────────
+// Initialises all subsystems (Whisper, llama-server, Wyoming TTS, tool system, audio),
+// then runs the listen -> transcribe -> generate -> speak loop until shutdown.
+// -------------------------------------------------------------------------
 int run(int argc, const char **argv)
 {
 	// Set up signal handlers
@@ -1355,9 +1352,6 @@ int run(int argc, const char **argv)
 	int reply_part = 0;
 	std::string text_to_speak_arr[150];
 	int reply_part_arr[150];
-	bool last_output_has_username = false;
-	bool last_output_has_EOT = true;
-	int input_tokens_count = 0;
 
 #ifdef HOTKEYS
 	HWND cur_window_handle = GetForegroundWindow(); // i hope you run a window that has focus
@@ -1373,12 +1367,9 @@ int run(int argc, const char **argv)
 		whisper_print_usage(argc, argv, params);
 		exit(0);
 	}
-#ifdef XTTS_FILE
-	allow_xtts_file(params.xtts_control_path, 1); // xtts can play
-#endif
-	// ── Whisper STT initialisation ───────────────────────────────────────────────
-// Loads the Whisper model from disk and creates the inference context.
-// whisper init
+
+	// -- Whisper STT initialisation -----------------------------------------------
+	// Loads the Whisper model from disk and creates the inference context.
 	struct whisper_context_params cparams = whisper_context_default_params();
 	cparams.use_gpu = params.use_gpu;
 
@@ -1388,104 +1379,38 @@ int run(int argc, const char **argv)
         fprintf(stderr, "No whisper.cpp model specified. Please provide using -mw <modelfile>\n");
         return 1;
     }
-	
-	// ── LLaMA LLM initialisation ─────────────────────────────────────────────────
-// Loads the LLM model with GPU/CPU split settings and creates the inference
-// context with the requested context size, batch size, and thread count.
-// llama init
 
-	llama_backend_init();
-
-	// Suppress llama.cpp internal log output during model load so it doesn't
-	// break the progress bar's \r rendering. Restored immediately after.
-	llama_log_set([](ggml_log_level, const char *, void *) {}, nullptr);
-
-	auto lmparams = llama_model_default_params();
-	if (!params.use_gpu)
-	{
-		lmparams.n_gpu_layers = 0;
-	}
-	else
-	{
-		lmparams.n_gpu_layers = params.n_gpu_layers;
-	}
-
-	lmparams.main_gpu = params.main_gpu;
-	if (params.split_mode == "layer")
-		lmparams.split_mode = LLAMA_SPLIT_MODE_LAYER;
-	else
-		lmparams.split_mode = LLAMA_SPLIT_MODE_NONE;
-	lmparams.tensor_split = params.tensor_split;
-
-	// Progress bar displayed while the model file is being read from disk.
-	lmparams.progress_callback = [](float progress, void *) -> bool {
-		int pct  = (int)(progress * 100.0f);
-		int done = pct / 5;           // 20 segments, each = 5%
-		fprintf(stderr, "\r  Loading model: [%-20s] %3d%%",
-			std::string(done, '#').append(20 - done, '.').c_str(), pct);
-		if (pct >= 100)
-			fprintf(stderr, "\n");
-		fflush(stderr);
-		return true;
-	};
-	lmparams.progress_callback_user_data = nullptr;
-
+	// -- llama-server connection check --------------------------------------------
 	fprintf(stderr, "\n");
-	struct llama_model *model_llama = llama_load_model_from_file(params.model_llama.c_str(), lmparams);
+	fprintf(stderr, "  Connecting to llama-server at %s ...\n", params.llama_url.c_str());
 
-	llama_context_params lcparams = llama_context_default_params();
+	bool server_ok = false;
+	for (int attempt = 0; attempt < 3; attempt++) {
+		if (llama_server_health_check(params.llama_url)) {
+			server_ok = true;
+			break;
+		}
+		fprintf(stderr, "  Attempt %d/3 failed, retrying in 2s...\n", attempt + 1);
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+	}
 
-	// tune these to your liking
-	lcparams.n_ctx = params.ctx_size; // 2048 default
-	lcparams.seed = 1;
-	lcparams.n_threads = params.n_threads;
-	lcparams.n_batch = params.batch_size; // 512 was default
+	if (server_ok) {
+		fprintf(stderr, "  llama-server is ready.\n\n");
+	} else {
+		fprintf(stderr, "  WARNING: llama-server not responding at %s\n", params.llama_url.c_str());
+		fprintf(stderr, "  The assistant will start but LLM requests will fail until the server is available.\n\n");
+	}
 
-	struct llama_context *ctx_llama = llama_new_context_with_model(model_llama, lcparams);
-
-	// Restore default llama.cpp logging now that model load is complete.
-	llama_log_set(nullptr, nullptr);
-
-	printf("print some info about the processing\n");
-	// Just do no traslation for now
+	// Just do no translation for now
 	params.language = "en";
 	params.translate = false;
-#if 0	
-	// print some info about the processing
-	{
-		fprintf(stderr, "\n");
 
-		if (!whisper_is_multilingual(ctx_wsp))
-		{
-			fprintf(stderr, "WARNING: model is not multilingual");
-			if (params.language != "en" || params.translate)
-			{
-				params.language = "en";
-				params.translate = false;
-				fprintf(stderr, "%s: WARNING: model is not multilingual, ignoring language and translation options\n", __func__);
-			}
-		}
-		fprintf(stderr, "%s: processing, %d threads, lang = %s, task = %s, timestamps = %d ...\n",
-				__func__,
-				params.n_threads,
-				params.language.c_str(),
-				params.translate ? "translate" : "transcribe",
-				params.no_timestamps ? 0 : 1);
-
-		fprintf(stderr, "\n");
-	}
-#endif
-	printf("finished: print some info about the processing\n");
-
-	// ── Audio capture initialisation ─────────────────────────────────────────────
-// Sets up the SDL audio capture device with a 15-second ring buffer,
-// or loads a WAV file for automated test mode.
-// init audio
-
-	// Test mode: load audio from file instead of microphone
+	// -- Audio capture initialisation ---------------------------------------------
+	// Sets up the SDL audio capture device with a 15-second ring buffer,
+	// or loads a WAV file for automated test mode.
 	bool test_mode = !params.test_input_file.empty();
 	std::vector<float> test_audio_data;
-	bool test_audio_injected = false; // Track if we've injected test audio
+	bool test_audio_injected = false;
 
 	if (test_mode) {
 		std::vector<std::vector<float>> test_audio_stereo;
@@ -1518,7 +1443,7 @@ int run(int argc, const char **argv)
 
 	std::string prompt_whisper;
 	if (params.language == "ru")
-		std::string prompt_whisper = ::replace(k_prompt_whisper_ru, "{1}", "Анна"); // Алиса is bad
+		std::string prompt_whisper = ::replace(k_prompt_whisper_ru, "{1}", "Anna");
 	else
 		std::string prompt_whisper = ::replace(k_prompt_whisper, "{1}", params.bot_name);
 
@@ -1547,10 +1472,9 @@ int run(int argc, const char **argv)
 		fprintf(stderr, "WARNING: Failed to parse Wyoming URL: %s\n", params.xtts_url.c_str());
 	}
 
-	// ── Instruct preset loading ───────────────────────────────────────────────────
-// Loads a JSON preset file that defines system/user/bot message formatting,
-// stop sequences, and other instruct-tuned model parameters.
-// instruct mode
+	// -- Instruct preset loading --------------------------------------------------
+	// Loads a JSON preset file that defines system/user/bot message formatting,
+	// stop sequences, and other instruct-tuned model parameters.
 	if (!params.instruct_preset.empty())
 	{
 		try
@@ -1627,80 +1551,11 @@ int run(int argc, const char **argv)
 		fprintf(stdout, "[Tool System] Injected %zu tools into system prompt\n", tool_registry.getAllTools().size());
 	}
 
-	// ── Session initialisation ────────────────────────────────────────────────────
-// Tokenises the initial prompt and optionally loads a cached session file
-// to resume a previous conversation without re-processing the full prompt.
-// init session
-	std::string path_session = params.path_session;
-	std::vector<llama_token> session_tokens;
-	auto embd_inp = ::llama_tokenize(ctx_llama, prompt_llama, true);
-
-	if (!path_session.empty())
-	{
-		fprintf(stderr, "%s: attempting to load saved session from %s\n", __func__, path_session.c_str());
-
-		// fopen to check for existing session
-		FILE *fp = std::fopen(path_session.c_str(), "rb");
-		if (fp != NULL)
-		{
-			std::fclose(fp);
-
-			session_tokens.resize(llama_n_ctx(ctx_llama));
-			size_t n_token_count_out = 0;
-			if (!llama_load_session_file(ctx_llama, path_session.c_str(), session_tokens.data(), session_tokens.capacity(), &n_token_count_out))
-			{
-				fprintf(stderr, "%s: error: failed to load session file '%s'\n", __func__, path_session.c_str());
-				return 1;
-			}
-			session_tokens.resize(n_token_count_out);
-			for (size_t i = 0; i < session_tokens.size(); i++)
-			{
-				embd_inp[i] = session_tokens[i];
-			}
-
-			fprintf(stderr, "%s: loaded a session with prompt size of %d tokens\n", __func__, (int)session_tokens.size());
-		}
-		else
-		{
-			fprintf(stderr, "%s: session file does not exist, will create\n", __func__);
-		}
-	}
-
-	// evaluate the initial prompt
-
-	printf("\n");
-	printf("%s : processing prompt (%d tokens)...\n", __func__, (int)embd_inp.size());
-
-	double llama_start_time = get_current_time_ms();
-
-	// ── Initial prompt evaluation ────────────────────────────────────────────────
-// Feeds the full initial prompt through the LLM in batches to prime the KV
-// cache before the first user turn begins.
-	int n_past = 0;
-	size_t num_chunks = (embd_inp.size() + lcparams.n_batch - 1) / lcparams.n_batch;
-	for (size_t i = 0; i < num_chunks; i++)
-	{
-		size_t start_idx = i * lcparams.n_batch;
-		size_t end_idx = std::min((i + 1) * lcparams.n_batch, embd_inp.size());
-		size_t chunk_size = end_idx - start_idx;
-		llama_eval(ctx_llama, embd_inp.data() + start_idx, chunk_size, n_past);
-		n_past += chunk_size;
-
-		int pct  = (int)(((float)(i + 1) / num_chunks) * 100.0f);
-		int done = pct / 5;
-		fprintf(stderr, "\r  Processing prompt: [%-20s] %3d%%",
-			std::string(done, '#').append(20 - done, '.').c_str(), pct);
-		fflush(stderr);
-	}
-	fprintf(stderr, "\n");
-
-	double llama_end_time = get_current_time_ms();
-	double llama_time_total = 0;
-	double llama_time_input = 0;
-	double llama_time_output = 0;
-
-	llama_time_total = llama_end_time - llama_start_time;
-	printf(" \nLlama start prompt: %d/%d tokens in %.3f s at %.0f t/s\n", embd_inp.size(), params.ctx_size, llama_time_total, embd_inp.size() / llama_time_total);
+	// -- Conversation history management ------------------------------------------
+	// Instead of token arrays, we maintain the full conversation as a string.
+	// Each turn appends "Person: text\nBot: response\n" to the history.
+	// The full prompt sent to llama-server = prompt_llama + conversation_history.
+	std::string conversation_history;
 
 	if (params.verbose_prompt)
 	{
@@ -1708,39 +1563,6 @@ int run(int argc, const char **argv)
 		fprintf(stdout, "%s", prompt_llama.c_str());
 		fflush(stdout);
 	}
-
-	// debug message about similarity of saved session, if applicable
-	size_t n_matching_session_tokens = 0;
-	if (session_tokens.size())
-	{
-		for (llama_token id : session_tokens)
-		{
-			if (n_matching_session_tokens >= embd_inp.size() || id != embd_inp[n_matching_session_tokens])
-			{
-				break;
-			}
-			n_matching_session_tokens++;
-		}
-		if (n_matching_session_tokens >= embd_inp.size())
-		{
-			fprintf(stderr, "%s: session file has exact match for prompt!\n", __func__);
-		}
-		else if (n_matching_session_tokens < (embd_inp.size() / 2))
-		{
-			fprintf(stderr, "%s: warning: session file has low similarity to prompt (%zu / %zu tokens); will mostly be reevaluated\n",
-					__func__, n_matching_session_tokens, embd_inp.size());
-		}
-		else
-		{
-			fprintf(stderr, "%s: session file matches %zu / %zu tokens of prompt\n",
-					__func__, n_matching_session_tokens, embd_inp.size());
-		}
-	}
-
-	// HACK - because session saving incurs a non-negligible delay, for now skip re-saving session
-	// if we loaded a session with at least 75% similarity. It's currently just used to speed up the
-	// initial prompt so it doesn't need to be an exact match.
-	bool need_to_save_session = !path_session.empty() && n_matching_session_tokens < (embd_inp.size() * 3 / 4);
 
 	// show wake command if enabled
 	const std::string wake_cmd = params.wake_cmd;
@@ -1757,15 +1579,7 @@ int run(int argc, const char **argv)
 
 	// text inference variables
 	const int voice_id = 2;
-	const int n_keep = embd_inp.size();
-	const int n_ctx = llama_n_ctx(ctx_llama);
 
-	n_past = n_keep;
-	int n_prev = 64;
-	std::vector<int> past_prev_arr{};
-	int n_past_prev = 0; // token count that was before the last answer
-	int n_session_consumed = !path_session.empty() && session_tokens.size() > 0 ? session_tokens.size() : 0;
-	std::vector<llama_token> embd;
 	std::string text_heard_prev;
 	std::string text_heard_trimmed;
 	int new_command_allowed = 1;
@@ -1776,7 +1590,7 @@ int run(int argc, const char **argv)
 	std::string last_output_needle = "";
 	if (params.language == "ru")
 	{
-		tts_intros = {"Хм", "Ну", "Нуу", "О", "А", "А?", "Угу", "Ох", "Ха", "Ах", "Блин", "Короче", "В общем", "Ой", "Слышь", "Ну вообще-то", "Ну а вообще", "Кароче", "Вот", "Знаешь", "Как бы", "Прикинь", "Послушай", "Типа", "Это", "Так вот", "Погоди", params.person};
+		tts_intros = {"Hm", "Nu", "Nuu", "O", "A", "A?", "Ugu", "Okh", "Ha", "Akh"};
 	}
 	else
 	{
@@ -1785,14 +1599,10 @@ int run(int argc, const char **argv)
 	srand(time(NULL)); // Initialize the random number generator
 
 	int last_command_time = 0;
-	int eot_antiprompt_id_1 = 0;
-	int eot_antiprompt_id_2 = 0;
 	std::string current_voice = params.xtts_voice;
 
-	// ── Antiprompt / stop-word setup ─────────────────────────────────────────────
-// Builds the list of strings that signal the end of a bot turn (person name,
-// newline, instruct suffix, EOT tokens, and any custom --stop-words).
-// reverse prompts for detecting when it's time to stop speaking
+	// -- Antiprompt / stop-word setup ---------------------------------------------
+	// Builds the list of strings that signal the end of a bot turn.
 	std::vector<std::string> antiprompts = {
 		params.person + chat_symb,
 		params.person + " " + chat_symb,
@@ -1804,9 +1614,7 @@ int run(int argc, const char **argv)
 	if (!params.instruct_preset_data["bot_message_suffix"].empty())
 	{
 		antiprompts.push_back(params.instruct_preset_data["bot_message_suffix"]);
-		eot_antiprompt_id_1 = antiprompts.size() - 1;
-		antiprompts.push_back("</end_of_turn>"); // weird tag that gemma-2-9 sometimes return instead of <end_of_turn>
-		eot_antiprompt_id_2 = antiprompts.size() - 1;
+		antiprompts.push_back("</end_of_turn>");
 	}
 
 	// additional stop words
@@ -1845,17 +1653,17 @@ int run(int argc, const char **argv)
 	std::thread shortcut_thread([cur_window_handle]()
 								{ keyboard_shortcut_func(cur_window_handle); });
 #endif
-	printf("\nVoice commands: Stop(Ctrl+Space or Escape), Regenerate(Ctrl+Right), Delete(Ctrl+Delete), Reset(Ctrl+R)\n");
+	printf("\nVoice commands: Stop (say 'stop' or type it)\n");
 
-	// ── TTS connection warmup ────────────────────────────────────────────────────
-// Sends an initialisation phrase to Wyoming-Piper to verify connectivity
-// and warm up the TTS pipeline before the first user interaction.
-// Test Wyoming-Piper TTS connection
+	// -- TTS connection warmup ----------------------------------------------------
+	// Sends an initialisation phrase to Wyoming-Piper to verify connectivity
+	// and warm up the TTS pipeline before the first user interaction.
 	printf("\n=========================================\n");
 	printf("Testing Wyoming-Piper TTS Connection...\n");
 	printf("=========================================\n");
 	printf("TTS URL: %s\n", params.xtts_url.c_str());
 	printf("TTS Voice: %s\n", params.xtts_voice.c_str());
+	printf("LLM URL: %s\n", params.llama_url.c_str());
 
 	// Pause microphone during TTS test to prevent feedback
 	if (!test_mode) {
@@ -1880,9 +1688,8 @@ int run(int argc, const char **argv)
 		printf("(Microphone resumed)\n");
 	}
 
-	// ── Tool system status display ───────────────────────────────────────────────
-// Lists all loaded tools and whether each supports fast-path (pre-LLM) execution.
-// Display tool system status
+	// -- Tool system status display -----------------------------------------------
+	// Lists all loaded tools and whether each supports fast-path (pre-LLM) execution.
 	printf("\n=========================================\n");
 	printf("Tool Calling System Status\n");
 	printf("=========================================\n");
@@ -1912,20 +1719,17 @@ int run(int argc, const char **argv)
 	double speech_len = 0;
 	int len_in_samples = 0;
 	std::string all_heard_pre;
-	int llama_interrupted = 0;
-	double llama_interrupted_time = 0.0;
-	llama_start_time = 0.0;
-	double llama_start_generation_time = 0.0; //  after prompt processing
-	llama_end_time = 0.0;
-	llama_time_total = 0.0;
+	double llama_start_time = 0.0;
+	double llama_end_time = 0.0;
+	double llama_time_total = 0.0;
+	double llama_start_generation_time = 0.0;
 	std::string user_typed = "";
 	bool user_typed_this = false;
 
-	// ═════════════════════════════════════════════════════════════════════════════
-// Main listen → transcribe → generate → speak loop.
-// Runs continuously until SIGINT, SIGTERM, or SDL quit event.
-// ═════════════════════════════════════════════════════════════════════════════
-// main loop
+	// ===========================================================================
+	// Main listen -> transcribe -> generate -> speak loop.
+	// Runs continuously until SIGINT, SIGTERM, or SDL quit event.
+	// ===========================================================================
 	while (is_running)
 	{
 		// Check for signal
@@ -1935,7 +1739,7 @@ int run(int argc, const char **argv)
 			break;
 		}
 
-		// // handle Ctrl + C
+		// handle Ctrl + C
 		is_running = sdl_poll_events();
 
 		if (!is_running)
@@ -1943,7 +1747,7 @@ int run(int argc, const char **argv)
 			break;
 		}
 
-		// delay. try lower?
+		// delay
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
 		int64_t t_ms = 0;
@@ -1952,7 +1756,6 @@ int run(int argc, const char **argv)
 		// keyboard input
 		user_typed_this = false;
 		console::set_display(console::reset);
-		// std::lock_guard<std::mutex> lock(input_mutex); // was blocking, TODO if it is really needed
 		if (!input_queue.empty())
 		{
 			std::string buffer;
@@ -1980,7 +1783,7 @@ int run(int argc, const char **argv)
 				send_tts_async("stop", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
 				audio.clear();
 				g_hotkey_pressed = "";
-				continue; // Skip rest of loop, don't process as typed input
+				continue;
 			}
 			else if (g_hotkey_pressed == "Ctrl+Right")
 			{
@@ -2002,9 +1805,8 @@ int run(int argc, const char **argv)
 			}
 		}
 #endif
-		// ── Audio capture ───────────────────────────────────────────────────────────
-// Gets the latest 1-second chunk of microphone audio (or injects test audio).
-// audio
+		// -- Audio capture --------------------------------------------------------
+		// Gets the latest 1-second chunk of microphone audio (or injects test audio).
 		{
 			// In test mode, inject the test audio data once
 			if (test_mode && !test_audio_data.empty()) {
@@ -2014,15 +1816,10 @@ int run(int argc, const char **argv)
 			} else if (!test_mode) {
 				audio.get(1000, pcmf32_cur); // step_ms, async - reduced to 1s for better responsiveness
 			}
-			// In test mode after injection, don't get more audio
 
-			// WHISPER_SAMPLE_RATE 16000
-			// vad_last_ms default 1250
-
-			// ── Voice Activity Detection (VAD) ───────────────────────────────────────────
-// Determines whether speech has started or ended in the captured audio.
-// Includes smart early-stop detection for short high-energy commands like "stop".
-// VAD processing - in test mode, simulate speech start then end
+			// -- Voice Activity Detection (VAD) -----------------------------------
+			// Determines whether speech has started or ended in the captured audio.
+			// Includes smart early-stop detection for short high-energy commands like "stop".
 			int vad_result;
 			if (test_mode && test_audio_injected && !pcmf32_cur.empty()) {
 				// Simulate VAD: speech started then ended
@@ -2032,36 +1829,24 @@ int run(int argc, const char **argv)
 					vad_result = 2; // Speech ended - trigger processing
 				}
 			} else {
-				// vad_simple returns true for silence, false for speech
-				// We need to implement a state machine:
-				// vad_result = 0: silence (no speech detected)
-				// vad_result = 1: speech started (transition from silence to speech)
-				// vad_result = 2: speech ended (transition from speech to silence)
-
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.min_energy);
 
-				// SMART EARLY STOP DETECTION: Check for high-energy short utterances (like "STOP!")
-				// If speech just started and we detect high energy + short duration, trigger early
+				// SMART EARLY STOP DETECTION
 				static double early_trigger_start_time = 0;
 				bool early_trigger = false;
 
 				if (is_speech && vad_result_prev != 1) {
-					// Speech just started - record time
 					early_trigger_start_time = get_current_time_ms();
 				} else if (is_speech && vad_result_prev == 1) {
-					// Speech continuing - check if it's been short + high energy
 					double speech_duration_ms = get_current_time_ms() - early_trigger_start_time;
 
-					// Calculate energy of recent audio (last 300-500ms)
 					int check_samples = std::min((int)pcmf32_cur.size(), (WHISPER_SAMPLE_RATE * 500) / 1000);
 					float recent_energy = 0.0f;
-					for (int i = pcmf32_cur.size() - check_samples; i < pcmf32_cur.size(); i++) {
+					for (int i = pcmf32_cur.size() - check_samples; i < (int)pcmf32_cur.size(); i++) {
 						recent_energy += fabsf(pcmf32_cur[i]);
 					}
 					recent_energy /= check_samples;
 
-					// If short duration (300-600ms) + high energy (>0.01, typical of shouted commands)
-					// trigger early without waiting for full VAD silence
 					if (speech_duration_ms >= 300.0 && speech_duration_ms <= 600.0 && recent_energy > 0.01f) {
 						early_trigger = true;
 						if (params.print_energy) {
@@ -2071,56 +1856,43 @@ int run(int argc, const char **argv)
 				}
 
 				if (is_speech) {
-					// Speech is happening
 					if (early_trigger) {
 						vad_result = 2; // Trigger early end for interrupt commands
 					} else {
-						vad_result = (vad_result_prev == 1) ? 1 : 1;  // Keep at 1 if already speaking, or set to 1 if just started
+						vad_result = 1;
 					}
 				} else {
-					// Silence
-					vad_result = (vad_result_prev == 1) ? 2 : 0;  // If was speaking, set to 2 (ended), otherwise stay at 0
+					vad_result = (vad_result_prev == 1) ? 2 : 0;
 				}
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
 			{
 				if (vad_result_prev != 1) // real start
 				{
-					speech_start_ms = get_current_time_ms(); // double with microsecond precision
+					speech_start_ms = get_current_time_ms();
 					vad_result_prev = 1;
 
-					// whisper warmup request, not real one
-					// audio.get((int)(speech_len*1000), pcmf32_cur);
-					// printf("%.3f after vad-start, before pre transcribe (%d)\n", get_current_time_ms(), pcmf32_cur.size());
-					// Skip warmup in test mode to preserve injected audio
+					// whisper warmup request
 					if (!test_mode && (!params.push_to_talk || (params.push_to_talk && g_hotkey_pressed == "Alt")))
 					{
-						// Ensure minimum buffer size for Whisper (at least 1 second = 16000 samples)
-						const int min_samples_warmup = WHISPER_SAMPLE_RATE; // 16000 samples = 1 second
-						if (pcmf32_cur.size() < min_samples_warmup) {
-							pcmf32_cur.resize(min_samples_warmup, 0.0f); // Pad with silence
+						const int min_samples_warmup = WHISPER_SAMPLE_RATE;
+						if (pcmf32_cur.size() < (size_t)min_samples_warmup) {
+							pcmf32_cur.resize(min_samples_warmup, 0.0f);
 						}
 
 						{
-							all_heard_pre = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms)); // warmup - try with small size audio
+							all_heard_pre = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms));
 							g_hotkey_pressed = "";
 						}
 					}
 				}
-#ifdef XTTS_FILE
-				// user has started speaking, xtts cannot play
-				if (!params.push_to_talk || (params.push_to_talk && g_hotkey_pressed == "Alt"))
-				{
-					allow_xtts_file(params.xtts_control_path, 0);
-				}
-#endif
 			}
-			// ── Speech ended: transcribe and process ─────────────────────────────────────
-// Triggered when VAD detects end-of-speech, force_speak flag, or typed input.
-// Runs Whisper transcription then dispatches the result to the command/LLM pipeline.
+			// -- Speech ended: transcribe and process ---------------------------------
+			// Triggered when VAD detects end-of-speech, force_speak flag, or typed input.
+			// Runs Whisper transcription then dispatches the result to the command/LLM pipeline.
 if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
-				speech_end_ms = get_current_time_ms(); // double with microsecond precision
+				speech_end_ms = get_current_time_ms();
 				speech_len = speech_end_ms - speech_start_ms;
 				if (speech_len < 0.10)
 					speech_len = 0;
@@ -2132,7 +1904,6 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				vad_result_prev = 2;
 				speech_start_ms = 0;
 
-				// In test mode with injected audio, skip the length check and process anyway
 				if (!speech_len && !user_typed.size() && !(test_mode && test_audio_injected))
 					continue;
 
@@ -2140,16 +1911,12 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				if (speech_len < 1.10)
 					speech_len = 1.10; // whisper doesn't like sentences < 1.10s
 				if (!test_mode) {
-					// While generation is running, TTS audio fills the buffer.
-					// Use a short window so Whisper sees recent audio (the user's
-					// command) rather than seconds of story content with "stop" buried in it.
 					int audio_window_ms = g_generation_running.load() ? 2000 : 10000;
 					audio.get(audio_window_ms, pcmf32_cur);
 				}
-				// In test mode, pcmf32_cur already has the test data from earlier injection
 				std::string all_heard;
 				if (params.debug) {
-					printf("%.3f after vad-end (%d)\n", get_current_time_ms(), pcmf32_cur.size());
+					printf("%.3f after vad-end (%d)\n", get_current_time_ms(), (int)pcmf32_cur.size());
 				}
 				if (user_typed.size())
 				{
@@ -2160,16 +1927,15 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				{
 					if (!params.push_to_talk || (params.push_to_talk && g_hotkey_pressed == "Alt"))
 					{
-						// Ensure minimum buffer size for Whisper (at least 1 second = 16000 samples)
-						const int min_samples = WHISPER_SAMPLE_RATE; // 16000 samples = 1 second
-						if (pcmf32_cur.size() < min_samples) {
-							pcmf32_cur.resize(min_samples, 0.0f); // Pad with silence
+						const int min_samples = WHISPER_SAMPLE_RATE;
+						if (pcmf32_cur.size() < (size_t)min_samples) {
+							pcmf32_cur.resize(min_samples, 0.0f);
 						}
 
 						if (params.debug) {
-							printf("%.3f before transcribe, buffer size: %d\n", get_current_time_ms(), pcmf32_cur.size());
+							printf("%.3f before transcribe, buffer size: %d\n", get_current_time_ms(), (int)pcmf32_cur.size());
 						}
-						all_heard = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms)); // real transcribe
+						all_heard = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms));
 						if (params.debug) {
 							printf("%.3f after transcribe, result: '%s'\n", get_current_time_ms(), all_heard.c_str());
 						}
@@ -2233,7 +1999,7 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				}
 				// remove all characters, except for letters, numbers, punctuation and ':', '\'', '-', ' '
 				if (params.language == "en" && !user_typed_this)
-					text_heard = std::regex_replace(text_heard, std::regex("[^a-zA-Z0-9\\.,\\?!\\s\\:\\'\\-]"), ""); // breaks non latin text, e.g. Russian
+					text_heard = std::regex_replace(text_heard, std::regex("[^a-zA-Z0-9\\.,\\?!\\s\\:\\'\\-]"), "");
 				// take first line
 				text_heard = text_heard.substr(0, text_heard.find_first_of('\n'));
 
@@ -2245,51 +2011,45 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				text_heard = RemoveTrailingCharactersUtf8(text_heard, U"!");
 				text_heard = RemoveTrailingCharactersUtf8(text_heard, U",");
 				text_heard = RemoveTrailingCharactersUtf8(text_heard, U".");
-				text_heard = RemoveTrailingCharactersUtf8(text_heard, U"»");
+				text_heard = RemoveTrailingCharactersUtf8(text_heard, U"\u00BB");
 				text_heard = RemoveTrailingCharactersUtf8(text_heard, U"[");
 				text_heard = RemoveTrailingCharactersUtf8(text_heard, U"]");
-				if (text_heard[0] == '.')
+				if (!text_heard.empty() && text_heard[0] == '.')
 					text_heard.erase(0, 1);
-				if (text_heard[0] == '!')
+				if (!text_heard.empty() && text_heard[0] == '!')
 					text_heard.erase(0, 1);
-				if (text_heard[0] == '[')
+				if (!text_heard.empty() && text_heard[0] == '[')
 					text_heard.erase(0, 1);
 				trim(text_heard);
-				if (text_heard == "!" || text_heard == "." || text_heard == "Sil" || text_heard == "Bye" || text_heard == "Okay" || text_heard == "Okay." || text_heard == "Thank you." || text_heard == "Thank you" || text_heard == "Thanks." || text_heard == "Bye." || text_heard == "Thank you for listening." || text_heard == "К" || text_heard == "Спасибо" || text_heard == "Пока" || text_heard == params.bot_name || text_heard == "*Звук!*" || text_heard == "Р" || text_heard.find("Редактор субтитров") != std::string::npos || text_heard.find("можешь это сделать") != std::string::npos || text_heard.find("Как дела?") != std::string::npos || text_heard.find("Это") != std::string::npos || text_heard.find("Добро пожаловать") != std::string::npos || text_heard.find("Спасибо за внимание") != std::string::npos || text_heard.find("Будьте здоровы") != std::string::npos || text_heard.find("Продолжение следует") != std::string::npos || text_heard.find("End of") != std::string::npos || text_heard.find("The End") != std::string::npos || text_heard.find("THE END") != std::string::npos || text_heard.find("The film was made") != std::string::npos || text_heard.find("Translated by") != std::string::npos || text_heard.find("Thanks for watching") != std::string::npos || text_heard.find("The second part of the video") != std::string::npos || text_heard.find("Thank you for watching") != std::string::npos || text_heard.find("*click*") != std::string::npos || text_heard.find("Субтитры") != std::string::npos || text_heard.find("До свидания") != std::string::npos || text_heard.find("До новых встреч") != std::string::npos || text_heard.find("ПЕСНЯ") != std::string::npos || text_heard.find("Silence") != std::string::npos || text_heard.find("Поехали") != std::string::npos || text_heard == "You're" || text_heard == "you're" || text_heard == "You're not" || text_heard == "See?" || text_heard == "you" || text_heard == "You" || text_heard == "Yeah" || text_heard == "Well" || text_heard == "Hey" || text_heard == "Oh" || text_heard == "Right" || text_heard == "Real" || text_heard == "Huh" || text_heard == "I" || text_heard == "I'm" || text_heard.find("*звук!") != std::string::npos || text_heard == "В" || text_heard == "а" || text_heard == "*")
+				// Hallucination filter
+				if (text_heard == "!" || text_heard == "." || text_heard == "Sil" || text_heard == "Bye" || text_heard == "Okay" || text_heard == "Okay." || text_heard == "Thank you." || text_heard == "Thank you" || text_heard == "Thanks." || text_heard == "Bye." || text_heard == "Thank you for listening." || text_heard == params.bot_name || text_heard.find("End of") != std::string::npos || text_heard.find("The End") != std::string::npos || text_heard.find("THE END") != std::string::npos || text_heard.find("Thanks for watching") != std::string::npos || text_heard.find("Thank you for watching") != std::string::npos || text_heard.find("Silence") != std::string::npos || text_heard == "You're" || text_heard == "you're" || text_heard == "You're not" || text_heard == "See?" || text_heard == "you" || text_heard == "You" || text_heard == "Yeah" || text_heard == "Well" || text_heard == "Hey" || text_heard == "Oh" || text_heard == "Right" || text_heard == "Real" || text_heard == "Huh" || text_heard == "I" || text_heard == "I'm" || text_heard == "*")
 					text_heard = "";
 				text_heard = std::regex_replace(text_heard, std::regex("\\s+$"), ""); // trailing whitespace
 
 				text_heard_trimmed = text_heard; // no periods or spaces
 				trim(text_heard_trimmed);
-				if (text_heard_trimmed[0] == '.')
+				if (!text_heard_trimmed.empty() && text_heard_trimmed[0] == '.')
 					text_heard_trimmed.erase(0, 1);
-				if (text_heard_trimmed[0] == '!')
+				if (!text_heard_trimmed.empty() && text_heard_trimmed[0] == '!')
 					text_heard_trimmed.erase(0, 1);
-				if (text_heard_trimmed[text_heard_trimmed.length() - 1] == '.' || text_heard_trimmed[text_heard_trimmed.length() - 1] == '!')
-					text_heard_trimmed.erase(text_heard_trimmed.length() - 1, 1);
+				if (!text_heard_trimmed.empty()) {
+					if (text_heard_trimmed[text_heard_trimmed.length() - 1] == '.' || text_heard_trimmed[text_heard_trimmed.length() - 1] == '!')
+						text_heard_trimmed.erase(text_heard_trimmed.length() - 1, 1);
+				}
 				trim(text_heard_trimmed);
-				text_heard_trimmed = LowerCase(text_heard_trimmed); // not working right with utf and russian
+				text_heard_trimmed = LowerCase(text_heard_trimmed);
 
 				fflush(stdout);
-				std::string user_command;
-#ifdef XTTS_FILE
-				if (params.vad_start_thold)
-				{
-					// user has finished speaking, xtts can play
-					// xtts slows down whisper -> moved this block after whisper
-					allow_xtts_file(params.xtts_control_path, 1);
-				}
-#endif
-				// TTS rand INTRO sentence for instant reponse
+
+				// TTS rand INTRO sentence for instant response
 				if (params.xtts_intro)
 				{
 					if (text_heard_trimmed.size())
 					{
 						rand_intro_text = tts_intros[rand() % tts_intros.size()];
 						text_to_speak_arr[thread_i] = rand_intro_text;
-						// Capture current index by value to avoid race condition
 						int current_thread_idx = thread_i;
-						threads.emplace_back([&, current_thread_idx] // creates a thread, threads are cleaned after user ends speech, after n threads
+						threads.emplace_back([&, current_thread_idx]
 											 {
 							if (text_to_speak_arr[current_thread_idx].size())
 							{
@@ -2300,30 +2060,25 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 					}
 				}
 
-				// ── Fast-path tool execution ─────────────────────────────────────────────────
-// Checks if the heard text matches a registered fast-path tool (e.g. "stop").
-// If matched, executes the tool immediately and skips LLM generation entirely.
-// FAST PATH TOOL EXECUTION (pre-LLaMA)
-				// Check if the user said a fast-path command (e.g., "stop")
+				// -- Fast-path tool execution -----------------------------------------
+				// Checks if the heard text matches a registered fast-path tool (e.g. "stop").
+				// If matched, executes the tool immediately and skips LLM generation entirely.
 				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
 				if (matched && tool_def.fast_path) {
 					fprintf(stdout, "\n[Fast Path Tool: %s]\n", tool_def.name.c_str());
 
-					// Execute the tool
 					tool_system::ToolResult result = tool_registry.execute(tool_def.name, json::object());
 
 					if (result.success) {
 						// Stop any background generation
 						g_stop_generation = true;
-						// Skip LLaMA processing for fast-path commands
-						// (Tool executors handle Wyoming events)
 						audio.clear();
 						g_hotkey_pressed = "";
 						test_audio_injected = false;
 						continue;
 					} else {
 						fprintf(stderr, "Fast path tool execution failed: %s\n", result.message.c_str());
-						// Fall through to normal LLaMA processing
+						// Fall through to normal processing
 					}
 				}
 
@@ -2338,108 +2093,68 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 					g_llm_thread.join();
 				}
 
-				// ── Background generation thread ─────────────────────────────────────────────
-// Spawns g_llm_thread to run LLM inference and TTS dispatch concurrently,
-// allowing the main thread to return immediately to listening for new commands.
-// Spawn generation + TTS in a background thread.
-				// text_heard is captured by value (it goes out of scope on the main thread).
-				// All persistent LLM state (embd_inp, n_past, ctx_llama, etc.) by reference.
+				// -- Background generation thread -------------------------------------
+				// Spawns g_llm_thread to run LLM inference via llama-server HTTP
+				// and TTS dispatch concurrently, allowing the main thread to
+				// return immediately to listening for new commands.
 				g_stop_generation = false;
 				g_generation_running = true;
 				// Tell Wyoming-Piper a new response is starting so it resets STOP_CMD.
-				// Must happen before any TTS chunks are dispatched.
 				if (tool_system::g_wyoming_client)
 					tool_system::g_wyoming_client->sendNewResponse();
 				g_llm_thread = std::thread([&, text_heard]() mutable {
-				// Local vars that were previously declared before the fast path:
-				int translation_is_going = 0;
-				int n_embd_inp_before_trans = 0;
-				int tokens_in_reply = 0;
-				std::string current_voice_tmp = "";
 
-				// LLAMA
 				llama_start_time = get_current_time_ms();
-				const std::vector<llama_token> tokens = llama_tokenize(ctx_llama, text_heard.c_str(), false);
 
-				if (text_heard.empty() || tokens.empty() || force_speak)
+				if (text_heard.empty() || force_speak)
 				{
 					fprintf(stdout, "%s: Heard nothing, skipping ...\n", __func__);
 					g_hotkey_pressed = "";
-					test_audio_injected = false; // Reset even if nothing heard
+					test_audio_injected = false;
 					g_generation_running = false;
-					return; // exit lambda - nothing to generate
+					return;
 				}
 
 				force_speak = false;
-				test_audio_injected = false; // Reset for test mode
+				test_audio_injected = false;
 				trim(text_heard);
 				if (params.debug) {
 					fprintf(stdout, "text_heard %s:\n", text_heard.c_str());
-					for (char ch : text_heard) printf("%X ", ch);
-					printf("\n\n");
 				}
 
 				text_heard_prev = text_heard;
-				n_past_prev = embd_inp.size();
-				past_prev_arr.push_back(embd_inp.size());
-				std::string translation_full = "";
-				std::string bot_name_current = params.bot_name;
-				std::string bot_name_current_ru = params.bot_name;
-				std::string text_heard_with_instruct = text_heard;
-				int n_comas = 0; // comas counter
 
-				if (last_output_has_username && !user_typed_this) // last model output has user name
-				{
-					text_heard.insert(0, 1, ' ');				// missing space
-					text_heard_with_instruct.insert(0, 1, ' '); // missing space
-				}
-				else if (!last_output_has_EOT) // no EOT ( <end_of_turn>)
-				{
-					text_heard.insert(0, "\n" + params.person + chat_symb + " ");
-					text_heard_with_instruct.insert(0, params.instruct_preset_data["bot_message_suffix"] + "\n" + params.instruct_preset_data["user_message_prefix"] + "\n" + params.person + chat_symb + " ");
-				}
-				else // has EOT or no_instuct
-				{
-					text_heard.insert(0, "\n" + params.person + chat_symb + " ");
-					text_heard_with_instruct.insert(0, "\n" + params.instruct_preset_data["user_message_prefix"] + "\n" + params.person + chat_symb + " ");
-				}
-
-				text_heard += "\n" + params.bot_name + chat_symb;
-				text_heard_with_instruct += params.instruct_preset_data["user_message_suffix"] + "\n" + params.instruct_preset_data["bot_message_prefix"] + "\n" + params.bot_name + chat_symb;
-
+				// Print user input
 				if (user_typed_this)
 				{
-					fprintf(stdout, "%s%s%s", "\033[1m", params.bot_name + chat_symb, "\033[0m");
-					g_hotkey_pressed = "";
+					fprintf(stdout, "%s%s%s", "\033[1m", (params.bot_name + chat_symb).c_str(), "\033[0m");
 				}
 				else
-					fprintf(stdout, "%s%s%s", "\033[1m", text_heard.c_str(), "\033[0m");
-				if (params.instruct_preset.size())
-					text_heard = text_heard_with_instruct; // don't print instruct, using another string var
-				fflush(stdout);
-				int split_after = params.split_after;
-
-				embd = ::llama_tokenize(ctx_llama, text_heard, false); // not sure why 2 times llama_tokenize
-				input_tokens_count = embd.size();
-
-				// Append the new input tokens to the session_tokens vector
-				if (!path_session.empty())
 				{
-					session_tokens.insert(session_tokens.end(), tokens.begin(), tokens.end());
+					fprintf(stdout, "%s%s%s", "\033[1m",
+						("\n" + params.person + chat_symb + " " + text_heard + "\n" + params.bot_name + chat_symb).c_str(),
+						"\033[0m");
 				}
+				fflush(stdout);
+
+				// Build the full prompt for llama-server:
+				// system_prompt + conversation_history + new_user_turn
+				std::string user_turn = "\n" + params.person + chat_symb + " " + text_heard;
+				std::string bot_prefix = "\n" + params.bot_name + chat_symb;
+
+				// Build the full prompt
+				std::string full_prompt = prompt_llama + conversation_history + user_turn + bot_prefix;
 
 				// removing all threads
-				if (threads.size() >= 80) // check text_to_speak_arr init size 150
+				if (threads.size() >= 80)
 				{
-					printf("[!...", threads.size());
+					printf("[!...");
 					for (auto &t : threads)
 					{
 						try
 						{
 							if (t.joinable())
 								t.join();
-							else
-								printf("Notice: thread %d is NOT joinable\n", thread_i);
 						}
 						catch (const std::exception &ex)
 						{
@@ -2452,528 +2167,75 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				if (thread_i > 100)
 					thread_i = 0; // rotation
 
-				float temp_next = params.temp;
-
 				// Initialize tool call parser for this generation
-				static tool_system::ToolCallParser tool_parser;
+				tool_system::ToolCallParser tool_parser;
 				tool_parser.reset();
 
-				// text inference
-				bool done = false;
-				std::string text_to_speak;
-				int new_tokens = 0;
-				while (true)
-				{
-					// ── Token generation loop ────────────────────────────────────────────────────
-// Generates one token per iteration. Exits when n_predict is reached,
-// g_stop_generation is set, an antiprompt is matched, or EOS is sampled.
-// predict
-					if (new_tokens > params.n_predict || g_stop_generation.load())
-						break;
-					new_tokens++;
-					if (embd.size() > 0)
-					{
-						if (n_past + (int)embd.size() > n_ctx)
-						{
-							n_past = n_keep;
+				// Set up the streaming context
+				llama_stream_context stream_ctx;
+				stream_ctx.stop_flag = &g_stop_generation;
+				stream_ctx.new_tokens = 0;
+				stream_ctx.debug = params.debug;
+				stream_ctx.params = &params;
+				stream_ctx.current_voice = current_voice;
+				stream_ctx.threads = &threads;
+				stream_ctx.text_to_speak_arr = text_to_speak_arr;
+				stream_ctx.reply_part_arr = reply_part_arr;
+				stream_ctx.thread_i = &thread_i;
+				stream_ctx.reply_part = &reply_part;
+				stream_ctx.tool_parser = &tool_parser;
+				stream_ctx.tool_registry = &tool_registry;
+				stream_ctx.antiprompts = &antiprompts;
+				stream_ctx.done = false;
 
-							// insert n_left/2 tokens at the start of embd from last_n_tokens
-							embd.insert(embd.begin(), embd_inp.begin() + embd_inp.size() - n_prev, embd_inp.end());
-							// stop saving session if we run out of context
-							path_session = "";
-						}
+				// Build stop words for the server request
+				std::vector<std::string> server_stop_words;
+				for (const auto& ap : antiprompts) {
+					server_stop_words.push_back(ap);
+				}
+				// Always include these for Mistral format
+				server_stop_words.push_back("[INST]");
+				server_stop_words.push_back("</s>");
 
-						// try to reuse a matching prefix from the loaded session instead of re-eval (via n_past)
-						// REVIEW
-						if (n_session_consumed < (int)session_tokens.size())
-						{
-							size_t i = 0;
-							for (; i < embd.size(); i++)
-							{
-								if (embd[i] != session_tokens[n_session_consumed])
-								{
-									session_tokens.resize(n_session_consumed);
-									break;
-								}
+				llama_start_generation_time = get_current_time_ms();
 
-								n_past++;
-								n_session_consumed++;
+				// Send to llama-server and stream response
+				std::string response = llama_server_generate(
+					full_prompt,
+					params.llama_url,
+					params,
+					g_stop_generation,
+					server_stop_words,
+					stream_ctx
+				);
 
-								if (n_session_consumed >= (int)session_tokens.size())
-								{
-									i++;
-									break;
-								}
-							}
-							if (i > 0)
-							{
-								embd.erase(embd.begin(), embd.begin() + i);
-							}
-						}
-
-						if (embd.size() > 0 && !path_session.empty())
-						{
-							session_tokens.insert(session_tokens.end(), embd.begin(), embd.end());
-							n_session_consumed = session_tokens.size();
-						}
-
-						// NEW prompt eval
-						size_t total_size = embd.size();
-						// size_t batch_size = lcparams.n_batch;
-						//  Split the input embeddings into smaller chunks
-						for (size_t i = 0; i < total_size; i += lcparams.n_batch)
-						{
-							size_t chunk_size = (total_size - i < lcparams.n_batch) ? (total_size - i) : lcparams.n_batch;
-							llama_eval(ctx_llama, embd.data() + i, chunk_size, n_past);
-							n_past += chunk_size;
-						}
-					}
-
-					embd_inp.insert(embd_inp.end(), embd.begin(), embd.end());
-
-					embd.clear();
-					if (done)
-						break;
-					std::string out_token_str = "";
-					char out_token_symbol;
-
-					if (!llama_start_generation_time)
-						llama_start_generation_time = get_current_time_ms();
-
-					{
-						// out of user input, sample next token
-						const float top_k = params.top_k;
-						const float top_p = params.top_p;
-						const float min_p = params.min_p;
-						float temp = params.temp;
-						const float repeat_penalty = params.repeat_penalty;
-						const int repeat_last_n = params.repeat_last_n; // 256
-
-						if (!path_session.empty() && need_to_save_session)
-						{
-							need_to_save_session = false;
-							llama_save_session_file(ctx_llama, path_session.c_str(), session_tokens.data(), session_tokens.size());
-						}
-
-						llama_token id = 0;
-						int person_name_is_found = 0;
-						int bot_name_is_found = 0;
-
-						{
-							auto logits = llama_get_logits(ctx_llama);
-							auto n_vocab = llama_n_vocab(model_llama);
-
-							logits[llama_token_eos(model_llama)] = 0;
-
-							std::vector<llama_token_data> candidates;
-							candidates.reserve(n_vocab);
-							for (llama_token token_id = 0; token_id < n_vocab; token_id++)
-							{
-								candidates.emplace_back(llama_token_data{token_id, logits[token_id], 0.0f});
-							}
-
-							llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
-
-							// apply repeat penalty
-							const float nl_logit = logits[llama_token_nl(model_llama)];
-
-							llama_sample_repetition_penalties(ctx_llama, &candidates_p,
-															  embd_inp.data() + std::max(0, n_past - repeat_last_n),
-															  repeat_last_n, repeat_penalty, 0.0, 0.0f);
-
-							logits[llama_token_nl(model_llama)] = nl_logit;
-
-							if (temp != temp_next)
-								temp = temp_next; // high temp just for 1 token
-
-							if (temp <= 0)
-							{
-								// Greedy sampling
-								id = llama_sample_token_greedy(ctx_llama, &candidates_p);
-							}
-							else
-							{
-								// Temperature sampling
-								llama_sample_top_k(ctx_llama, &candidates_p, top_k, 1);
-								llama_sample_top_p(ctx_llama, &candidates_p, top_p, 1);
-								llama_sample_min_p(ctx_llama, &candidates_p, min_p, 1);
-								llama_sample_temp(ctx_llama, &candidates_p, temp);
-								id = llama_sample_token(ctx_llama, &candidates_p);
-							}
-							if (temp != params.temp)
-								temp = temp_next = params.temp; // back to normal temp
-						}
-
-						if (id != llama_token_eos(model_llama))
-						{
-							// add it to the context
-							embd.push_back(id);
-							out_token_str = llama_token_to_piece(ctx_llama, id);
-
-							// Feed token to tool call parser
-							bool tool_detected = tool_parser.feedToken(out_token_str);
-
-							if (tool_detected && tool_parser.hasToolCall()) {
-								// Extract and execute the tool call
-								tool_system::ToolCall call = tool_parser.getToolCall();
-								fprintf(stdout, "\n[Tool Call: %s]\n", call.name.c_str());
-
-								tool_system::ToolResult result = tool_registry.execute(call.name, call.arguments);
-
-								if (result.success) {
-									// Tool executors handle Wyoming events
-									fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
-								} else {
-									fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
-								}
-
-								// Reset parser for potential next tool call
-								tool_parser.reset();
-							}
-
-							// ── Tool call detection & text extraction ────────────────────────────────────
-// Feeds each token to the streaming ToolCallParser. If a complete <tool_call>
-// block is detected, executes the tool. Otherwise extracts clean text for TTS.
-// Use the parser's normal text (excluding tool tags)
-							std::string clean_text = tool_parser.getText();
-							// Replace newlines with spaces: multi-line LLM responses should flow
-							// as continuous speech rather than sending bare \n to TTS.
-							std::replace(clean_text.begin(), clean_text.end(), '\n', ' ');
-							if (!clean_text.empty()) {
-								text_to_speak += clean_text;
-								printf("%s", clean_text.c_str());
-							}
-
-							tokens_in_reply++;
-
-							// detect sequence repetition (llama stuck in a loop) https://github.com/ggerganov/llama.cpp/pull/2593
-							if (params.seqrep)
-							{
-								// fill new needle
-								if (utf8_length(last_output_needle) > 25)
-									last_output_needle = utf8_substr(last_output_needle, 5, utf8_length(last_output_needle) - 5);
-								last_output_needle += out_token_str;
-								out_token_symbol = out_token_str[out_token_str.size() - 1];
-								if (out_token_symbol == ' ' || out_token_symbol == '.' || out_token_symbol == ',' || out_token_symbol == '!' || out_token_symbol == '?')
-								{
-									// search old needle
-									if (utf8_length(last_output_buffer) > 300 && utf8_length(last_output_needle) >= 20 && last_output_buffer.find(last_output_needle) != std::string::npos)
-									{
-										printf(" [LOOP: %s]\n", last_output_needle.c_str(), utf8_length(last_output_needle));
-
-										int symbols_to_delete = static_cast<int>(utf8_length(last_output_needle) * 1); //  all the needle, todo: check params.person and bot name
-										const std::vector<llama_token> tokens_to_del = llama_tokenize(ctx_llama, last_output_needle.c_str(), false);
-										int rollback_num = tokens_to_del.size();
-										if (rollback_num) // tokens
-										{
-													embd_inp.erase(embd_inp.end() - rollback_num, embd_inp.end());
-											n_past -= rollback_num;
-											text_to_speak = utf8_substr(text_to_speak, 0, utf8_length(text_to_speak) - symbols_to_delete);
-											last_output_needle = utf8_substr(last_output_needle, 0, utf8_length(last_output_needle) - symbols_to_delete);
-											last_output_buffer = utf8_substr(last_output_buffer, 0, utf8_length(last_output_buffer) - symbols_to_delete);
-														temp_next = 1.8; // just for 1 token
-															 // continue;
-										}
-									}
-								}
-								// ── Sequence repetition detection ────────────────────────────────────────────
-// Detects if the model is repeating itself by searching for a recent substring
-// in a rolling output buffer. On detection, rolls back tokens and raises temperature.
-// fill buffer for seqrep
-								if (utf8_length(last_output_buffer) > 1000)
-									last_output_buffer = utf8_substr(last_output_buffer, 100, last_output_buffer.size() - 100); // in symbols not tokens, non-latin symbols takes 2x more
-								last_output_buffer += out_token_str;
-							}
-
-							if (text_to_speak == '\n' + params.person + ':')
-							{
-								person_name_is_found = 1;
-								translation_is_going = 0;
-							}
-							else if (text_to_speak[0] == '\n' && text_to_speak[text_to_speak.size() - 1] == ':' && text_to_speak.size() < 10 && text_to_speak.find(' ') == std::string::npos) // \nName: (single word only)
-							{
-								bot_name_is_found = 1;
-								bot_name_current = text_to_speak.substr(1, text_to_speak.size() - 2);
-								translation_full = "";
-								text_to_speak = "";
-							}
-
-							int text_len = text_to_speak.size();
-							if (text_to_speak[text_len - 1] == ',')
-								n_comas++;
-							if (new_tokens == split_after && params.split_after && text_to_speak[text_len - 1] == '\'')
-								split_after++;
-							if (text_to_speak.size() >= 3 && text_to_speak.substr(text_to_speak.size() - 3, 3) == "Mr.")
-								text_to_speak[text_len - 1] = ' '; // no splitting on mr.
-
-							// ── TTS sentence splitting & dispatch ────────────────────────────────────────
-// Accumulates generated text until a sentence boundary is reached (. ? ! ; : \n),
-// then dispatches the chunk to send_tts_async in a worker thread.
-// splitting for tts
-							if (text_len >= 2 && new_tokens >= 2 && !person_name_is_found && ((new_tokens == split_after && params.split_after && text_to_speak[text_len - 1] != '\'') || text_to_speak[text_len - 1] == '.' || text_to_speak[text_len - 1] == '(' || text_to_speak[text_len - 1] == ')' || (text_to_speak[text_len - 1] == ',' && n_comas == 1 && new_tokens > split_after && params.split_after) || (text_to_speak[text_len - 2] == ' ' && text_to_speak[text_len - 1] == '-') || text_to_speak[text_len - 1] == '?' || text_to_speak[text_len - 1] == '!' || text_to_speak[text_len - 1] == ';' || text_to_speak[text_len - 1] == ':' || text_to_speak[text_len - 1] == '\n'))
-							{
-								if (translation_is_going == 1)
-								{
-									translation_full += text_to_speak;
-								}
-
-								text_to_speak = ::replace(text_to_speak, "\"", "'");
-								text_to_speak = ::replace(text_to_speak, antiprompts[0], "");
-
-								if (text_to_speak.size()) // first and mid parts of the sentence
-								{
-
-									// translate
-									// each generated sentence is translated by the same llama model, in the same ctx
-									if (params.translate)
-									{
-										if (translation_is_going == 0)
-										{
-											std::string text_to_speak_translated = "";
-											n_embd_inp_before_trans = embd_inp.size();
-											fprintf(stdout, "\n	Перевод:", n_embd_inp_before_trans);
-											std::string trans_prompt = "\nПеревод последнего предложения на русский.\n" + bot_name_current_ru + ":" + translation_full;
-											std::vector<llama_token> trans_prompt_emb = ::llama_tokenize(ctx_llama, trans_prompt, false); // prompt to tokens
-											embd.insert(embd.end(), trans_prompt_emb.begin(), trans_prompt_emb.end());					  // inject prompt
-											translation_is_going = 1;																	  // started
-											text_to_speak = "";
-											continue;
-										}
-									}
-
-									// XTTS in threads
-									text_to_speak_arr[thread_i] = text_to_speak;
-									reply_part_arr[thread_i] = reply_part;
-									reply_part++;
-									try
-									{
-										// Capture current index by value to avoid race condition
-										int current_thread_idx = thread_i;
-										threads.emplace_back([&, current_thread_idx] // captures index by value
-															 {
-											if (text_to_speak_arr[current_thread_idx].size())
-											{
-												send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx], params.debug);
-												text_to_speak_arr[current_thread_idx] = "";
-												reply_part_arr[current_thread_idx] = 0;
-											} });
-										thread_i++;
-										text_to_speak = "";
-										if (params.sleep_before_xtts)
-											std::this_thread::sleep_for(std::chrono::milliseconds(params.sleep_before_xtts)); // 1s pause to speed up xtts/wav2lip inference
-
-									}
-									catch (const std::exception &ex)
-									{
-										std::cerr << "[Exception]: Failed to push_back mid thread: " << ex.what() << '\n';
-									}
-
-									// deleting translation from ctx
-									if (params.translate && translation_is_going == 1)
-									{
-										translation_is_going = 0; // finished
-
-										if (n_embd_inp_before_trans && embd_inp.size())
-										{
-											int rollback_num = embd_inp.size() - n_embd_inp_before_trans;
-											if (rollback_num)
-											{
-												embd_inp.erase(embd_inp.end() - rollback_num, embd_inp.end());
-												n_past -= rollback_num;
-												printf("\n"); // to separate translation from original
-											}
-											continue;
-										}
-									}
-								}
-							}
-						}
-					}
-
-					{
-						// TODO: check if llama_token_to_piece is fast enough
-						std::string last_output;
-						for (int i = embd_inp.size() - 10; i < (int)embd_inp.size(); i++)
-						{ // was 16
-							last_output += llama_token_to_piece(ctx_llama, embd_inp[i]);
-						}
-						last_output += llama_token_to_piece(ctx_llama, embd[0]);
-
-						int i_antiprompt = 0;
-						last_output_has_username = false;
-						last_output_has_EOT = false;
-						for (std::string &antiprompt : antiprompts)
-						{
-							// multiple character names for xtts
-							if (params.multi_chars && last_output.size() >= 4)
-							{
-								last_output = ::replace(last_output, " ???", ""); // there's a crash with regex, not sure why, todo
-								last_output = ::replace(last_output, " ??", "");
-								last_output = ::replace(last_output, " ?", "");
-								last_output = ::replace(last_output, " !!!", "");
-								last_output = ::replace(last_output, " !!", "");
-								last_output = ::replace(last_output, " !", "");
-								last_output = ::replace(last_output, "!!!", "");
-								last_output = ::replace(last_output, "!!", "");
-								last_output = ::replace(last_output, " ...", "");
-								last_output = ::replace(last_output, " .", "");
-								last_output = ::replace(last_output, " ,", "");
-								last_output = ::replace(last_output, "...", "");
-								last_output = ::replace(last_output, "(", "");
-								last_output = ::replace(last_output, ")", "");
-
-								// new char found, will use its voice in Tts
-								std::smatch matches;
-								std::regex r("\n([^:]*):", std::regex::icase | std::regex::optimize);
-								if (std::regex_search(last_output, matches, r) && !matches.empty() && matches.size() >= 2 && !matches[1].str().empty() && matches[1].str() != params.person && matches[1].str() != " \n" + params.person)
-								{
-									current_voice_tmp = matches[1].str();
-									current_voice_tmp = ::replace(current_voice_tmp, ":", "");
-									current_voice_tmp = ::replace(current_voice_tmp, "\"", "");
-									trim(current_voice_tmp);
-									if (current_voice_tmp.size() > 1 && current_voice_tmp.size() < 30)
-									{
-										current_voice = current_voice_tmp;
-										std::regex regEx(current_voice + ":");
-										text_to_speak = std::regex_replace(text_to_speak, regEx, "");
-									}
-								}
-							}
-
-							// ── Antiprompt / stop-word detection ─────────────────────────────────────────
-// Checks the recent output against all antiprompts. On match, ends generation
-// and sends remaining text to TTS. Enforces min_tokens by rolling back if needed.
-// stop words
-							if (last_output.length() > antiprompt.length() && last_output.find(antiprompt.c_str(), last_output.length() - antiprompt.length(), antiprompt.length()) != std::string::npos)
-							{
-								done = true;
-								text_to_speak = ::replace(text_to_speak, antiprompt, "");
-								fflush(stdout);
-								need_to_save_session = true;
-								if (i_antiprompt == 0)
-								{
-									last_output_has_username = true;
-									printf(" "); // for typed input
-								}
-								else if (i_antiprompt == eot_antiprompt_id_1 || i_antiprompt == eot_antiprompt_id_2)
-								{
-									last_output_has_EOT = true;
-								}
-								if (antiprompt == params.instruct_preset_data["bot_message_suffix"] || antiprompt == "</end_of_turn>") // delete printed tag
-								{
-									std::string backspaces(antiprompt.length(), '\b');
-									std::string spaces(antiprompt.length(), ' ');
-									fflush(stdout);
-									printf("%s", backspaces); // remove printed tag
-									printf("%s", spaces);	  // replace with spaces
-									printf("%s", backspaces); // remove spaces (?!)
-									printf("\n");
-									fflush(stdout);
-								}
-
-								// min tokens in reply
-								if (params.min_tokens && tokens_in_reply < params.min_tokens)
-								{
-									int symbols_to_delete = static_cast<int>(utf8_length(antiprompt) * 1) + 1; // +\n
-									const std::vector<llama_token> tokens_to_del = llama_tokenize(ctx_llama, antiprompt.c_str(), false);
-									int rollback_num = tokens_to_del.size() + 1; // + \n
-									if (rollback_num)							 // tokens
-									{
-										embd_inp.erase(embd_inp.end() - rollback_num, embd_inp.end());
-										n_past -= rollback_num;
-										if (symbols_to_delete > utf8_length(text_to_speak))
-											text_to_speak = "";
-										else
-											text_to_speak = utf8_substr(text_to_speak, 0, utf8_length(text_to_speak) - symbols_to_delete);
-										temp_next = 1.8; // just for 1 token
-
-										fflush(stdout);
-										printf("\b\b\b\b\b\b\b\b\b\b\b\b"); // remove printed person_name
-										fflush(stdout);
-										done = false;
-									}
-									if (params.debug)
-									{
-										// print all emb for debug
-										std::string full_dialog = emb_to_str(ctx_llama, embd_inp);
-										printf("\n=====FULL text in embd (%d tokens, %d symbols)=====\n%s\n====END====\n", embd_inp.size(), full_dialog.size(), full_dialog.c_str());
-									}
-								}
-								else
-								{
-									if (params.debug)
-									{
-										// print all emb for debug
-										std::string full_dialog = emb_to_str(ctx_llama, embd_inp);
-										printf("\n=====FULL text in embd (%d tokens, %d symbols)=====\n%s\n====END====\n", embd_inp.size(), full_dialog.size(), full_dialog.c_str());
-									}
-									break;
-								}
-							}
-							i_antiprompt++;
-						}
-					}
-
-					is_running = sdl_poll_events();
-
-					if (!is_running)
-					{
-						break;
+				// Clean response: remove antiprompt text from the stored response
+				for (const auto& ap : antiprompts) {
+					size_t apos = response.find(ap);
+					if (apos != std::string::npos) {
+						response = response.substr(0, apos);
 					}
 				}
+				trim(response);
 
-				// ── Final TTS dispatch ────────────────────────────────────────────────────────
-// After the generation loop exits, sends any remaining buffered text to TTS.
-// final part of the sentence, if any
-				text_to_speak = ::replace(text_to_speak, "\"", "'");
-				if (text_to_speak.size())
-				{
-					text_to_speak_arr[thread_i] = text_to_speak;
-					reply_part_arr[thread_i] = reply_part;
-					reply_part++;
-					try
-					{
-						// Capture current index by value to avoid race condition
-						int current_thread_idx = thread_i;
-						threads.emplace_back([&, current_thread_idx] // captures index by value
-											 {
-							if (text_to_speak_arr[current_thread_idx].size())
-							{
-								send_tts_async(text_to_speak_arr[current_thread_idx], current_voice, params.language, params.xtts_url, reply_part_arr[current_thread_idx], params.debug);
-								text_to_speak_arr[current_thread_idx] = "";
-								reply_part_arr[current_thread_idx] = 0;
-							} });
-						thread_i++;
-						text_to_speak = "";
-					}
-					catch (const std::exception &ex)
-					{
-						std::cerr << "[Exception]: Failed to emplace fin thread: " << ex.what() << '\n';
-					}
-				}
-
-				// audio.clear() removed: main thread owns audio capture.
-				// When generation finishes, g_generation_running goes false and
-				// the main listen loop will naturally handle audio from that point.
+				// Append this turn to conversation history
+				conversation_history += user_turn + bot_prefix + " " + response;
 
 				llama_end_time = get_current_time_ms();
 				if (params.verbose)
 				{
-					llama_time_input = llama_start_generation_time - llama_start_time;
-					llama_time_output = llama_end_time - llama_start_generation_time;
 					llama_time_total = llama_end_time - llama_start_time;
-					printf("\n\n[tokens: %d in + %d out. Input %.3f s + output %.3f s = total: %.3f s]", input_tokens_count, new_tokens, llama_time_input, llama_time_output, llama_time_total);
-					printf("\n[Speed: input %.2f t/s + output %.2f t/s = total: %.2f t/s]\n", input_tokens_count / llama_time_input, new_tokens / llama_time_output, new_tokens / llama_time_total);
+					double llama_time_gen = llama_end_time - llama_start_generation_time;
+					printf("\n\n[tokens: %d out in %.3f s = %.2f t/s]\n",
+						stream_ctx.new_tokens, llama_time_gen,
+						stream_ctx.new_tokens / (llama_time_gen > 0 ? llama_time_gen : 1.0));
 				}
-				llama_interrupted = 0;
-				llama_interrupted_time = 0.0;
 				llama_start_generation_time = 0.0;
 				g_hotkey_pressed = "";
 
 				// In test mode, exit after processing one input
 				if (test_mode) {
 					fprintf(stderr, "\n%s: TEST MODE - processing complete, waiting for TTS threads\n", __func__);
-					// Wait for all TTS threads to complete
 					for (auto& t : threads) {
 						if (t.joinable()) {
 							t.join();
@@ -2995,15 +2257,11 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 	whisper_print_timings(ctx_wsp);
 	whisper_free(ctx_wsp);
 
-	llama_print_timings(ctx_llama);
-	llama_free(ctx_llama);
-
-	// In test mode, or on SIGINT, don't wait for input threads — they're
-	// blocked on stdin/SDL reads and won't return on their own.
+	// In test mode, or on SIGINT, don't wait for input threads
 	if (!test_mode && !g_sigint_received) {
-		input_thread.join(); // kb input
+		input_thread.join();
 #ifdef HOTKEYS
-		shortcut_thread.join(); // shortcuts
+		shortcut_thread.join();
 #endif
 	}
 
@@ -3016,9 +2274,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 	return 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Platform entry points
-// ─────────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 #if _WIN32
 int wmain(int argc, const wchar_t **argv_UTF16LE)
 {

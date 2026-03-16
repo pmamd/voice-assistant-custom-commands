@@ -28,13 +28,11 @@ if (WHISPER_SDL2)
 
     set(TARGET talk-llama-custom)
 
-    # Our custom source files (includes full llama.cpp from talk-llama-fast)
+    # Our custom source files
     # Note: console.cpp is #included in talk-llama.cpp, not compiled separately
+    # LLM inference is handled by llama-server over HTTP (no embedded llama.cpp)
     add_executable(${TARGET}
         custom/talk-llama/talk-llama.cpp
-        custom/talk-llama/llama.cpp
-        custom/talk-llama/unicode.cpp
-        custom/talk-llama/unicode-data.cpp
         custom/talk-llama/tts-socket.c
         custom/talk-llama/tts-request.c
         custom/talk-llama/tool-system.cpp
@@ -45,7 +43,6 @@ if (WHISPER_SDL2)
     # Include directories (order matters - local files before system)
     target_include_directories(${TARGET} BEFORE PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/custom/talk-llama
-        ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp/examples/talk-llama
         ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp/examples
         ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp
     )

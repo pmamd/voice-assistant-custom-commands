@@ -1,6 +1,6 @@
 #!/bin/bash
 # Voice Assistant Demo Script
-# This script starts the Wyoming-Piper TTS server and the voice assistant
+# This script starts llama-server, Wyoming-Piper TTS, and the voice assistant
 
 set -e
 
@@ -65,6 +65,33 @@ WYOMING_PORT=10200
 WHISPER_MODEL="./whisper.cpp/models/ggml-tiny.en.bin"
 LLAMA_MODEL="./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
 TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
+
+# llama-server configuration
+LLAMA_SERVER_PORT=8080
+LLAMA_SERVER_URL="http://localhost:${LLAMA_SERVER_PORT}"
+# Allow override via environment variable
+LLAMA_SERVER_BIN="${LLAMA_SERVER_BIN:-}"
+
+# Find llama-server binary
+_find_llama_server() {
+    if [[ -n "$LLAMA_SERVER_BIN" && -x "$LLAMA_SERVER_BIN" ]]; then
+        echo "$LLAMA_SERVER_BIN"
+        return
+    fi
+    # Check common locations
+    for candidate in \
+        "$HOME/.local/bin/llama-server" \
+        "/usr/local/bin/llama-server" \
+        "/usr/bin/llama-server" \
+        "./build/bin/llama-server" \
+        "./llama-server"; do
+        if [[ -x "$candidate" ]]; then
+            echo "$candidate"
+            return
+        fi
+    done
+    echo ""
+}
 
 # Check if talk-llama-custom is already running and kill it
 if pgrep -f "talk-llama-custom" > /dev/null; then
@@ -135,24 +162,85 @@ if ! pgrep -f "wyoming.piper" > /dev/null; then
     echo ""
 fi
 
+# Check/start llama-server (similar to Wyoming-Piper logic)
+_check_llama_server() {
+    # Check if llama-server is already listening on the configured port
+    if curl -s --connect-timeout 2 "${LLAMA_SERVER_URL}/health" > /dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+if _check_llama_server; then
+    echo -e "${GREEN}✓ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
+else
+    echo "llama-server not running at ${LLAMA_SERVER_URL}"
+    LLAMA_SERVER_BIN=$(_find_llama_server)
+
+    if [[ -z "$LLAMA_SERVER_BIN" ]]; then
+        echo -e "${YELLOW}⚠ llama-server binary not found${NC}"
+        echo "Set LLAMA_SERVER_BIN env var or install llama-server to ~/.local/bin/"
+        echo "The assistant will start but LLM queries will fail until llama-server is available."
+    else
+        if [ ! -f "$LLAMA_MODEL" ]; then
+            echo -e "${RED}✗ Error: LLaMA model not found at $LLAMA_MODEL${NC}"
+            echo "Please download a GGUF model and place it at: $LLAMA_MODEL"
+            exit 1
+        fi
+
+        echo -e "${GREEN}Starting llama-server...${NC}"
+        echo "  Binary: $LLAMA_SERVER_BIN"
+        echo "  Model:  $LLAMA_MODEL"
+        echo "  Port:   $LLAMA_SERVER_PORT"
+
+        "$LLAMA_SERVER_BIN" \
+            --model "$LLAMA_MODEL" \
+            --port "$LLAMA_SERVER_PORT" \
+            --ctx-size 2048 \
+            --n-gpu-layers 999 \
+            > /tmp/llama-server.log 2>&1 &
+
+        LLAMA_SERVER_PID=$!
+        echo "llama-server started (PID: $LLAMA_SERVER_PID)"
+        echo "Log: /tmp/llama-server.log"
+
+        # Wait for server to be ready (model loading can take a while)
+        echo "Waiting for llama-server to load model..."
+        for i in $(seq 1 60); do
+            if _check_llama_server; then
+                echo -e "${GREEN}✓ llama-server ready${NC}"
+                break
+            fi
+            if ! kill -0 "$LLAMA_SERVER_PID" 2>/dev/null; then
+                echo -e "${RED}✗ llama-server process died${NC}"
+                echo "Check log: cat /tmp/llama-server.log"
+                exit 1
+            fi
+            printf "\r  Loading model: %ds..." "$i"
+            sleep 1
+        done
+        echo ""
+
+        if ! _check_llama_server; then
+            echo -e "${RED}✗ llama-server failed to start within 60s${NC}"
+            echo "Check log: cat /tmp/llama-server.log"
+            exit 1
+        fi
+    fi
+fi
+
 # Check required files
 echo "Checking required files..."
 
 if [ ! -f "$TALK_LLAMA_BIN" ]; then
     echo -e "${RED}✗ Error: talk-llama-custom not found at $TALK_LLAMA_BIN${NC}"
-    echo "Please build it with: cmake -B build && cmake --build build"
+    echo "Please build it with: cmake -B build -DWHISPER_SDL2=ON && cmake --build build"
     exit 1
 fi
 
 if [ ! -f "$WHISPER_MODEL" ]; then
     echo -e "${RED}✗ Error: Whisper model not found at $WHISPER_MODEL${NC}"
     echo "Please download it with: cd whisper.cpp/models && bash download-ggml-model.sh tiny.en"
-    exit 1
-fi
-
-if [ ! -f "$LLAMA_MODEL" ]; then
-    echo -e "${RED}✗ Error: LLaMA model not found at $LLAMA_MODEL${NC}"
-    echo "Please download a GGUF model and place it at: $LLAMA_MODEL"
     exit 1
 fi
 
@@ -225,13 +313,15 @@ echo "  - Speak into your microphone to interact"
 echo "  - Say 'stop' to interrupt AI speech"
 echo "  - Press Ctrl+C to exit (now with graceful shutdown!)"
 echo ""
-echo "Models:"
-echo "  - Whisper: $WHISPER_MODEL"
-echo "  - LLaMA: $LLAMA_MODEL"
-echo "  - TTS Voice: $PIPER_VOICE"
+echo "Services:"
+echo "  - Whisper:       $WHISPER_MODEL"
+echo "  - LLM server:    $LLAMA_SERVER_URL"
+echo "  - LLM model:     $LLAMA_MODEL"
+echo "  - TTS Voice:     $PIPER_VOICE"
 echo ""
 echo "Monitoring:"
-echo "  - Wyoming-Piper log: tail -f /tmp/wyoming-piper.log"
+echo "  - Wyoming-Piper log:  tail -f /tmp/wyoming-piper.log"
+echo "  - llama-server log:   tail -f /tmp/llama-server.log"
 echo "  - To watch TTS requests in another terminal:"
 echo "    tail -f /tmp/wyoming-piper.log | grep -i 'synthesize\\|error'"
 echo ""
@@ -240,8 +330,8 @@ echo ""
 
 # Start the voice assistant
 $TALK_LLAMA_BIN \
-    -ml "$LLAMA_MODEL" \
     -mw "$WHISPER_MODEL" \
+    --llama-url "$LLAMA_SERVER_URL" \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
@@ -256,7 +346,17 @@ echo "=========================================="
 echo "Shutting down..."
 echo "=========================================="
 
-# Ask if user wants to stop Wyoming-Piper
+# Ask if user wants to stop services
+read -p "Stop llama-server? (y/N) [default: N] " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Stopping llama-server..."
+    pkill -f "llama-server.*${LLAMA_SERVER_PORT}" || true
+    echo -e "${GREEN}✓ llama-server stopped${NC}"
+else
+    echo "llama-server left running in background"
+fi
+
 read -p "Stop Wyoming-Piper TTS server? (y/N) [default: N] " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
