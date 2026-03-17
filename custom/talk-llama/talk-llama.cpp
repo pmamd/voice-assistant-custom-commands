@@ -1137,10 +1137,12 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 						tool_system::ToolResult result = ctx->tool_registry->execute(call.name, call.arguments);
 						if (result.success) {
 							fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
-							// Speak the tool result confirmation
+							// Speak the tool result and stop LLM generation
+							// (LLM commentary after a tool call is redundant and causes TTS overlap)
 							if (!result.message.empty()) {
 								dispatch_tts_sentence(ctx, result.message);
 							}
+							ctx->done = true;
 						} else {
 							fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
 						}
@@ -2069,7 +2071,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				// Checks if the heard text matches a registered fast-path tool (e.g. "stop").
 				// If matched, executes the tool immediately and skips LLM generation entirely.
 				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
-				if (matched && tool_def.fast_path) {
+				// Skip resume_speaking if we're not actually paused — pass through to LLM
+				bool skip_fast_path = (tool_def.name == "resume_speaking" && !tool_system::g_wyoming_paused);
+				if (matched && tool_def.fast_path && !skip_fast_path) {
 					fprintf(stdout, "\n[Fast Path Tool: %s]\n", tool_def.name.c_str());
 
 					tool_system::ToolResult result = tool_registry.execute(tool_def.name, json::object());
@@ -2077,6 +2081,10 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 					if (result.success) {
 						// Stop any background generation
 						g_stop_generation = true;
+						// Speak confirmation via a direct TTS call (bypasses stopped generation)
+						if (!result.message.empty()) {
+							send_tts_async(result.message, params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
+						}
 						audio.clear();
 						g_hotkey_pressed = "";
 						test_audio_injected = false;

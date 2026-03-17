@@ -11,6 +11,9 @@ namespace tool_system {
 // Global Wyoming client pointer (set by main program)
 WyomingClient* g_wyoming_client = nullptr;
 
+// Track whether Wyoming audio is currently paused
+std::atomic<bool> g_wyoming_paused{false};
+
 // Singleton instance
 ToolRegistry& ToolRegistry::getInstance() {
     static ToolRegistry instance;
@@ -199,8 +202,9 @@ ToolResult stop_speaking(const json& args) {
         return ToolResult(false, "Wyoming client not available");
     }
 
+    g_wyoming_paused = false;
     if (g_wyoming_client->sendAudioStop()) {
-        return ToolResult(true, "Stopped speaking");
+        return ToolResult(true, "Okay.");
     } else {
         return ToolResult(false, "Failed to send stop command");
     }
@@ -215,7 +219,8 @@ ToolResult pause_speaking(const json& args) {
     }
 
     if (g_wyoming_client->sendAudioPause()) {
-        return ToolResult(true, "Paused speaking");
+        g_wyoming_paused = true;
+        return ToolResult(true, "Paused.");
     } else {
         return ToolResult(false, "Failed to send pause command");
     }
@@ -230,7 +235,8 @@ ToolResult resume_speaking(const json& args) {
     }
 
     if (g_wyoming_client->sendAudioResume()) {
-        return ToolResult(true, "Resumed speaking");
+        g_wyoming_paused = false;
+        return ToolResult(true, "Resuming.");
     } else {
         return ToolResult(false, "Failed to send resume command");
     }

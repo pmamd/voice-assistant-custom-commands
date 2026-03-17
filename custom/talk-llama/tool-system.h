@@ -1,3 +1,4 @@
+#include <atomic>
 #pragma once
 
 #include <string>
@@ -99,5 +100,6 @@ class WyomingClient;
 // Global Wyoming client pointer for tool executors to use
 // Set this before executing voice control tools (stop, pause, resume)
 extern WyomingClient* g_wyoming_client;
+extern std::atomic<bool> g_wyoming_paused;
 
 } // namespace tool_system
