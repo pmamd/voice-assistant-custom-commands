@@ -60,7 +60,7 @@ class RealInterruptTester:
             proc = subprocess.Popen(
                 [
                     str(self.talk_llama_bin),
-                    "-ml", str(self.llama_model),
+                    "--llama-url", "http://127.0.0.1:8083",
                     "-mw", str(self.whisper_model),
                     "--xtts-url", "http://localhost:10200/",
                     "--xtts-voice", "en_US-lessac-medium",

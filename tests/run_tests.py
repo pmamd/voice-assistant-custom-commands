@@ -673,7 +673,7 @@ class TestHarness:
         talk_llama_config = self.config.get('config', {}).get('talk_llama', {})
         binary = talk_llama_config.get('binary', './build/bin/talk-llama')
         whisper_model = talk_llama_config.get('whisper_model', './models/ggml-base.en.bin')
-        llama_model = talk_llama_config.get('llama_model', './models/ggml-llama-7B.bin')
+        llama_url = talk_llama_config.get('llama_url', 'http://127.0.0.1:8083')
         temperature = talk_llama_config.get('temperature', None)
 
         # Build command
@@ -681,7 +681,7 @@ class TestHarness:
             binary,
             '--test-input', str(input_wav),
             '-mw', whisper_model,
-            '-ml', llama_model,
+            '--llama-url', llama_url,
             '--verbose'
         ]
 
