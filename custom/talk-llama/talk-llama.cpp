@@ -1137,6 +1137,10 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 						tool_system::ToolResult result = ctx->tool_registry->execute(call.name, call.arguments);
 						if (result.success) {
 							fprintf(stdout, "[Tool executed: %s]\n", result.message.c_str());
+							// Speak the tool result confirmation
+							if (!result.message.empty()) {
+								dispatch_tts_sentence(ctx, result.message);
+							}
 						} else {
 							fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
 						}
@@ -1735,6 +1739,7 @@ int run(int argc, const char **argv)
 		// Check for signal
 		if (g_sigint_received) {
 			fprintf(stderr, "Signal received, exiting main loop...\n");
+			g_stop_generation = true; // abort any in-flight CURL stream
 			is_running = false;
 			break;
 		}
@@ -2256,6 +2261,12 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 
 	whisper_print_timings(ctx_wsp);
 	whisper_free(ctx_wsp);
+
+	// Stop background LLM thread before cleanup to prevent std::terminate()
+	if (g_llm_thread.joinable()) {
+		g_stop_generation = true;
+		g_llm_thread.join();
+	}
 
 	// In test mode, or on SIGINT, don't wait for input threads
 	if (!test_mode && !g_sigint_received) {
