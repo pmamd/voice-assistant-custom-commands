@@ -237,6 +237,32 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 6b. ALSA default audio device
+# ---------------------------------------------------------------------------
+# Wyoming-Piper uses aplay without -D, so it plays on whatever ALSA defaults to.
+# On machines with HDMI + USB audio, HDMI is usually card 0 (the default).
+# Detect the first non-HDMI playback card and set it as the ALSA default.
+info "Configuring ALSA default audio device..."
+
+if [[ -f "$HOME/.asoundrc" ]]; then
+    ok "~/.asoundrc already exists — skipping (edit manually if audio plays to wrong device)"
+else
+    # Find first non-HDMI card number
+    USB_CARD=$(aplay -l 2>/dev/null | grep "^card" | grep -iv "hdmi\|displayport" | head -1 | grep -oP 'card \K[0-9]+')
+    if [[ -n "$USB_CARD" ]]; then
+        cat > "$HOME/.asoundrc" << EOF
+defaults.pcm.card $USB_CARD
+defaults.ctl.card $USB_CARD
+EOF
+        ok "Set ALSA default to card $USB_CARD ($(aplay -l 2>/dev/null | grep "^card $USB_CARD:" | sed 's/card [0-9]*: //' | cut -d'[' -f2 | cut -d']' -f1))"
+        warn "If audio plays on the wrong device, edit ~/.asoundrc and change the card number"
+    else
+        warn "Could not detect a non-HDMI audio card. Edit ~/.asoundrc manually if needed."
+        echo "  See docs/WYOMING.md for instructions."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # 7. Whisper model
 # ---------------------------------------------------------------------------
 echo ""

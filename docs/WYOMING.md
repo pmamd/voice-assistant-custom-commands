@@ -114,6 +114,29 @@ compliance would enable:
 Restoring compliance would require Wyoming-Piper to stream `AudioStart/Chunk/Stop` back
 to the client instead of playing locally, and talk-llama to receive and play those chunks.
 
+## Audio Device Configuration
+
+Wyoming-Piper calls `aplay` without specifying a device, so it uses whatever ALSA
+selects as the system default. On machines with multiple audio cards (e.g. HDMI + USB),
+the default is often HDMI rather than the intended output device.
+
+**Check your default device:**
+```bash
+aplay -l          # list all playback devices
+aplay /usr/share/sounds/alsa/Front_Center.wav   # test default
+```
+
+**Set the correct default** by creating `~/.asoundrc`:
+```
+defaults.pcm.card 1   # replace 1 with the card number of your output device
+defaults.ctl.card 1
+```
+
+Find the right card number from `aplay -l`. For example, if the MAYA44 USB is
+`card 1`, the config above routes all `aplay` output there.
+
+After creating `~/.asoundrc`, restart Wyoming-Piper for the change to take effect.
+
 ## References
 
 - [Wyoming Protocol](https://github.com/rhasspy/wyoming)
