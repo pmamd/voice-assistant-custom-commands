@@ -131,6 +131,7 @@ info "Installing runtime system packages..."
 
 sudo apt-get update -qq
 sudo apt-get install -y \
+    curl \
     libsdl2-2.0-0 \
     libcurl4 \
     libcjson1 \

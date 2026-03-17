@@ -15,48 +15,9 @@ echo "Voice Assistant with Custom Commands"
 echo "=========================================="
 echo ""
 
-# If rocBLAS has no precompiled kernels for the current GPU arch, find the
-# nearest available one in the same subfamily and set HSA_OVERRIDE_GFX_VERSION.
-_setup_hsa_override() {
-    local rocm_lib
-    rocm_lib=$(ls -d /opt/rocm*/lib/rocblas/library 2>/dev/null | head -1)
-    [[ -z "$rocm_lib" ]] && return
-
-    local gpu_arch
-    gpu_arch=$(rocminfo 2>/dev/null | grep -m1 "Name:.*gfx" | awk '{print $2}')
-    [[ -z "$gpu_arch" ]] && return
-
-    # If a TensileLibrary already exists for this arch, no override needed.
-    ls "$rocm_lib"/TensileLibrary*"$gpu_arch"* &>/dev/null && return
-
-    # For gfx115x iGPUs: same-subfamily (gfx115x) kernels crash at runtime
-    # because iGPU/dGPU differ in CU count and wave properties. Use gfx1100
-    # (RDNA3 dGPU) which is more stable across the gfx11 family.
-    local digits="${gpu_arch#gfx}"
-    local nearest
-    if [[ "$digits" == 115* ]]; then
-        nearest="gfx1100"
-    else
-        # For other unsupported arches, try nearest in same subfamily.
-        local prefix="${digits:0:${#digits}-1}"
-        nearest=$(ls "$rocm_lib"/TensileLibrary_lazy_gfx*.dat 2>/dev/null \
-            | grep -oE "gfx${prefix}[0-9]+" | sort | tail -1)
-    fi
-    [[ -z "$nearest" ]] && return
-
-    # Convert gfxNNNN -> HSA major.minor.stepping (e.g. gfx1151 -> 11.5.1)
-    local n="${nearest#gfx}"
-    local hsa
-    if [[ ${#n} -eq 4 ]]; then
-        hsa="${n:0:2}.${n:2:1}.${n:3:1}"
-    else
-        hsa="${n:0:1}.${n:1:1}.${n:2:1}"
-    fi
-
-    echo "GPU $gpu_arch not in rocBLAS library — using override $nearest (HSA $hsa)"
-    export HSA_OVERRIDE_GFX_VERSION="$hsa"
-}
-_setup_hsa_override
+# Note: HSA_OVERRIDE_GFX_VERSION is intentionally NOT set here.
+# talk-llama-custom uses CPU only (no GPU/HIP). llama-server manages
+# its own GPU context and must NOT inherit any HSA overrides.
 
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
@@ -162,16 +123,75 @@ if ! pgrep -f "wyoming.piper" > /dev/null; then
     echo ""
 fi
 
-# Check llama-server is reachable — we do not auto-start it.
-# llama-server is an independent service managed outside this script.
-if curl -s --connect-timeout 2 "${LLAMA_SERVER_URL}/health" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ llama-server running at ${LLAMA_SERVER_URL}${NC}"
+# HTTP check helper — uses curl if available, falls back to Python
+_http_ok() {
+    local url="$1"
+    if command -v curl &>/dev/null; then
+        curl -s --connect-timeout 2 "$url" > /dev/null 2>&1
+    else
+        python3 -c "
+import urllib.request, sys
+try:
+    urllib.request.urlopen('$url', timeout=2)
+    sys.exit(0)
+except:
+    sys.exit(1)
+" 2>/dev/null
+    fi
+}
+
+# Check/start llama-server
+if _http_ok "${LLAMA_SERVER_URL}/health"; then
+    echo -e "${GREEN}✓ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
 else
-    echo -e "${RED}✗ llama-server not responding at ${LLAMA_SERVER_URL}${NC}"
-    echo "  Start it before running this script, e.g.:"
-    echo "    llama-server -m <model.gguf> --port ${LLAMA_SERVER_PORT} -ngl 999"
-    echo "  Or set a different URL:  export LLAMA_SERVER_URL=http://host:port"
-    exit 1
+    echo "llama-server not running at ${LLAMA_SERVER_URL}"
+    LLAMA_SERVER_BIN=$(_find_llama_server)
+
+    if [[ -z "$LLAMA_SERVER_BIN" ]]; then
+        echo -e "${RED}✗ llama-server binary not found${NC}"
+        echo "  Install llama-server to ~/.local/bin/ or set LLAMA_SERVER_BIN"
+        exit 1
+    fi
+
+    if [ ! -f "$LLAMA_MODEL" ]; then
+        echo -e "${RED}✗ LLaMA model not found at $LLAMA_MODEL${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Starting llama-server...${NC}"
+    echo "  Binary: $LLAMA_SERVER_BIN"
+    echo "  Model:  $LLAMA_MODEL"
+    echo "  Port:   $LLAMA_SERVER_PORT"
+
+    "$LLAMA_SERVER_BIN" \
+        --model "$LLAMA_MODEL" \
+        --host 0.0.0.0 \
+        --port "$LLAMA_SERVER_PORT" \
+        -ngl 999 \
+        > /tmp/llama-server.log 2>&1 &
+
+    LLAMA_SERVER_PID=$!
+    echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
+
+    echo "Waiting for llama-server to load model..."
+    for i in $(seq 1 120); do
+        if _http_ok "${LLAMA_SERVER_URL}/health"; then
+            echo -e "\n${GREEN}✓ llama-server ready${NC}"
+            break
+        fi
+        if ! kill -0 "$LLAMA_SERVER_PID" 2>/dev/null; then
+            echo -e "\n${RED}✗ llama-server process died — check: cat /tmp/llama-server.log${NC}"
+            exit 1
+        fi
+        printf "\r  Loading model: %ds..." "$i"
+        sleep 1
+    done
+    echo ""
+
+    if ! _http_ok "${LLAMA_SERVER_URL}/health"; then
+        echo -e "${RED}✗ llama-server failed to start within 120s${NC}"
+        exit 1
+    fi
 fi
 
 # Check required files
