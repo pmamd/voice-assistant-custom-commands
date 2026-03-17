@@ -162,71 +162,16 @@ if ! pgrep -f "wyoming.piper" > /dev/null; then
     echo ""
 fi
 
-# Check/start llama-server (similar to Wyoming-Piper logic)
-_check_llama_server() {
-    # Check if llama-server is already listening on the configured port
-    if curl -s --connect-timeout 2 "${LLAMA_SERVER_URL}/health" > /dev/null 2>&1; then
-        return 0
-    fi
-    return 1
-}
-
-if _check_llama_server; then
-    echo -e "${GREEN}✓ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
+# Check llama-server is reachable — we do not auto-start it.
+# llama-server is an independent service managed outside this script.
+if curl -s --connect-timeout 2 "${LLAMA_SERVER_URL}/health" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ llama-server running at ${LLAMA_SERVER_URL}${NC}"
 else
-    echo "llama-server not running at ${LLAMA_SERVER_URL}"
-    LLAMA_SERVER_BIN=$(_find_llama_server)
-
-    if [[ -z "$LLAMA_SERVER_BIN" ]]; then
-        echo -e "${YELLOW}⚠ llama-server binary not found${NC}"
-        echo "Set LLAMA_SERVER_BIN env var or install llama-server to ~/.local/bin/"
-        echo "The assistant will start but LLM queries will fail until llama-server is available."
-    else
-        if [ ! -f "$LLAMA_MODEL" ]; then
-            echo -e "${RED}✗ Error: LLaMA model not found at $LLAMA_MODEL${NC}"
-            echo "Please download a GGUF model and place it at: $LLAMA_MODEL"
-            exit 1
-        fi
-
-        echo -e "${GREEN}Starting llama-server...${NC}"
-        echo "  Binary: $LLAMA_SERVER_BIN"
-        echo "  Model:  $LLAMA_MODEL"
-        echo "  Port:   $LLAMA_SERVER_PORT"
-
-        "$LLAMA_SERVER_BIN" \
-            --model "$LLAMA_MODEL" \
-            --port "$LLAMA_SERVER_PORT" \
-            --ctx-size 2048 \
-            --n-gpu-layers 999 \
-            > /tmp/llama-server.log 2>&1 &
-
-        LLAMA_SERVER_PID=$!
-        echo "llama-server started (PID: $LLAMA_SERVER_PID)"
-        echo "Log: /tmp/llama-server.log"
-
-        # Wait for server to be ready (model loading can take a while)
-        echo "Waiting for llama-server to load model..."
-        for i in $(seq 1 60); do
-            if _check_llama_server; then
-                echo -e "${GREEN}✓ llama-server ready${NC}"
-                break
-            fi
-            if ! kill -0 "$LLAMA_SERVER_PID" 2>/dev/null; then
-                echo -e "${RED}✗ llama-server process died${NC}"
-                echo "Check log: cat /tmp/llama-server.log"
-                exit 1
-            fi
-            printf "\r  Loading model: %ds..." "$i"
-            sleep 1
-        done
-        echo ""
-
-        if ! _check_llama_server; then
-            echo -e "${RED}✗ llama-server failed to start within 60s${NC}"
-            echo "Check log: cat /tmp/llama-server.log"
-            exit 1
-        fi
-    fi
+    echo -e "${RED}✗ llama-server not responding at ${LLAMA_SERVER_URL}${NC}"
+    echo "  Start it before running this script, e.g.:"
+    echo "    llama-server -m <model.gguf> --port ${LLAMA_SERVER_PORT} -ngl 999"
+    echo "  Or set a different URL:  export LLAMA_SERVER_URL=http://host:port"
+    exit 1
 fi
 
 # Check required files
