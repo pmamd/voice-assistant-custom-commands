@@ -2273,7 +2273,13 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 	// Stop background LLM thread before cleanup to prevent std::terminate()
 	if (g_llm_thread.joinable()) {
 		g_stop_generation = true;
-		g_llm_thread.join();
+		if (g_sigint_received) {
+			// On SIGINT, detach rather than join — the CURL stream may be mid-transfer
+			// and join() would block waiting for the next chunk. The OS cleans up on exit.
+			g_llm_thread.detach();
+		} else {
+			g_llm_thread.join();
+		}
 	}
 
 	// In test mode, or on SIGINT, don't wait for input threads
