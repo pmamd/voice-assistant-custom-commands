@@ -65,28 +65,39 @@ if pgrep -f "talk-llama-custom" > /dev/null; then
 fi
 
 # Check if Wyoming-Piper is already running
-if pgrep -f "wyoming.piper" > /dev/null; then
-    echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
-    read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Stopping Wyoming-Piper..."
-        pkill -f "wyoming.piper" || true
+_wyoming_port_listening() {
+    ss -tlnp | grep -q ":$WYOMING_PORT "
+}
+
+_wyoming_kill_all() {
+    pkill -f "wyoming.piper" || true
+    sleep 1
+    if _wyoming_port_listening; then
+        PORT_PIDS=$(ss -tlnp | grep ":$WYOMING_PORT " | grep -oP 'pid=\K[0-9]+')
+        for pid in $PORT_PIDS; do kill -9 "$pid" 2>/dev/null || true; done
         sleep 1
-        # Force-kill anything still holding the port
-        if ss -tlnp | grep -q ":$WYOMING_PORT "; then
-            PORT_PIDS=$(ss -tlnp | grep ":$WYOMING_PORT " | grep -oP 'pid=\K[0-9]+')
-            for pid in $PORT_PIDS; do
-                kill -9 "$pid" 2>/dev/null || true
-            done
-            sleep 1
-        fi
-        if ss -tlnp | grep -q ":$WYOMING_PORT "; then
-            echo -e "${RED}✗ Port $WYOMING_PORT still in use — try: kill -9 \$(lsof -ti tcp:$WYOMING_PORT)${NC}"
-            exit 1
-        fi
+    fi
+}
+
+if pgrep -f "wyoming.piper" > /dev/null; then
+    if ! _wyoming_port_listening; then
+        # Process exists but port not listening — zombie or crashed, restart silently
+        echo -e "${YELLOW}⚠ Wyoming-Piper process found but port $WYOMING_PORT not listening (zombie/crashed) — restarting${NC}"
+        _wyoming_kill_all
     else
-        echo "Continuing with existing Wyoming-Piper instance..."
+        echo -e "${YELLOW}⚠ Wyoming-Piper is already running${NC}"
+        read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Stopping Wyoming-Piper..."
+            _wyoming_kill_all
+            if _wyoming_port_listening; then
+                echo -e "${RED}✗ Port $WYOMING_PORT still in use — try: kill -9 \$(lsof -ti tcp:$WYOMING_PORT)${NC}"
+                exit 1
+            fi
+        else
+            echo "Continuing with existing Wyoming-Piper instance..."
+        fi
     fi
 fi
 
