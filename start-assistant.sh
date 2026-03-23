@@ -243,11 +243,19 @@ echo "Detecting audio devices..."
 CAPTURE_DEVICE="-1"  # Default: use default device
 
 # Get list of capture devices using SDL
-if command -v arecord &> /dev/null; then
-    # Get list of ALSA capture devices
-    DEVICE_LIST=$(arecord -l 2>/dev/null | grep "^card" | sed 's/card \([0-9]\+\).*device \([0-9]\+\).*/hw:\1,\2/' || echo "")
+if ! command -v arecord &> /dev/null; then
+    echo -e "${RED}✗ arecord not found — install alsa-utils: sudo apt-get install alsa-utils${NC}"
+    exit 1
+fi
 
-    if [ -n "$DEVICE_LIST" ]; then
+DEVICE_LIST=$(arecord -l 2>/dev/null | grep "^card" | sed 's/card \([0-9]\+\).*device \([0-9]\+\).*/hw:\1,\2/' || echo "")
+
+if [ -z "$DEVICE_LIST" ]; then
+    echo -e "${RED}✗ No audio capture devices found — plug in a microphone and try again${NC}"
+    exit 1
+fi
+
+if [ -n "$DEVICE_LIST" ]; then
         DEVICE_COUNT=$(echo "$DEVICE_LIST" | wc -l)
 
         if [ "$DEVICE_COUNT" -gt 1 ]; then
@@ -290,7 +298,6 @@ if command -v arecord &> /dev/null; then
             echo -e "${GREEN}✓ Using default microphone${NC}"
         fi
     fi
-fi
 
 echo ""
 
