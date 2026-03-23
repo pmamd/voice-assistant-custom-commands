@@ -2270,20 +2270,21 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 	whisper_print_timings(ctx_wsp);
 	whisper_free(ctx_wsp);
 
-	// Stop background LLM thread before cleanup to prevent std::terminate()
-	if (g_llm_thread.joinable()) {
+	// On SIGINT, exit immediately — detaching threads that hold stack pointers
+	// causes use-after-free / segfault. The OS handles cleanup.
+	if (g_sigint_received) {
 		g_stop_generation = true;
-		if (g_sigint_received) {
-			// On SIGINT, detach rather than join — the CURL stream may be mid-transfer
-			// and join() would block waiting for the next chunk. The OS cleans up on exit.
-			g_llm_thread.detach();
-		} else {
-			g_llm_thread.join();
-		}
+		_exit(0);
 	}
 
-	// In test mode, or on SIGINT, don't wait for input threads
-	if (!test_mode && !g_sigint_received) {
+	// Stop background LLM thread (normal exit path)
+	if (g_llm_thread.joinable()) {
+		g_stop_generation = true;
+		g_llm_thread.join();
+	}
+
+	// In test mode, don't wait for input threads (they'll never finish)
+	if (!test_mode) {
 		input_thread.join();
 #ifdef HOTKEYS
 		shortcut_thread.join();

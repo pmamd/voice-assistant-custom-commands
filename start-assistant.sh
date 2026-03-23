@@ -70,8 +70,12 @@ _wyoming_port_listening() {
 }
 
 _wyoming_kill_all() {
-    pkill -f "wyoming.piper" || true
+    # Kill all matching processes by PID (pkill can't kill zombies, but kill -9 on PIDs works)
+    for pid in $(pgrep -f "wyoming.piper" 2>/dev/null); do
+        kill -9 "$pid" 2>/dev/null || true
+    done
     sleep 1
+    # Also kill anything still holding the port
     if _wyoming_port_listening; then
         PORT_PIDS=$(ss -tlnp | grep ":$WYOMING_PORT " | grep -oP 'pid=\K[0-9]+')
         for pid in $PORT_PIDS; do kill -9 "$pid" 2>/dev/null || true; done
@@ -101,8 +105,8 @@ if pgrep -f "wyoming.piper" > /dev/null; then
     fi
 fi
 
-# Start Wyoming-Piper if not running
-if ! pgrep -f "wyoming.piper" > /dev/null; then
+# Start Wyoming-Piper if port not listening (use port as truth, not pgrep — zombies fool pgrep)
+if ! _wyoming_port_listening; then
     echo -e "${GREEN}Starting Wyoming-Piper TTS server (modified version with tool support)...${NC}"
 
     # Create data directory if it doesn't exist
@@ -124,7 +128,7 @@ if ! pgrep -f "wyoming.piper" > /dev/null; then
     echo "Waiting for TTS server to start..."
     sleep 3
 
-    if ! pgrep -f "wyoming.piper" > /dev/null; then
+    if ! _wyoming_port_listening; then
         echo -e "${RED}✗ Failed to start Wyoming-Piper${NC}"
         echo "Check log: cat /tmp/wyoming-piper.log"
         exit 1
