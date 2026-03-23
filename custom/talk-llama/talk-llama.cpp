@@ -989,6 +989,7 @@ struct llama_stream_context {
 	std::string text_to_speak;     // current sentence accumulator for TTS
 	int new_tokens;                // token counter
 	bool debug;
+	bool word_count_threshold_reached = false; // waiting for next clean word boundary
 
 	// TTS dispatch state
 	const whisper_params* params;
@@ -1215,6 +1216,28 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 				bool is_boundary = (last == '.' || last == '?' || last == '!' ||
 				                    last == ';' || last == ':' || last == '\n');
 
+				// Dispatch on comma once we have a meaningful chunk
+				if (last == ',' && text_len >= 25) {
+					is_boundary = true;
+				}
+
+				// Deferred word-count dispatch: set flag when ~6 words accumulated,
+				// then dispatch at the START of the next space-prefixed token so
+				// we never cut mid-BPE-token (e.g. " ric" before "hes" = "riches").
+				if (!is_boundary && ctx->word_count_threshold_reached &&
+				    !token_text.empty() && token_text[0] == ' ') {
+					// New word starting — previous word is complete, safe to dispatch
+					is_boundary = true;
+					ctx->word_count_threshold_reached = false;
+				}
+				if (!is_boundary && !ctx->word_count_threshold_reached) {
+					int word_count = std::count(ctx->text_to_speak.begin(),
+					                            ctx->text_to_speak.end(), ' ');
+					if (word_count >= 6) {
+						ctx->word_count_threshold_reached = true;
+					}
+				}
+
 				// Also split on " - " (dash with spaces)
 				if (text_len >= 3 && ctx->text_to_speak[text_len - 2] == ' ' && last == '-') {
 					is_boundary = true;
@@ -1226,6 +1249,7 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 				}
 
 				if (is_boundary) {
+					ctx->word_count_threshold_reached = false;
 					dispatch_tts_sentence(ctx, ctx->text_to_speak);
 					ctx->text_to_speak.clear();
 
