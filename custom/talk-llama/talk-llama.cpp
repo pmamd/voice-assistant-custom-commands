@@ -1449,6 +1449,21 @@ int run(int argc, const char **argv)
 			fprintf(stderr, "%s: failed to read test input file: %s\n", __func__, params.test_input_file.c_str());
 			return 1;
 		}
+		// Pad test audio to simulate the real 10-second capture window.
+		// Without context, Whisper fails on short inputs (< ~1.5s).
+		// Add 1 second of silence before the speech and pad total to 10 seconds.
+		{
+			const int target   = WHISPER_SAMPLE_RATE * 10; // 10s total
+			const int prefix   = WHISPER_SAMPLE_RATE * 1;  // 1s silence before speech
+			if ((int)test_audio_data.size() < target) {
+				std::vector<float> padded(target, 0.0f);
+				int speech_len = (int)test_audio_data.size();
+				int copy_start = std::min(prefix, target - speech_len);
+				std::copy(test_audio_data.begin(), test_audio_data.end(),
+				          padded.begin() + copy_start);
+				test_audio_data = std::move(padded);
+			}
+		}
 	}
 
 	audio_async audio(15 * 1000); // length_ms
