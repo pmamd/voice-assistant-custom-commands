@@ -155,36 +155,29 @@ except:
     fi
 }
 
-# Check/start llama-server
-if _http_ok "${LLAMA_SERVER_URL}/health"; then
-    echo -e "${GREEN}✓ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
-else
-    echo "llama-server not running at ${LLAMA_SERVER_URL}"
-    LLAMA_SERVER_BIN=$(_find_llama_server)
+_llama_start() {
+    local bin model port
+    bin=$(_find_llama_server)
+    model="$LLAMA_MODEL"
+    port="$LLAMA_SERVER_PORT"
 
-    if [[ -z "$LLAMA_SERVER_BIN" ]]; then
+    if [[ -z "$bin" ]]; then
         echo -e "${RED}✗ llama-server binary not found${NC}"
         echo "  Install llama-server to ~/.local/bin/ or set LLAMA_SERVER_BIN"
         exit 1
     fi
-
-    if [ ! -f "$LLAMA_MODEL" ]; then
-        echo -e "${RED}✗ LLaMA model not found at $LLAMA_MODEL${NC}"
+    if [ ! -f "$model" ]; then
+        echo -e "${RED}✗ LLaMA model not found at $model${NC}"
         exit 1
     fi
 
     echo -e "${GREEN}Starting llama-server...${NC}"
-    echo "  Binary: $LLAMA_SERVER_BIN"
-    echo "  Model:  $LLAMA_MODEL"
-    echo "  Port:   $LLAMA_SERVER_PORT"
+    echo "  Binary: $bin"
+    echo "  Model:  $model"
+    echo "  Port:   $port"
 
-    "$LLAMA_SERVER_BIN" \
-        --model "$LLAMA_MODEL" \
-        --host 0.0.0.0 \
-        --port "$LLAMA_SERVER_PORT" \
-        -ngl 999 \
+    "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 999 \
         > /tmp/llama-server.log 2>&1 &
-
     LLAMA_SERVER_PID=$!
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
 
@@ -192,7 +185,7 @@ else
     for i in $(seq 1 120); do
         if _http_ok "${LLAMA_SERVER_URL}/health"; then
             echo -e "\n${GREEN}✓ llama-server ready${NC}"
-            break
+            return 0
         fi
         if ! kill -0 "$LLAMA_SERVER_PID" 2>/dev/null; then
             echo -e "\n${RED}✗ llama-server process died — check: cat /tmp/llama-server.log${NC}"
@@ -202,11 +195,29 @@ else
         sleep 1
     done
     echo ""
+    echo -e "${RED}✗ llama-server failed to start within 120s${NC}"
+    exit 1
+}
 
-    if ! _http_ok "${LLAMA_SERVER_URL}/health"; then
-        echo -e "${RED}✗ llama-server failed to start within 120s${NC}"
-        exit 1
+# Check/start llama-server — mirrors Wyoming-Piper logic
+if _http_ok "${LLAMA_SERVER_URL}/health"; then
+    echo -e "${YELLOW}⚠ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
+    read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "Stopping llama-server..."
+        pkill -f "llama-server.*${LLAMA_SERVER_PORT}" || true
+        sleep 2
+        if _http_ok "${LLAMA_SERVER_URL}/health"; then
+            echo -e "${RED}✗ llama-server still running — kill it manually${NC}"
+            exit 1
+        fi
+        _llama_start
+    else
+        echo "Continuing with existing llama-server..."
     fi
+else
+    _llama_start
 fi
 
 # Check required files
