@@ -66,10 +66,11 @@
   <path d="M 150 245 Q 150 315 320 315" class="arrow"/>
   <text x="175" y="295" class="text-label">commands (bypass)</text>
 
-  <!-- Arrow: TTS Client down to Wyoming-Piper -->
-  <path d="M 400 345 L 400 430" class="arrow-thick"/>
-  <text x="418" y="385" class="text-label">HTTP POST</text>
-  <text x="418" y="400" class="text-label">{text: "...", ...}</text>
+  <!-- Arrow: TTS Client down to Wyoming-Piper (dashed = separate process call) -->
+  <path d="M 400 345 L 400 430" class="arrow-http"/>
+  <text x="418" y="378" class="text-label">HTTP POST</text>
+  <text x="418" y="393" class="text-label">{text: "...", ...}</text>
+  <text x="418" y="408" class="text-label">:10200</text>
 
   <!-- Arrow: LLM Client out right to llama-server -->
   <path d="M 480 205 L 780 205" class="arrow-http"/>
@@ -108,7 +109,7 @@
   <!-- Speaker -->
   <text x="565" y="638" class="icon-text">🔊</text>
   <text x="592" y="638" class="text">Speaker</text>
-  <path d="M 520 630 L 562 630" class="arrow-thick"/>
+  <path d="M 520 630 L 562 630" class="arrow"/>
 
   <!-- llama-server annotation box -->
   <rect x="690" y="280" width="160" height="55" rx="5" fill="#f9f0ff" stroke="#ce93d8" stroke-width="1"/>
@@ -118,5 +119,13 @@
 
   <!-- Arrow from annotation to llama-server -->
   <path d="M 770 280 L 810 255" stroke="#ce93d8" stroke-width="1" fill="none"/>
+
+  <!-- Legend -->
+  <rect x="55" y="595" width="195" height="80" rx="5" fill="white" stroke="#ccc" stroke-width="1"/>
+  <text x="152" y="612" text-anchor="middle" font-family="Arial" font-size="11" font-weight="bold" fill="#333">Legend</text>
+  <line x1="68" y1="627" x2="105" y2="627" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="112" y="631" font-family="Arial" font-size="10" fill="#555">data within same process</text>
+  <line x1="68" y1="648" x2="105" y2="648" stroke="#7b1fa2" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowhead-purple)"/>
+  <text x="112" y="652" font-family="Arial" font-size="10" fill="#555">call to separate process</text>
 
 </svg>

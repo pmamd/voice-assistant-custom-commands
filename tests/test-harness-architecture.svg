@@ -90,9 +90,9 @@
   <text x="630" y="328" class="small-text">• Generates audio with Piper</text>
   <text x="630" y="344" class="small-text">• Plays via aplay (dev/target)</text>
 
-  <!-- Arrow from talk-llama to Wyoming-Piper -->
-  <path d="M 560 270 L 620 290" class="arrow"/>
-  <text x="566" y="285" class="label">HTTP</text>
+  <!-- Arrow from talk-llama to Wyoming-Piper (dashed = separate process) -->
+  <path d="M 560 270 L 620 290" class="http-arrow"/>
+  <text x="558" y="285" class="label" fill="#9c27b0">HTTP</text>
 
   <!-- Output file -->
   <rect x="640" y="385" width="220" height="60" class="data" rx="5"/>
@@ -208,5 +208,5 @@
   <text x="1080" y="720" class="small-text">Process Flow</text>
 
   <line x1="1030" y1="740" x2="1070" y2="740" class="http-arrow"/>
-  <text x="1080" y="745" class="small-text">HTTP / SSE</text>
+  <text x="1080" y="745" class="small-text">Separate process call</text>
 </svg>
