@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="'Segoe UI', Arial, sans-serif">
+
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#555"/>
+    </marker>
+    <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#c0392b"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#27ae60"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#2980b9"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#8e44ad"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="520" fill="#f8f9fa"/>
+
+  <!-- Title -->
+  <text x="480" y="32" text-anchor="middle" font-size="17" font-weight="bold" fill="#1a1a2e">Latency Test Architecture</text>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- PIPELINE FLOW (top half) -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <!-- Timer start marker -->
+  <line x1="30" y1="75" x2="30" y2="195" stroke="#c0392b" stroke-width="2" stroke-dasharray="4,3"/>
+  <text x="30" y="69" text-anchor="middle" font-size="10" fill="#c0392b" font-weight="bold">t=0</text>
+  <text x="30" y="210" text-anchor="middle" font-size="9" fill="#c0392b">start_time</text>
+  <text x="30" y="222" text-anchor="middle" font-size="9" fill="#c0392b">= time.time()</text>
+
+  <!-- Step 1: Piper generates input WAV -->
+  <rect x="55" y="80" width="140" height="60" rx="6" fill="#4a90e2" stroke="#2e5c8a" stroke-width="1.5"/>
+  <text x="125" y="103" text-anchor="middle" font-size="11" font-weight="bold" fill="white">Audio Generator</text>
+  <text x="125" y="120" text-anchor="middle" font-size="10" fill="#dce8fa">Piper TTS</text>
+  <text x="125" y="134" text-anchor="middle" font-size="9" fill="#b8d0f0">"Hi" → WAV (16kHz)</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="195" y1="110" x2="235" y2="110" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="215" y="104" text-anchor="middle" font-size="9" fill="#555">WAV</text>
+
+  <!-- Step 2: binary -->
+  <rect x="235" y="80" width="155" height="60" rx="6" fill="#4a90e2" stroke="#2e5c8a" stroke-width="1.5"/>
+  <text x="312" y="100" text-anchor="middle" font-size="11" font-weight="bold" fill="white">talk-llama-custom</text>
+  <text x="312" y="116" text-anchor="middle" font-size="10" fill="#dce8fa">--test-input WAV</text>
+  <text x="312" y="130" text-anchor="middle" font-size="10" fill="#dce8fa">Whisper STT</text>
+
+  <!-- Arrow 2→llama-server (dashed = separate process) -->
+  <line x1="390" y1="96" x2="430" y2="96" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+  <text x="410" y="90" text-anchor="middle" font-size="9" fill="#8e44ad">HTTP</text>
+  <text x="410" y="102" text-anchor="middle" font-size="9" fill="#8e44ad">:8080</text>
+
+  <!-- llama-server -->
+  <rect x="430" y="70" width="130" height="80" rx="6" fill="#9c27b0" stroke="#6a0080" stroke-width="1.5"/>
+  <text x="495" y="93" text-anchor="middle" font-size="11" font-weight="bold" fill="white">llama-server</text>
+  <text x="495" y="110" text-anchor="middle" font-size="10" fill="#e1bee7">Mistral 7B</text>
+  <text x="495" y="125" text-anchor="middle" font-size="10" fill="#e1bee7">SSE stream</text>
+  <text x="495" y="140" text-anchor="middle" font-size="9" fill="#ce93d8">tokens → text</text>
+
+  <!-- Arrow llama-server → binary (back) -->
+  <line x1="430" y1="126" x2="390" y2="126" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+  <text x="410" y="140" text-anchor="middle" font-size="9" fill="#8e44ad">response</text>
+
+  <!-- Arrow binary → Wyoming-Piper (dashed = separate process) -->
+  <line x1="390" y1="110" x2="590" y2="110" stroke="#555" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr)"/>
+  <text x="490" y="168" text-anchor="middle" font-size="9" fill="#555">HTTP :10200</text>
+
+  <!-- Wyoming-Piper -->
+  <rect x="590" y="80" width="145" height="60" rx="6" fill="#4a90e2" stroke="#2e5c8a" stroke-width="1.5"/>
+  <text x="662" y="103" text-anchor="middle" font-size="11" font-weight="bold" fill="white">Wyoming-Piper</text>
+  <text x="662" y="120" text-anchor="middle" font-size="10" fill="#dce8fa">test mode</text>
+  <text x="662" y="134" text-anchor="middle" font-size="9" fill="#b8d0f0">saves output.wav</text>
+
+  <!-- Arrow Wyoming-Piper → verifier -->
+  <line x1="735" y1="110" x2="775" y2="110" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="755" y="104" text-anchor="middle" font-size="9" fill="#555">WAV</text>
+
+  <!-- Step 4: Audio Verifier -->
+  <rect x="775" y="80" width="145" height="60" rx="6" fill="#4a90e2" stroke="#2e5c8a" stroke-width="1.5"/>
+  <text x="847" y="100" text-anchor="middle" font-size="11" font-weight="bold" fill="white">Audio Verifier</text>
+  <text x="847" y="117" text-anchor="middle" font-size="10" fill="#dce8fa">Whisper STT</text>
+  <text x="847" y="131" text-anchor="middle" font-size="10" fill="#dce8fa">semantic match</text>
+
+  <!-- Timer end marker -->
+  <line x1="930" y1="75" x2="930" y2="195" stroke="#27ae60" stroke-width="2" stroke-dasharray="4,3"/>
+  <text x="930" y="69" text-anchor="middle" font-size="10" fill="#27ae60" font-weight="bold">t=end</text>
+  <text x="930" y="210" text-anchor="middle" font-size="9" fill="#27ae60">duration_ms</text>
+  <text x="930" y="222" text-anchor="middle" font-size="9" fill="#27ae60">recorded</text>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- WHAT IS MEASURED (timeline bar) -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <text x="480" y="255" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">What is measured</text>
+
+  <!-- Full e2e bar -->
+  <rect x="30" y="265" width="900" height="24" rx="4" fill="#e3f2fd" stroke="#1976d2" stroke-width="1.5"/>
+  <text x="480" y="281" text-anchor="middle" font-size="11" fill="#1976d2" font-weight="bold">End-to-end duration_ms  ← latency_test: max 5,000ms</text>
+
+  <!-- Sub-segments -->
+  <!-- Phase 1: audio gen -->
+  <rect x="30" y="300" width="120" height="20" rx="3" fill="#90caf9" stroke="#1976d2" stroke-width="1"/>
+  <text x="90" y="314" text-anchor="middle" font-size="9" fill="#1a237e">audio gen</text>
+
+  <!-- Phase 2: binary + whisper -->
+  <rect x="150" y="300" width="160" height="20" rx="3" fill="#66bb6a" stroke="#388e3c" stroke-width="1"/>
+  <text x="230" y="314" text-anchor="middle" font-size="9" fill="#1b5e20">Whisper STT</text>
+
+  <!-- Phase 3: llama-server -->
+  <rect x="310" y="300" width="310" height="20" rx="3" fill="#ce93d8" stroke="#8e44ad" stroke-width="1"/>
+  <text x="465" y="314" text-anchor="middle" font-size="9" fill="#4a148c">llama-server inference  ← usually the dominant cost</text>
+
+  <!-- Phase 4: TTS + verify -->
+  <rect x="620" y="300" width="150" height="20" rx="3" fill="#90caf9" stroke="#1976d2" stroke-width="1"/>
+  <text x="695" y="314" text-anchor="middle" font-size="9" fill="#1a237e">TTS + verify</text>
+
+  <!-- Phase 5: remaining -->
+  <rect x="770" y="300" width="160" height="20" rx="3" fill="#ffe082" stroke="#f9a825" stroke-width="1"/>
+  <text x="850" y="314" text-anchor="middle" font-size="9" fill="#e65100">audio verify</text>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- TWO TEST VARIANTS -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+
+  <!-- Divider -->
+  <line x1="30" y1="340" x2="930" y2="340" stroke="#ddd" stroke-width="1"/>
+
+  <text x="480" y="360" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Two latency budgets</text>
+
+  <!-- E2E latency test -->
+  <rect x="40" y="372" width="400" height="120" rx="8" fill="white" stroke="#1976d2" stroke-width="1.5"/>
+  <rect x="40" y="372" width="400" height="26" rx="8" fill="#1976d2"/>
+  <rect x="40" y="388" width="400" height="10" fill="#1976d2"/>
+  <text x="240" y="390" text-anchor="middle" font-size="12" font-weight="bold" fill="white">End-to-End Latency Test</text>
+  <text x="55" y="415" font-size="11" fill="#333">Input: <tspan font-style="italic">"Hi"</tspan> (short prompt → predictable response)</text>
+  <text x="55" y="433" font-size="11" fill="#333">Budget: <tspan font-weight="bold" fill="#c0392b">5,000 ms</tspan></text>
+  <text x="55" y="451" font-size="11" fill="#555">Covers: audio gen + Whisper + llama-server</text>
+  <text x="55" y="469" font-size="11" fill="#555">+ Wyoming-Piper TTS + audio verify</text>
+  <text x="55" y="484" font-size="9" fill="#888">Catches: model loading lag, cold-start, resource contention</text>
+
+  <!-- Fast path latency test -->
+  <rect x="515" y="372" width="410" height="120" rx="8" fill="white" stroke="#8e44ad" stroke-width="1.5"/>
+  <rect x="515" y="372" width="410" height="26" rx="8" fill="#8e44ad"/>
+  <rect x="515" y="388" width="410" height="10" fill="#8e44ad"/>
+  <text x="720" y="390" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Fast-Path Tool Latency Test</text>
+  <text x="530" y="415" font-size="11" fill="#333">Input: <tspan font-style="italic">"stop" / "pause" / "resume"</tspan></text>
+  <text x="530" y="433" font-size="11" fill="#333">Budget: <tspan font-weight="bold" fill="#c0392b">100 ms</tspan></text>
+  <text x="530" y="451" font-size="11" fill="#555">Covers: keyword match → Wyoming event only</text>
+  <text x="530" y="469" font-size="11" fill="#555">llama-server is <tspan font-weight="bold">bypassed entirely</tspan></text>
+  <text x="530" y="484" font-size="9" fill="#888">Catches: fast-path regression, tool registry overhead</text>
+
+  <!-- Pass/fail note -->
+  <text x="480" y="512" text-anchor="middle" font-size="10" fill="#555" font-style="italic">duration_ms is recorded for every test regardless of type — all test results include timing</text>
+
+</svg>
