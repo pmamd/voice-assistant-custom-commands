@@ -259,7 +259,7 @@ class TestLLMOutputQuality(unittest.TestCase):
     """
 
     def setUp(self):
-        for f in [_BINARY, _WHISPER_MODEL, _LLAMA_MODEL, _STORY_AUDIO]:
+        for f in [_BINARY, _WHISPER_MODEL, _STORY_AUDIO]:
             if not f.exists():
                 self.skipTest(f'Required file not found: {f}')
 
