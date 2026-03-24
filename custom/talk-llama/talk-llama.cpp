@@ -368,6 +368,20 @@ bool whisper_params_parse(int argc, const char **argv, whisper_params &params)
 		{
 			params.llama_url = argv[++i];
 		}
+		else if (arg == "--list-devices")
+		{
+			// List SDL capture devices and exit — fast, no whisper/llama needed
+			if (SDL_Init(SDL_INIT_AUDIO) != 0) {
+				fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+				return 1;
+			}
+			int n = SDL_GetNumAudioDevices(SDL_TRUE);
+			for (int i = 0; i < n; i++) {
+				printf("%d: %s\n", i, SDL_GetAudioDeviceName(i, SDL_TRUE));
+			}
+			SDL_Quit();
+			exit(0);
+		}
 		else
 		{
 			fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());

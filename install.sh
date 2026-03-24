@@ -247,15 +247,24 @@ info "Configuring ALSA default audio device..."
 if [[ -f "$HOME/.asoundrc" ]]; then
     ok "~/.asoundrc already exists — skipping (edit manually if audio plays to wrong device)"
 else
-    # Find first non-HDMI card number
-    USB_CARD=$(aplay -l 2>/dev/null | grep "^card" | grep -iv "hdmi\|displayport" | head -1 | grep -oP 'card \K[0-9]+')
-    if [[ -n "$USB_CARD" ]]; then
+    # Find first non-HDMI card and get its ALSA short name (robust across reboots
+    # since card numbers can change but names stay stable).
+    USB_CARD_LINE=$(aplay -l 2>/dev/null | grep "^card" | grep -iv "hdmi\|displayport" | head -1)
+    USB_CARD_NAME=$(echo "$USB_CARD_LINE" | sed 's/card [0-9]*: \([^ ]*\) .*/\1/')
+    USB_CARD_DESC=$(echo "$USB_CARD_LINE" | grep -oP '\[\K[^\]]+' | head -1)
+    if [[ -n "$USB_CARD_NAME" ]]; then
         cat > "$HOME/.asoundrc" << EOF
-defaults.pcm.card $USB_CARD
-defaults.ctl.card $USB_CARD
+# Route audio to $USB_CARD_DESC by name (not card number, which changes on reboot)
+defaults.pcm.!default {
+    type hw
+    card $USB_CARD_NAME
+}
+defaults.ctl.!default {
+    type hw
+    card $USB_CARD_NAME
+}
 EOF
-        ok "Set ALSA default to card $USB_CARD ($(aplay -l 2>/dev/null | grep "^card $USB_CARD:" | sed 's/card [0-9]*: //' | cut -d'[' -f2 | cut -d']' -f1))"
-        warn "If audio plays on the wrong device, edit ~/.asoundrc and change the card number"
+        ok "Set ALSA default to '$USB_CARD_NAME' ($USB_CARD_DESC) — stable across reboots"
     else
         warn "Could not detect a non-HDMI audio card. Edit ~/.asoundrc manually if needed."
         echo "  See docs/WYOMING.md for instructions."

@@ -242,62 +242,39 @@ echo ""
 echo "Detecting audio devices..."
 CAPTURE_DEVICE="-1"  # Default: use default device
 
-# Get list of capture devices using SDL
-if ! command -v arecord &> /dev/null; then
-    echo -e "${RED}✗ arecord not found — install alsa-utils: sudo apt-get install alsa-utils${NC}"
-    exit 1
-fi
+# Get capture device list from SDL (same order the binary will use)
+echo "Detecting audio devices..."
+mapfile -t DEVICE_NAMES < <("$TALK_LLAMA_BIN" --list-devices 2>/dev/null | sed 's/^[0-9]*: //')
+DEVICE_COUNT=${#DEVICE_NAMES[@]}
 
-DEVICE_LIST=$(arecord -l 2>/dev/null | grep "^card" | sed 's/card \([0-9]\+\).*device \([0-9]\+\).*/hw:\1,\2/' || echo "")
-
-if [ -z "$DEVICE_LIST" ]; then
+if [ "$DEVICE_COUNT" -eq 0 ]; then
     echo -e "${RED}✗ No audio capture devices found — plug in a microphone and try again${NC}"
     exit 1
 fi
 
-if [ -n "$DEVICE_LIST" ]; then
-        DEVICE_COUNT=$(echo "$DEVICE_LIST" | wc -l)
+if [ "$DEVICE_COUNT" -gt 1 ]; then
+    echo ""
+    echo "Multiple microphones detected:"
+    for i in "${!DEVICE_NAMES[@]}"; do
+        echo "$i: ${DEVICE_NAMES[$i]}"
+    done
 
-        if [ "$DEVICE_COUNT" -gt 1 ]; then
-            echo ""
-            echo "Multiple microphones detected:"
+    echo ""
+    read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -r MIC_CHOICE
+    echo ""
 
-            # Build array of device names for display
-            DEVICE_NAMES=()
-            DEVICE_NUM=0
-            while IFS= read -r device; do
-                # Convert hw:X,Y format to grep pattern for card X, device Y
-                CARD_NUM=$(echo "$device" | sed 's/hw:\([0-9]\+\),.*/\1/')
-                DEV_NUM=$(echo "$device" | sed 's/hw:[0-9]\+,\([0-9]\+\)/\1/')
+    if [ -z "$MIC_CHOICE" ]; then MIC_CHOICE=0; fi
 
-                # Extract card name and device name from arecord -l output (extract bracketed names)
-                DEVICE_NAME=$(arecord -l 2>/dev/null | grep -E "card $CARD_NUM:.*device $DEV_NUM:" | sed 's/card [0-9]\+: [^ ]* \[\([^]]*\)\], device [0-9]\+: [^[]*\[\([^]]*\)\].*/\1 - \2/')
-                DEVICE_NAMES+=("$DEVICE_NAME")
-                echo "$DEVICE_NUM: $DEVICE_NAME"
-                DEVICE_NUM=$((DEVICE_NUM + 1))
-            done <<< "$DEVICE_LIST"
-
-            echo ""
-            read -p "Select microphone [0-$((DEVICE_COUNT - 1))] (default: 0) " -r MIC_CHOICE
-            echo ""
-
-            # Default to 0 if empty
-            if [ -z "$MIC_CHOICE" ]; then
-                MIC_CHOICE=0
-            fi
-
-            if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -lt "$DEVICE_COUNT" ]; then
-                # SDL uses the device index directly (0-indexed)
-                CAPTURE_DEVICE="$MIC_CHOICE"
-                echo -e "${GREEN}✓ Using microphone $MIC_CHOICE: ${DEVICE_NAMES[$MIC_CHOICE]}${NC}"
-            else
-                echo -e "${YELLOW}⚠ Invalid selection, using default (0)${NC}"
-                CAPTURE_DEVICE="0"
-            fi
-        else
-            echo -e "${GREEN}✓ Using default microphone${NC}"
-        fi
+    if [[ "$MIC_CHOICE" =~ ^[0-9]+$ ]] && [ "$MIC_CHOICE" -ge 0 ] && [ "$MIC_CHOICE" -lt "$DEVICE_COUNT" ]; then
+        CAPTURE_DEVICE="$MIC_CHOICE"
+        echo -e "${GREEN}✓ Using microphone $MIC_CHOICE: ${DEVICE_NAMES[$MIC_CHOICE]}${NC}"
+    else
+        echo -e "${YELLOW}⚠ Invalid selection, using default (0)${NC}"
+        CAPTURE_DEVICE="0"
     fi
+else
+    echo -e "${GREEN}✓ Using default microphone${NC}"
+fi
 
 echo ""
 
