@@ -1804,6 +1804,14 @@ int run(int argc, const char **argv)
 	printf("\n\n");
 	printf("%s%s ", params.person.c_str(), chat_symb.c_str());
 	fflush(stdout);
+
+	// Discard audio buffered during startup (TTS warmup, setup code).
+	// Without this, audio said before the loop starts has an incorrect
+	// speech_start_ms → speech_len < 100ms → first utterance skipped.
+	if (!test_mode) {
+		audio.clear();
+	}
+
 	int vad_result_prev = 2; // ended
 	double speech_start_ms = 0;
 	double speech_end_ms = 0;

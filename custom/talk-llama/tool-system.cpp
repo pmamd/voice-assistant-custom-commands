@@ -184,8 +184,9 @@ std::string ToolRegistry::getToolsPrompt() const {
         oss << "\n";
     }
 
-    oss << "To use a tool, output: <tool_call>{\"name\": \"tool_name\", \"arguments\": {...}, \"id\": \"unique_id\"}</tool_call>\n";
-    oss << "You can continue speaking after calling a tool.\n";
+    oss << "To use a tool, output ONLY the tool call with no preamble or explanation:\n";
+    oss << "<tool_call>{\"name\": \"tool_name\", \"arguments\": {...}, \"id\": \"unique_id\"}</tool_call>\n";
+    oss << "Call tools immediately when requested. Do not say 'I'm sorry' or 'I didn't understand' — just execute the tool.\n";
 
     return oss.str();
 }
