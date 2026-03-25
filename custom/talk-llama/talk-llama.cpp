@@ -1810,11 +1810,15 @@ int run(int argc, const char **argv)
 	printf("%s%s ", params.person.c_str(), chat_symb.c_str());
 	fflush(stdout);
 
-	// Discard audio buffered during startup (TTS warmup, setup code).
-	// Without this, audio said before the loop starts has an incorrect
-	// speech_start_ms → speech_len < 100ms → first utterance skipped.
+	// Prime the VAD ring buffer before entering the main loop.
+	// After audio.clear(), the ring buffer is empty. If the user speaks
+	// immediately, audio.get(1000) blocks until 1s fills — by then the
+	// short utterance has aged past the vad_last_ms window and is missed.
+	// Clear stale startup audio, then wait for the buffer to fill with
+	// ~700ms of ambient noise so vad_simple has context on the first call.
 	if (!test_mode) {
 		audio.clear();
+		std::this_thread::sleep_for(std::chrono::milliseconds(700));
 	}
 
 	int vad_result_prev = 2; // ended
