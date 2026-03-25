@@ -1236,22 +1236,25 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 				}
 
 				// Deferred word-count dispatch: set flag when ~6 words accumulated,
-				// then dispatch at the START of the next space-prefixed token so
-				// we never cut mid-BPE-token (e.g. " ric" before "hes" = "riches").
+				// then dispatch at the START of the NEXT space-prefixed token.
+				// IMPORTANT: check threshold BEFORE setting it — if both happen in
+				// the same iteration (token " w" is the 6th space), we would dispatch
+				// a chunk ending with " w" and Piper says "double u".
 				bool word_count_dispatch = false;
-				if (!is_boundary && ctx->word_count_threshold_reached &&
-				    !token_text.empty() && token_text[0] == ' ') {
-					// New word starting — previous word is complete, safe to dispatch
-					is_boundary = true;
-					word_count_dispatch = true;
-					ctx->word_count_threshold_reached = false;
-				}
-				if (!is_boundary && !ctx->word_count_threshold_reached) {
+				bool threshold_already_set = ctx->word_count_threshold_reached;
+				if (!ctx->word_count_threshold_reached) {
 					int word_count = std::count(ctx->text_to_speak.begin(),
 					                            ctx->text_to_speak.end(), ' ');
 					if (word_count >= 6) {
 						ctx->word_count_threshold_reached = true;
 					}
+				}
+				if (!is_boundary && threshold_already_set &&
+				    !token_text.empty() && token_text[0] == ' ') {
+					// Previous threshold was set, new word starting — safe to dispatch
+					is_boundary = true;
+					word_count_dispatch = true;
+					ctx->word_count_threshold_reached = false;
 				}
 
 				// Also split on " - " (dash with spaces)
@@ -1776,6 +1779,18 @@ int run(int argc, const char **argv)
 			curl_easy_cleanup(warmup_curl);
 			printf("KV cache warmed.\n\n");
 		}
+	}
+
+	// Whisper GPU warmup — first inference initializes GPU kernels and can take
+	// 2-5x longer. Without this, the speech-start warmup transcription blocks
+	// long enough that the user's first utterance exceeds the silence timeout.
+	if (!test_mode) {
+		printf("Warming up Whisper GPU...\n");
+		std::vector<float> whisper_warmup_audio(WHISPER_SAMPLE_RATE, 0.0f);
+		float prob_dummy = 0.0f;
+		int64_t t_dummy = 0;
+		transcribe(ctx_wsp, params, whisper_warmup_audio, prompt_whisper, prob_dummy, t_dummy);
+		printf("Whisper GPU warmed.\n\n");
 	}
 
 	// Resume microphone
