@@ -54,6 +54,13 @@ _find_llama_server() {
     echo ""
 }
 
+# Kill any stale aplay processes — they can hang indefinitely with PipeWire
+# and block audio playback for subsequent sessions
+if pgrep -x aplay > /dev/null 2>&1; then
+    echo -e "${YELLOW}⚠ Killing stale aplay process(es)${NC}"
+    pkill -9 -x aplay || true
+fi
+
 # Check if talk-llama-custom is already running and kill it
 if pgrep -f "talk-llama-custom" > /dev/null; then
     echo -e "${YELLOW}⚠ Found existing talk-llama-custom process(es)${NC}"

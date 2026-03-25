@@ -179,8 +179,11 @@ class PiperProcessManager:
 
     # Aplay process
     async def get_aplay_process(self, wavefile) -> PiperProcess:
+        # Use timeout to prevent aplay hanging indefinitely if PipeWire stalls.
+        # A TTS chunk should never exceed 30 seconds; if it does, kill aplay.
         aplay_proc = AplayProcess(
             proc=await asyncio.create_subprocess_exec(
+                "timeout", "30",
                 "aplay",
                 wavefile
             )
