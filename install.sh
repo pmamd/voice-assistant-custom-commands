@@ -239,35 +239,36 @@ fi
 # ---------------------------------------------------------------------------
 # 6b. ALSA default audio device
 # ---------------------------------------------------------------------------
-# Wyoming-Piper uses aplay without -D, so it plays on whatever ALSA defaults to.
-# On machines with HDMI + USB audio, HDMI is usually card 0 (the default).
-# Detect the first non-HDMI playback card and set it as the ALSA default.
-info "Configuring ALSA default audio device..."
+# Wyoming-Piper uses aplay without -D, so it plays on whatever the system routes to.
+# If PipeWire is running, it manages audio routing — do NOT use .asoundrc to bypass it
+# (that causes "device busy" errors). Instead configure PipeWire's default sink.
+# If PipeWire is not running, fall back to a simple .asoundrc card selection.
+info "Configuring default audio output device..."
 
-if [[ -f "$HOME/.asoundrc" ]]; then
-    ok "~/.asoundrc already exists — skipping (edit manually if audio plays to wrong device)"
-else
-    # Find first non-HDMI card and get its ALSA short name (robust across reboots
-    # since card numbers can change but names stay stable).
-    USB_CARD_LINE=$(aplay -l 2>/dev/null | grep "^card" | grep -iv "hdmi\|displayport" | head -1)
-    USB_CARD_NAME=$(echo "$USB_CARD_LINE" | sed 's/card [0-9]*: \([^ ]*\) .*/\1/')
-    USB_CARD_DESC=$(echo "$USB_CARD_LINE" | grep -oP '\[\K[^\]]+' | head -1)
-    if [[ -n "$USB_CARD_NAME" ]]; then
-        cat > "$HOME/.asoundrc" << EOF
-# Route audio to $USB_CARD_DESC by name (not card number, which changes on reboot)
-defaults.pcm.!default {
-    type hw
-    card $USB_CARD_NAME
-}
-defaults.ctl.!default {
-    type hw
-    card $USB_CARD_NAME
-}
-EOF
-        ok "Set ALSA default to '$USB_CARD_NAME' ($USB_CARD_DESC) — stable across reboots"
+if command -v wpctl &>/dev/null && wpctl status &>/dev/null 2>&1; then
+    # PipeWire is running — set the default sink to the first non-HDMI output
+    SINK_ID=$(wpctl status 2>/dev/null | grep -A50 'Sinks:' | grep -v 'HDMI\|Display' | \
+              grep -oP '^\s+\K\d+(?=\.)' | head -1)
+    if [[ -n "$SINK_ID" ]]; then
+        wpctl set-default "$SINK_ID" 2>/dev/null && \
+            ok "PipeWire default sink set to ID $SINK_ID ($(wpctl status 2>/dev/null | grep "$SINK_ID\."))"
     else
-        warn "Could not detect a non-HDMI audio card. Edit ~/.asoundrc manually if needed."
-        echo "  See docs/WYOMING.md for instructions."
+        warn "Could not find a non-HDMI PipeWire sink. Check audio routing manually."
+    fi
+    # Remove any .asoundrc that might interfere with PipeWire
+    if [[ -f "$HOME/.asoundrc" ]]; then
+        rm "$HOME/.asoundrc"
+        ok "Removed ~/.asoundrc (PipeWire manages routing)"
+    fi
+elif [[ ! -f "$HOME/.asoundrc" ]]; then
+    # No PipeWire — use .asoundrc with simple card selection (plug layer for format conversion)
+    USB_CARD=$(aplay -l 2>/dev/null | grep "^card" | grep -iv "hdmi\|displayport" | \
+               head -1 | grep -oP 'card \K[0-9]+')
+    if [[ -n "$USB_CARD" ]]; then
+        printf 'defaults.pcm.card %s\ndefaults.ctl.card %s\n' "$USB_CARD" "$USB_CARD" > "$HOME/.asoundrc"
+        ok "Set ALSA default to card $USB_CARD (ALSA only, no PipeWire)"
+    else
+        warn "Could not detect a non-HDMI audio card."
     fi
 fi
 
