@@ -313,6 +313,7 @@ $TALK_LLAMA_BIN \
     -vth 1.2 \
     -n 300 \
     --allow-newline \
+    -p Driver \
     -c "$CAPTURE_DEVICE"
 
 # Cleanup on exit
