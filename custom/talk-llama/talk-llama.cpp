@@ -1038,8 +1038,8 @@ static void dispatch_tts_sentence(llama_stream_context* ctx, const std::string& 
 			text = ::replace(text, ap, "");
 		}
 	}
-	trim(text);
-	if (text.empty()) return;
+	rtrim(text);  // only trim trailing — preserve leading space for Piper prosody
+	if (text.empty() || text.find_first_not_of(" \t\n\r") == std::string::npos) return;
 
 	int idx = *ctx->thread_i;
 	ctx->text_to_speak_arr[idx] = text;
@@ -1238,10 +1238,12 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 				// Deferred word-count dispatch: set flag when ~6 words accumulated,
 				// then dispatch at the START of the next space-prefixed token so
 				// we never cut mid-BPE-token (e.g. " ric" before "hes" = "riches").
+				bool word_count_dispatch = false;
 				if (!is_boundary && ctx->word_count_threshold_reached &&
 				    !token_text.empty() && token_text[0] == ' ') {
 					// New word starting — previous word is complete, safe to dispatch
 					is_boundary = true;
+					word_count_dispatch = true;
 					ctx->word_count_threshold_reached = false;
 				}
 				if (!is_boundary && !ctx->word_count_threshold_reached) {
@@ -1264,7 +1266,10 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 
 				if (is_boundary) {
 					ctx->word_count_threshold_reached = false;
-					dispatch_tts_sentence(ctx, ctx->text_to_speak);
+					// Word-count split: append "..." so Piper uses continuation intonation
+					std::string chunk = ctx->text_to_speak;
+					if (word_count_dispatch) chunk += "...";
+					dispatch_tts_sentence(ctx, chunk);
 					ctx->text_to_speak.clear();
 
 					if (ctx->params->sleep_before_xtts) {
