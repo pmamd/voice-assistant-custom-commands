@@ -1941,7 +1941,8 @@ int run(int argc, const char **argv)
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.min_energy);
 
 				// SMART EARLY STOP DETECTION
-				static double early_trigger_start_time = 0;
+				static double early_trigger_start_time = -1; // -1 = uninitialized
+				if (early_trigger_start_time < 0) early_trigger_start_time = get_current_time_ms();
 				bool early_trigger = false;
 
 				if (is_speech && vad_result_prev != 1) {
