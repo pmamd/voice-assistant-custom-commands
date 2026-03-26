@@ -2195,6 +2195,14 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				// return immediately to listening for new commands.
 				g_stop_generation = false;
 				g_generation_running = true;
+				// If Wyoming audio was paused (not resumed before new input), stop the
+				// paused aplay processes so new audio can play. Without this, SIGSTOP'd
+				// aplay processes hold PipeWire streams and new audio is silent.
+				if (tool_system::g_wyoming_paused) {
+					if (tool_system::g_wyoming_client)
+						tool_system::g_wyoming_client->sendAudioStop();
+					tool_system::g_wyoming_paused = false;
+				}
 				// Tell Wyoming-Piper a new response is starting so it resets STOP_CMD.
 				if (tool_system::g_wyoming_client)
 					tool_system::g_wyoming_client->sendNewResponse();
