@@ -1733,19 +1733,16 @@ int run(int argc, const char **argv)
 	printf("TTS Voice: %s\n", params.xtts_voice.c_str());
 	printf("LLM URL: %s\n", params.llama_url.c_str());
 
-	// Pause microphone during TTS test to prevent feedback
-	if (!test_mode) {
-		audio.pause();
-		printf("(Microphone paused during TTS test)\n");
-	}
-
-	// Send a simple test message to Wyoming-Piper
+	// Send a simple test message to Wyoming-Piper.
+	// Microphone stays running — keeping PipeWire capture active through all
+	// warmups lets it stabilize over ~6s so no extra wait is needed at the end.
+	// Any TTS feedback captured during startup is discarded by audio.clear().
 	std::thread tts_test_thread([&params]() {
 		send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
 	});
 	tts_test_thread.detach();
 
-	// Wait for TTS test audio to finish playing (avoid feedback)
+	// Wait for TTS test audio to finish playing
 	std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 	printf("TTS test sent. If you heard audio, TTS is working.\n");
 	printf("=========================================\n\n");
@@ -1793,12 +1790,6 @@ int run(int argc, const char **argv)
 		printf("Whisper GPU warmed.\n\n");
 	}
 
-	// Resume microphone
-	if (!test_mode) {
-		audio.resume();
-		printf("(Microphone resumed)\n");
-	}
-
 	// -- Tool system status display -----------------------------------------------
 	// Lists all loaded tools and whether each supports fast-path (pre-LLM) execution.
 	printf("\n=========================================\n");
@@ -1816,15 +1807,11 @@ int run(int argc, const char **argv)
 	}
 	printf("=========================================\n\n");
 
-	// Wait for PipeWire audio capture to stabilize before showing the prompt.
-	// PipeWire takes ~3s after audio.resume() to fully deliver audio to SDL.
-	// Speaking before stabilization means the audio never reaches the ring buffer.
-	// We clear stale audio then wait, so the prompt only appears when ready.
-	// Empirically: 2s wait → first hello missed; 5s wait → always works.
+	// Discard audio captured during startup warmups (TTS test feedback, etc.).
+	// PipeWire has been running continuously since audio.init() ~6s ago,
+	// so it is already stabilized — no additional wait needed.
 	if (!test_mode) {
 		audio.clear();
-		std::this_thread::sleep_for(std::chrono::milliseconds(3500));
-		audio.clear(); // discard any audio captured during stabilization
 	}
 
 	if (params.push_to_talk)
