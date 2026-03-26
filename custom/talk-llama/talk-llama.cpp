@@ -1003,7 +1003,6 @@ struct llama_stream_context {
 	std::string text_to_speak;     // current sentence accumulator for TTS
 	int new_tokens;                // token counter
 	bool debug;
-	bool word_count_threshold_reached = false; // waiting for next clean word boundary
 
 	// TTS dispatch state
 	const whisper_params* params;
@@ -1235,27 +1234,7 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 					is_boundary = true;
 				}
 
-				// Deferred word-count dispatch: set flag when ~6 words accumulated,
-				// then dispatch at the START of the NEXT space-prefixed token.
-				// IMPORTANT: check threshold BEFORE setting it — if both happen in
-				// the same iteration (token " w" is the 6th space), we would dispatch
-				// a chunk ending with " w" and Piper says "double u".
-				bool word_count_dispatch = false;
-				bool threshold_already_set = ctx->word_count_threshold_reached;
-				if (!ctx->word_count_threshold_reached) {
-					int word_count = std::count(ctx->text_to_speak.begin(),
-					                            ctx->text_to_speak.end(), ' ');
-					if (word_count >= 6) {
-						ctx->word_count_threshold_reached = true;
-					}
-				}
-				if (!is_boundary && threshold_already_set &&
-				    !token_text.empty() && token_text[0] == ' ') {
-					// Previous threshold was set, new word starting — safe to dispatch
-					is_boundary = true;
-					word_count_dispatch = true;
-					ctx->word_count_threshold_reached = false;
-				}
+				bool word_count_dispatch = false; // word-count split removed; punctuation only
 
 				// Also split on " - " (dash with spaces)
 				if (text_len >= 3 && ctx->text_to_speak[text_len - 2] == ' ' && last == '-') {
@@ -1268,7 +1247,6 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 				}
 
 				if (is_boundary) {
-					ctx->word_count_threshold_reached = false;
 					// Word-count split: append "..." so Piper uses continuation intonation
 					std::string chunk = ctx->text_to_speak;
 					if (word_count_dispatch) chunk += "...";
