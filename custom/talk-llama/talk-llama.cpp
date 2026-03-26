@@ -1816,6 +1816,17 @@ int run(int argc, const char **argv)
 	}
 	printf("=========================================\n\n");
 
+	// Wait for PipeWire audio capture to stabilize before showing the prompt.
+	// PipeWire takes ~3s after audio.resume() to fully deliver audio to SDL.
+	// Speaking before stabilization means the audio never reaches the ring buffer.
+	// We clear stale audio then wait, so the prompt only appears when ready.
+	// Empirically: 2s wait → first hello missed; 5s wait → always works.
+	if (!test_mode) {
+		audio.clear();
+		std::this_thread::sleep_for(std::chrono::milliseconds(3500));
+		audio.clear(); // discard any audio captured during stabilization
+	}
+
 	if (params.push_to_talk)
 		printf("Type anything or hold 'Alt' to speak:\n");
 	else
@@ -1824,17 +1835,6 @@ int run(int argc, const char **argv)
 	printf("\n\n");
 	printf("%s%s ", params.person.c_str(), chat_symb.c_str());
 	fflush(stdout);
-
-	// Prime the VAD ring buffer before entering the main loop.
-	// After audio.clear(), the ring buffer is empty. If the user speaks
-	// immediately, audio.get(1000) blocks until 1s fills — by then the
-	// short utterance has aged past the vad_last_ms window and is missed.
-	// Clear stale startup audio, then wait for the buffer to fill with
-	// ~700ms of ambient noise so vad_simple has context on the first call.
-	if (!test_mode) {
-		audio.clear();
-		std::this_thread::sleep_for(std::chrono::milliseconds(700));
-	}
 
 	int vad_result_prev = 2; // ended
 	double speech_start_ms = 0;
