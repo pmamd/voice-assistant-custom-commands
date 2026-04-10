@@ -1,6 +1,6 @@
 [submodule "whisper.cpp"]
 	path = whisper.cpp
-	url = https://github.com/ggerganov/whisper.cpp.git
+	url = https://github.com/amd/whisper.cpp
 [submodule "tests/external/piper"]
 	path = tests/external/piper
 	url = https://github.com/OHF-Voice/piper1-gpl.git
