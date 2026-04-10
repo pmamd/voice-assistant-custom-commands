@@ -94,6 +94,14 @@ void sigint_handler(int sig) {
 	}
 }
 
+// Compatibility stub for read_wav (removed in AMD whisper.cpp fork)
+// Test mode disabled - AMD whisper.cpp fork doesn't include drwav
+// Production code uses SDL2 audio capture, not WAV file input
+bool read_wav(const std::string & fname, std::vector<float> & pcmf32, std::vector<std::vector<float>> & pcmf32s, bool stereo) {
+	fprintf(stderr, "%s: test mode not supported with AMD whisper.cpp fork (drwav not available)\n", __func__);
+	return false;
+}
+
 // global
 // Stores the name of the most recently pressed hotkey (e.g. "Ctrl+Space", "Escape").
 // Read by the main loop; written by the hotkey background thread.
@@ -1918,7 +1926,8 @@ int run(int argc, const char **argv)
 					vad_result = 2; // Speech ended - trigger processing
 				}
 			} else {
-				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy, params.min_energy);
+				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
+				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
 				// SMART EARLY STOP DETECTION
 				static double early_trigger_start_time = -1; // -1 = uninitialized
