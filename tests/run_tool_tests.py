@@ -111,7 +111,7 @@ class ToolSystemTestRunner:
                 [
                     str(self.binary),
                     "--llama-url", os.environ.get("LLAMA_URL", "http://127.0.0.1:8083"),
-                    "-mw", "./whisper.cpp/models/ggml-tiny.en.bin",
+                    "-mw", "./whisper.cpp/models/ggml-base.en.bin",
                     "--xtts-url", "http://localhost:10200/",
                     "--xtts-voice", "en_US-lessac-medium",
                     "--temp", "0.5",

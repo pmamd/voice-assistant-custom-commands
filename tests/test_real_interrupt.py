@@ -19,7 +19,7 @@ class RealInterruptTester:
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.talk_llama_bin = project_root / "build/bin/talk-llama-custom"
-        self.whisper_model = project_root / "whisper.cpp/models/ggml-tiny.en.bin"
+        self.whisper_model = project_root / "whisper.cpp/models/ggml-base.en.bin"
         self.llama_model = project_root / "models/llama-2-7b-chat.Q4_K_M.gguf"
         
         self.generator = AudioGenerator(

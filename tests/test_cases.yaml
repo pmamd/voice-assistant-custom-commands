@@ -167,7 +167,7 @@ config:
   # System under test
   talk_llama:
     binary: "./build/bin/talk-llama-custom"
-    whisper_model: "./whisper.cpp/models/ggml-tiny.en.bin"
+    whisper_model: "./whisper.cpp/models/ggml-base.en.bin"
     llama_model: "../models/llama-2-7b-chat.Q4_K_M.gguf"
     temperature: 0.5  # Lower temperature for more consistent responses
     test_mode: true
@@ -175,7 +175,7 @@ config:
   # Verification settings
   audio_verifier:
     whisper_bin: "./build/bin/main"
-    whisper_model: "./whisper.cpp/models/ggml-tiny.en.bin"
+    whisper_model: "./whisper.cpp/models/ggml-base.en.bin"
     output_dir: "./audio/outputs"
 
   # Wyoming-Piper TTS server settings
