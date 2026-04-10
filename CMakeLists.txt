@@ -4,6 +4,26 @@ project(voice-assistant-custom-commands)
 # Enable building whisper.cpp examples (needed for common and common-sdl libraries)
 set(WHISPER_BUILD_EXAMPLES ON CACHE BOOL "Build whisper examples" FORCE)
 
+# AMD VitisAI NPU support (optional, for target machine with FlexML runtime)
+option(WHISPER_VITISAI "Enable VitisAI NPU backend for whisper.cpp" OFF)
+
+if(WHISPER_VITISAI)
+    # FlexML runtime paths (for target .22 machine)
+    set(FLEXMLRT_ROOT "/home/amd/RyzenAI-Full" CACHE PATH "FlexML runtime root directory")
+
+    # Set up FlexML include and library paths
+    set(CMAKE_PREFIX_PATH "${FLEXMLRT_ROOT}/lib/python3.12/site-packages/flexmlrt;${FLEXMLRT_ROOT}/deployment;${CMAKE_PREFIX_PATH}")
+
+    # Add FlexML include directory
+    include_directories("${FLEXMLRT_ROOT}/lib/python3.12/site-packages/flexmlrt/include")
+
+    # Add FlexML library directory
+    link_directories("${FLEXMLRT_ROOT}/deployment/lib")
+
+    message(STATUS "VitisAI NPU support: ENABLED")
+    message(STATUS "FlexML runtime: ${FLEXMLRT_ROOT}")
+endif()
+
 # Build whisper.cpp submodule
 add_subdirectory(whisper.cpp)
 
@@ -67,6 +87,16 @@ if (WHISPER_SDL2)
         ${CLBLAST_LIBNAME}
         ${CMAKE_THREAD_LIBS_INIT}
     )
+
+    # Link FlexML runtime if VitisAI is enabled
+    if(WHISPER_VITISAI)
+        target_link_libraries(${TARGET} PRIVATE flexmlrt)
+        # Set rpath so runtime can find libflexmlrt.so without LD_LIBRARY_PATH
+        set_target_properties(${TARGET} PROPERTIES
+            INSTALL_RPATH "${FLEXMLRT_ROOT}/deployment/lib"
+            BUILD_RPATH "${FLEXMLRT_ROOT}/deployment/lib"
+        )
+    endif()
 
     if(WIN32)
         # Windows 8.1 or later for PrefetchVirtualMemory
