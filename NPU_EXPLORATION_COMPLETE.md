@@ -22,7 +22,7 @@ ssh amd@192.168.86.26 'cd ~/RyzenAI-SW/Demos/ASR/Whisper && \
 Result: 9.2s total, TTFT 50ms, RTF 0.64
 
 # GPU Test
-ssh amd@192.168.86.26 'cd ~/voice-assistant-custom-commands && \
+ssh amd@192.168.86.26 'cd ~/git/voice-assistant-custom-commands && \
   build/bin/main -m whisper.cpp/models/ggml-base.en.bin \
   -f /tmp/test_voice_command.wav'
 Result: 1.14s total, 989ms encode, 43ms decode
