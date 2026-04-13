@@ -94,12 +94,38 @@ void sigint_handler(int sig) {
 	}
 }
 
-// Compatibility stub for read_wav (removed in AMD whisper.cpp fork)
-// Test mode disabled - AMD whisper.cpp fork doesn't include drwav
-// Production code uses SDL2 audio capture, not WAV file input
+// Read WAV file for test mode
+// Simple WAV reader - doesn't depend on drwav
 bool read_wav(const std::string & fname, std::vector<float> & pcmf32, std::vector<std::vector<float>> & pcmf32s, bool stereo) {
-	fprintf(stderr, "%s: test mode not supported with AMD whisper.cpp fork (drwav not available)\n", __func__);
-	return false;
+	std::ifstream file(fname, std::ios::binary);
+	if (!file) {
+		fprintf(stderr, "%s: failed to open '%s'\n", __func__, fname.c_str());
+		return false;
+	}
+
+	// Read WAV header (44 bytes for PCM)
+	char header[44];
+	file.read(header, 44);
+	if (!file || std::string(header, 4) != "RIFF" || std::string(header + 8, 4) != "WAVE") {
+		fprintf(stderr, "%s: invalid WAV file '%s'\n", __func__, fname.c_str());
+		return false;
+	}
+
+	// Read audio data
+	std::vector<int16_t> samples;
+	int16_t sample;
+	while (file.read(reinterpret_cast<char*>(&sample), sizeof(int16_t))) {
+		samples.push_back(sample);
+	}
+
+	// Convert to float
+	pcmf32.resize(samples.size());
+	for (size_t i = 0; i < samples.size(); i++) {
+		pcmf32[i] = samples[i] / 32768.0f;
+	}
+
+	fprintf(stderr, "%s: read %zu samples from '%s'\n", __func__, pcmf32.size(), fname.c_str());
+	return true;
 }
 
 // global
