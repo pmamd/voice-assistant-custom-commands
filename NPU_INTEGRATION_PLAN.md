@@ -94,7 +94,7 @@ endif()
 
 **Action on .22:**
 ```bash
-ssh amd@192.168.86.22 'bash -s' << 'ENDSSH'
+ssh amd@192.168.86.26 'bash -s' << 'ENDSSH'
 cd ~/Projects/git/talk-llama-fast/whisper.cpp/models
 
 # Download base model (multilingual, required for NPU)
@@ -149,7 +149,7 @@ cd ~/git/voice-assistant-custom-commands
 git push
 
 # On target
-ssh amd@192.168.86.22 'bash -s' << 'ENDSSH'
+ssh amd@192.168.86.26 'bash -s' << 'ENDSSH'
 cd ~/Projects/git/talk-llama-fast
 git pull
 
@@ -175,7 +175,7 @@ ENDSSH
 ### 2.2 Test NPU Inference
 
 ```bash
-ssh amd@192.168.86.22 'bash -s' << 'ENDSSH'
+ssh amd@192.168.86.26 'bash -s' << 'ENDSSH'
 cd ~/Projects/git/talk-llama-fast
 
 # Set up environment
@@ -232,7 +232,7 @@ time ./build/bin/talk-llama-custom \
 
 **Run:**
 ```bash
-ssh amd@192.168.86.22 'bash benchmark_whisper_npu.sh'
+ssh amd@192.168.86.26 'bash benchmark_whisper_npu.sh'
 ```
 
 **Expected:** NPU ~500ms, confirms 2x improvement

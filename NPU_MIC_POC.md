@@ -11,7 +11,7 @@ The NPU Whisper implementation **already has microphone support built-in** using
 **Easiest POC - Just run it:**
 
 ```bash
-ssh amd@192.168.86.22
+ssh amd@192.168.86.26
 source /opt/xilinx/xrt/setup.sh
 source /home/amd/RyzenAI-Full/bin/activate
 cd ~/RyzenAI-SW/Demos/ASR/Whisper
@@ -63,7 +63,7 @@ std::string transcribe_npu_from_mic(int duration_ms = 2000) {
     // Buffer audio for duration_ms, then transcribe
     char cmd[2048];
     snprintf(cmd, sizeof(cmd),
-        "ssh amd@192.168.86.22 '"
+        "ssh amd@192.168.86.26 '"
         "source /opt/xilinx/xrt/setup.sh && "
         "source /home/amd/RyzenAI-Full/bin/activate && "
         "cd ~/RyzenAI-SW/Demos/ASR/Whisper && "
@@ -281,7 +281,7 @@ This is what your current system does with whisper.cpp.
 ### Phase 1: Validate (30 min)
 ```bash
 # Test existing mic support
-ssh amd@192.168.86.22
+ssh amd@192.168.86.26
 cd ~/RyzenAI-SW/Demos/ASR/Whisper
 python run_whisper.py --model-type whisper-small --device npu --input mic --duration 0
 ```
@@ -298,7 +298,7 @@ Create simple wrapper script:
 #!/bin/bash
 # Quick POC wrapper
 
-ssh amd@192.168.86.22 << 'ENDSSH'
+ssh amd@192.168.86.26 << 'ENDSSH'
 source /opt/xilinx/xrt/setup.sh
 source /home/amd/RyzenAI-Full/bin/activate
 cd ~/RyzenAI-SW/Demos/ASR/Whisper
@@ -379,7 +379,7 @@ Total:                    ~1332ms (1.3 seconds)
 
 **Start with Option 1 (30 minutes):**
 ```bash
-ssh amd@192.168.86.22
+ssh amd@192.168.86.26
 cd ~/RyzenAI-SW/Demos/ASR/Whisper
 source /opt/xilinx/xrt/setup.sh && source /home/amd/RyzenAI-Full/bin/activate
 python run_whisper.py --model-type whisper-small --device npu --input mic --duration 0
@@ -402,7 +402,7 @@ Want to test RIGHT NOW? Run this:
 echo "Testing NPU Whisper with microphone..."
 echo ""
 
-ssh amd@192.168.86.22 'bash -s' << 'ENDSSH'
+ssh amd@192.168.86.26 'bash -s' << 'ENDSSH'
 source /opt/xilinx/xrt/setup.sh
 source /home/amd/RyzenAI-Full/bin/activate
 cd ~/RyzenAI-SW/Demos/ASR/Whisper

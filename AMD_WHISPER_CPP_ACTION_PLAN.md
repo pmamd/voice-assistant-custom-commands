@@ -43,7 +43,7 @@ Official status: "Windows only" (but worth trying!)
 **On .22, attempt build:**
 
 ```bash
-ssh amd@192.168.86.22
+ssh amd@192.168.86.26
 
 # Create test directory
 mkdir -p ~/whisper-npu-test

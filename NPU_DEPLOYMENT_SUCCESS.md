@@ -6,7 +6,7 @@
 
 Date: 2026-04-10
 Branch: `whisper-npu`
-Target: amd@192.168.86.22 (~/Projects/git/talk-llama-fast)
+Target: amd@192.168.86.26 (~/Projects/git/talk-llama-fast)
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Test Setup
 - **Audio:** "Tell me a story" voice command (1.2 seconds)
-- **Target:** AMD Ryzen AI @ 192.168.86.22
+- **Target:** AMD Ryzen AI @ 192.168.86.26
 - **Date:** 2026-04-10
 
 ## Results

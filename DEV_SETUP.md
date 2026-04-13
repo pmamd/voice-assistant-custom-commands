@@ -15,7 +15,7 @@ There is no WSL intermediary. Edit, build, and test all happen locally. No SSH, 
 | Role | Address | User | Project path |
 |------|---------|------|-------------|
 | **Dev machine** (here) | `192.168.86.74` | `paul` | `~/git/voice-assistant-custom-commands` |
-| **Target machine** | `192.168.86.22` | `amd` | `~/Projects/git/talk-llama-fast` |
+| **Target machine** | `192.168.86.26` | `amd` | `~/Projects/git/talk-llama-fast` |
 
 ## Development Workflow
 
@@ -35,7 +35,7 @@ Tests pass → commit → push → deploy to target
 ### Deploy to target after tests pass
 
 ```bash
-ssh amd@192.168.86.22 "cd ~/Projects/git/talk-llama-fast && git pull && cmake --build build -j"
+ssh amd@192.168.86.26 "cd ~/Projects/git/talk-llama-fast && git pull && cmake --build build -j"
 ```
 
 ## Build

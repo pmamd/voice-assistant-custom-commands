@@ -43,7 +43,7 @@ Run 3: 442ms total, 163ms encode
 ## Build Configuration
 
 ### Location
-- Machine: amd@192.168.86.22
+- Machine: amd@192.168.86.26
 - Path: `~/whisper-npu-test/whisper.cpp`
 - Branch: master (AMD fork)
 - Repo: https://github.com/amd/whisper.cpp

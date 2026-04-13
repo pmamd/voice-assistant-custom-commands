@@ -193,7 +193,7 @@ ls /home/amd/Downloads/ryzen_ai-1.6.1/
 
 ### Check Library Availability:
 ```bash
-ssh amd@192.168.86.22 'find /opt/xilinx -name "*onnxruntime*" -o -name "*vitisai*"'
+ssh amd@192.168.86.26 'find /opt/xilinx -name "*onnxruntime*" -o -name "*vitisai*"'
 ```
 
 ## Next Steps
