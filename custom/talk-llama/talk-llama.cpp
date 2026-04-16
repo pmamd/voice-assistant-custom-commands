@@ -2068,7 +2068,7 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 						if (params.debug) {
 							printf("%.3f after transcribe, result: '%s'\n", get_current_time_ms(), all_heard.c_str());
 						}
-						fprintf(stderr, "[LATENCY] Whisper: %.0fms\n", whisper_end - whisper_start);
+						fprintf(stderr, "[LATENCY] Whisper: %.0fms\n", (whisper_end - whisper_start) * 1000.0);
 						g_hotkey_pressed = "";
 					}
 				}
@@ -2342,7 +2342,7 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				server_stop_words.push_back("</s>");
 
 				llama_start_generation_time = get_current_time_ms();
-				fprintf(stderr, "[LATENCY] VAD->LLM: %.0fms\n", llama_start_generation_time - latency_vad_end);
+				fprintf(stderr, "[LATENCY] VAD->LLM: %.0fms\n", (llama_start_generation_time - latency_vad_end) * 1000.0);
 
 				// Send to llama-server and stream response
 				std::string response = llama_server_generate(
@@ -2367,8 +2367,8 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				conversation_history += user_turn + bot_prefix + " " + response;
 
 				llama_end_time = get_current_time_ms();
-				fprintf(stderr, "[LATENCY] LLM generation: %.0fms\n", llama_end_time - llama_start_generation_time);
-				fprintf(stderr, "[LATENCY] TOTAL (VAD end -> LLM complete): %.0fms\n", llama_end_time - latency_vad_end);
+				fprintf(stderr, "[LATENCY] LLM generation: %.0fms\n", (llama_end_time - llama_start_generation_time) * 1000.0);
+				fprintf(stderr, "[LATENCY] TOTAL (VAD end -> LLM complete): %.0fms\n", (llama_end_time - latency_vad_end) * 1000.0);
 				if (params.verbose)
 				{
 					llama_time_total = llama_end_time - llama_start_time;
