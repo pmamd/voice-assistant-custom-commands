@@ -77,18 +77,17 @@ run_test "gpu_baseline" ""
 sleep 2
 
 # Test 3: NPU (if available)
-if [ -f "$PROJECT_ROOT/whisper.cpp/models/ggml-base.en.bin" ]; then
-    echo "Test 3: NPU (VitisAI)"
-    echo "----------------------------------------"
-    # Note: NPU support requires specific whisper.cpp build
-    # and XRT environment from start-assistant.sh
-    if grep -q "WHISPER_VITISAI" "$BINARY" 2>/dev/null; then
-        run_test "npu" ""
-    else
-        echo "NPU not available in this build"
-    fi
-    sleep 2
+echo "Test 3: NPU (VitisAI)"
+echo "----------------------------------------"
+# Check if binary is linked to flexmlrt (NPU support)
+if ldd "$BINARY" 2>/dev/null | grep -q "libflexmlrt"; then
+    # Set XRT environment for NPU
+    export XLNX_VART_FIRMWARE=/opt/xilinx/overlaybins/xclbins
+    run_test "npu" "--no-gpu"
+else
+    echo "NPU not available in this build (libflexmlrt not linked)"
 fi
+sleep 2
 
 # Generate summary report
 SUMMARY_FILE="$RESULTS_DIR/latency_summary_${TIMESTAMP}.txt"
