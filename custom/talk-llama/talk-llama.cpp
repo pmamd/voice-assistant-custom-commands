@@ -1845,6 +1845,7 @@ int run(int argc, const char **argv)
 	double llama_end_time = 0.0;
 	double llama_time_total = 0.0;
 	double llama_start_generation_time = 0.0;
+	double latency_vad_end = 0.0;
 	std::string user_typed = "";
 	bool user_typed_this = false;
 
@@ -2018,6 +2019,7 @@ int run(int argc, const char **argv)
 if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
 				speech_end_ms = get_current_time_ms();
+				latency_vad_end = speech_end_ms;
 				speech_len = speech_end_ms - speech_start_ms;
 				if (speech_len < 0.10)
 					speech_len = 0;
@@ -2060,10 +2062,13 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 						if (params.debug) {
 							printf("%.3f before transcribe, buffer size: %d\n", get_current_time_ms(), (int)pcmf32_cur.size());
 						}
+						double whisper_start = get_current_time_ms();
 						all_heard = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms));
+						double whisper_end = get_current_time_ms();
 						if (params.debug) {
 							printf("%.3f after transcribe, result: '%s'\n", get_current_time_ms(), all_heard.c_str());
 						}
+						fprintf(stderr, "[LATENCY] Whisper: %.0fms\n", whisper_end - whisper_start);
 						g_hotkey_pressed = "";
 					}
 				}
@@ -2337,6 +2342,7 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				server_stop_words.push_back("</s>");
 
 				llama_start_generation_time = get_current_time_ms();
+				fprintf(stderr, "[LATENCY] VAD->LLM: %.0fms\n", llama_start_generation_time - latency_vad_end);
 
 				// Send to llama-server and stream response
 				std::string response = llama_server_generate(
@@ -2361,6 +2367,8 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				conversation_history += user_turn + bot_prefix + " " + response;
 
 				llama_end_time = get_current_time_ms();
+				fprintf(stderr, "[LATENCY] LLM generation: %.0fms\n", llama_end_time - llama_start_generation_time);
+				fprintf(stderr, "[LATENCY] TOTAL (VAD end -> LLM complete): %.0fms\n", llama_end_time - latency_vad_end);
 				if (params.verbose)
 				{
 					llama_time_total = llama_end_time - llama_start_time;
