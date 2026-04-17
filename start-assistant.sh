@@ -15,9 +15,9 @@ echo "Voice Assistant with Custom Commands"
 echo "=========================================="
 echo ""
 
-# Set HSA override for gfx1153 (890M iGPU) - required for GPU acceleration
-# Per ryzenai-embedded-eval-kit: gfx1153 needs HSA_OVERRIDE_GFX_VERSION=11.0.3
-export HSA_OVERRIDE_GFX_VERSION=11.0.3
+# Note: HSA_OVERRIDE_GFX_VERSION is intentionally NOT set here.
+# talk-llama-custom uses CPU only (no GPU/HIP). llama-server manages
+# its own GPU context and must NOT inherit any HSA overrides.
 
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
@@ -183,7 +183,7 @@ _llama_start() {
     echo "  Model:  $model"
     echo "  Port:   $port"
 
-    "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 999 --no-warmup \
+    "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 999 \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
