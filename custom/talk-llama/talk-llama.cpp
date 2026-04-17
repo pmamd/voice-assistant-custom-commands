@@ -937,6 +937,9 @@ int hSocket, read_size;
 		text = ::replace(text, "\"", "");
 		text = ::replace(text, "..", ".");
 
+		// Track TTS request timing
+		double tts_send_start = get_current_time_ms();
+
 		int still_running = 1;
 		char *json = TTS_RequestEncode(text.c_str());
 
@@ -964,6 +967,11 @@ int hSocket, read_size;
 		//Send data to the server
 		TTS_SocketSend(hSocket, json, strlen(json));
 		free(json);
+
+		double tts_send_end = get_current_time_ms();
+		fprintf(stderr, "[LATENCY] TTS request sent: %.0fms (text: %zu chars)\n",
+		        (tts_send_end - tts_send_start) * 1000.0, text.length());
+
 		//Received the data from the server
 		close(hSocket);
 		shutdown(hSocket,0);
@@ -2021,6 +2029,10 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				speech_end_ms = get_current_time_ms();
 				latency_vad_end = speech_end_ms;
 				speech_len = speech_end_ms - speech_start_ms;
+				// Log VAD duration for latency measurement
+				if (speech_start_ms > 0) {
+					fprintf(stderr, "[LATENCY] VAD duration: %.0fms\n", speech_len * 1000.0);
+				}
 				if (speech_len < 0.10)
 					speech_len = 0;
 				else if (speech_len > 10.0)
