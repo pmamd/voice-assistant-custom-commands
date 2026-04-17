@@ -36,18 +36,20 @@ mkdir -p "$RESULTS_DIR"
 run_test() {
     local test_name="$1"
     local whisper_args="$2"
+    local whisper_model="${3:-./whisper.cpp/models/ggml-base.en.bin}"
     local result_file="$RESULTS_DIR/latency_${test_name}_${TIMESTAMP}.log"
 
     echo -e "${YELLOW}Running: $test_name${NC}"
+    echo "Whisper model: $whisper_model"
     echo "Whisper args: $whisper_args"
     echo "Output: $result_file"
     echo ""
 
-    # Run the test with HSA override for gfx1153 (890M iGPU uses gfx1100 kernels)
-    HSA_OVERRIDE_GFX_VERSION=11.0.0 $BINARY \
+    # Run the test with HSA override for gfx1153 (eval kit uses 11.0.3)
+    HSA_OVERRIDE_GFX_VERSION=11.0.3 $BINARY \
         --test-input "$TEST_AUDIO" \
         --llama-url http://localhost:8080 \
-        -mw ./whisper.cpp/models/ggml-base.en.bin \
+        -mw "$whisper_model" \
         $whisper_args \
         --xtts-url http://localhost:10200/ \
         --xtts-voice en_US-lessac-medium \
@@ -83,7 +85,8 @@ echo "----------------------------------------"
 if ldd "$BINARY" 2>/dev/null | grep -q "libflexmlrt"; then
     # Set XRT environment for NPU
     export XLNX_VART_FIRMWARE=/opt/xilinx/overlaybins/xclbins
-    run_test "npu" "--no-gpu"
+    # CRITICAL: NPU requires ggml-base.bin (multilingual), not ggml-base.en.bin
+    run_test "npu" "--no-gpu" "./whisper.cpp/models/ggml-base.bin"
 else
     echo "NPU not available in this build (libflexmlrt not linked)"
 fi
