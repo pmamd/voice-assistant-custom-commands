@@ -36,7 +36,7 @@ mkdir -p "$RESULTS_DIR"
 run_test() {
     local test_name="$1"
     local whisper_args="$2"
-    local whisper_model="${3:-./whisper.cpp/models/ggml-base.en.bin}"
+    local whisper_model="${3:-$PROJECT_ROOT/whisper.cpp/models/ggml-base.en.bin}"
     local result_file="$RESULTS_DIR/latency_${test_name}_${TIMESTAMP}.log"
 
     echo -e "${YELLOW}Running: $test_name${NC}"
@@ -86,7 +86,7 @@ if ldd "$BINARY" 2>/dev/null | grep -q "libflexmlrt"; then
     # Set XRT environment for NPU
     export XLNX_VART_FIRMWARE=/opt/xilinx/overlaybins/xclbins
     # CRITICAL: NPU requires ggml-base.bin (multilingual), not ggml-base.en.bin
-    run_test "npu" "--no-gpu" "./whisper.cpp/models/ggml-base.bin"
+    run_test "npu" "--no-gpu" "$PROJECT_ROOT/whisper.cpp/models/ggml-base.bin"
 else
     echo "NPU not available in this build (libflexmlrt not linked)"
 fi
