@@ -1,0 +1,25 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-03-16 15:08:26
+Total Tests: 3
+Passed: 0
+Failed: 3
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 0ms
+  Error: Voice model 'en_US-lessac-medium' not found in external/piper-voices
+
+[FAIL] question_response
+  Duration: 0ms
+  Error: Voice model 'en_US-lessac-medium' not found in external/piper-voices
+
+[FAIL] stop_command_basic
+  Duration: 0ms
+  Error: Voice model 'en_US-lessac-medium' not found in external/piper-voices
+
+================================================================================

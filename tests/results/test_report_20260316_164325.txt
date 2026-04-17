@@ -1,0 +1,33 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-03-16 16:43:25
+Total Tests: 3
+Passed: 2
+Failed: 1
+Success Rate: 66.7%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 6597ms
+  Transcription: 'Help me I help you today.'
+  Expected: 'How can I assist you today?'
+  Confidence: 78.96%
+  Similarity: 53.13%
+
+[PASS] question_response
+  Duration: 5535ms
+  Transcription: 'The answer to the mathematical expression 2+2 is 4.'
+  Expected: 'The answer is 4'
+  Confidence: 91.62%
+  Similarity: 56.79%
+
+[PASS] stop_command_basic
+  Duration: 109056ms
+  Transcription: 'Voice Assistant initialised.'
+  Expected: 'None'
+  Confidence: 71.68%
+
+================================================================================

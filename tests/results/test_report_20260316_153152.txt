@@ -1,0 +1,28 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-03-16 15:31:52
+Total Tests: 3
+Passed: 1
+Failed: 2
+Success Rate: 33.3%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 6806ms
+  Expected: 'How can I assist you today?'
+  Similarity: 20.78%
+
+[FAIL] question_response
+  Duration: 5374ms
+  Expected: 'The answer is 4'
+  Similarity: 20.45%
+
+[PASS] stop_command_basic
+  Duration: 120807ms
+  Transcription: '[STOP COMMAND]'
+  Expected: 'stop'
+
+================================================================================

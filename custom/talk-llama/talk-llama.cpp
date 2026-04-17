@@ -969,10 +969,13 @@ int hSocket, read_size;
 		free(json);
 
 		double tts_send_end = get_current_time_ms();
-		fprintf(stderr, "[LATENCY] TTS request sent: %.0fms (text: %zu chars)\n",
-		        (tts_send_end - tts_send_start) * 1000.0, text.length());
+		if (debug) {
+			fprintf(stderr, "[LATENCY] TTS request sent: %.0fms (text: %zu chars)\n",
+			        (tts_send_end - tts_send_start) * 1000.0, text.length());
+		}
 
-		//Received the data from the server
+		//Close the socket (fire-and-forget - TTS happens asynchronously)
+		//NOTE: For true TTS timing including synthesis, use end-to-end test with Wyoming-Piper test mode
 		close(hSocket);
 		shutdown(hSocket,0);
 		shutdown(hSocket,1);
