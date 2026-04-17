@@ -99,7 +99,23 @@ bool ToolCallParser::feedToken(const std::string& token) {
 
 bool ToolCallParser::parseToolCall() {
     try {
-        json j = json::parse(json_content_);
+        // Strip malformed quotes that some LLMs add
+        // Common patterns:
+        //   "{"name": ...}  (opening quote, no closing quote)
+        //   "{"name": ...}" (properly quoted)
+        std::string json_str = json_content_;
+
+        // Remove leading quote-brace if present: "{
+        if (json_str.length() >= 2 && json_str[0] == '"' && json_str[1] == '{') {
+            json_str = json_str.substr(1);  // Remove leading "
+        }
+
+        // Remove trailing brace-quote if present: }"
+        if (json_str.length() >= 2 && json_str[json_str.length() - 2] == '}' && json_str[json_str.length() - 1] == '"') {
+            json_str = json_str.substr(0, json_str.length() - 1);  // Remove trailing "
+        }
+
+        json j = json::parse(json_str);
 
         if (!j.contains("name") || !j["name"].is_string()) {
             fprintf(stderr, "[Tool Parser] Missing 'name' field in tool call\n");
