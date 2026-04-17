@@ -99,23 +99,41 @@ bool ToolCallParser::feedToken(const std::string& token) {
 
 bool ToolCallParser::parseToolCall() {
     try {
-        // Strip malformed quotes that some LLMs add
-        // Common patterns:
-        //   "{"name": ...}  (opening quote, no closing quote)
-        //   "{"name": ...}" (properly quoted)
+        // LLMs sometimes output malformed JSON in multiple ways:
+        // 1. "{"name": ...}"  - entire JSON wrapped in quotes
+        // 2. "{name": ...}    - missing quote on first key after stripping leading "{
+        // 3. "{"name": ...}   - opening quote but no closing quote
+
         std::string json_str = json_content_;
+        json j;
+        bool parsed = false;
 
-        // Remove leading quote-brace if present: "{
-        if (json_str.length() >= 2 && json_str[0] == '"' && json_str[1] == '{') {
-            json_str = json_str.substr(1);  // Remove leading "
+        // Try to parse as-is first
+        try {
+            j = json::parse(json_str);
+            parsed = true;
+        } catch (...) {
+            // Parse failed, try fixing common issues
+
+            // Strip outer quotes if present: "..." -> ...
+            if (json_str.length() >= 2 && json_str.front() == '"' && json_str.back() == '"') {
+                json_str = json_str.substr(1, json_str.length() - 2);
+            } else if (json_str.length() >= 2 && json_str.front() == '"' && json_str[1] == '{') {
+                // Has leading quote but maybe not trailing: "{ ...
+                json_str = json_str.substr(1);  // Remove leading "
+                // Remove trailing " if present
+                if (!json_str.empty() && json_str.back() == '"') {
+                    json_str.pop_back();
+                }
+            }
+
+            j = json::parse(json_str);
+            parsed = true;
         }
 
-        // Remove trailing brace-quote if present: }"
-        if (json_str.length() >= 2 && json_str[json_str.length() - 2] == '}' && json_str[json_str.length() - 1] == '"') {
-            json_str = json_str.substr(0, json_str.length() - 1);  // Remove trailing "
+        if (!parsed) {
+            return false;
         }
-
-        json j = json::parse(json_str);
 
         if (!j.contains("name") || !j["name"].is_string()) {
             fprintf(stderr, "[Tool Parser] Missing 'name' field in tool call\n");
