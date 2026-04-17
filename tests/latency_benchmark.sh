@@ -43,8 +43,8 @@ run_test() {
     echo "Output: $result_file"
     echo ""
 
-    # Run the test with HSA override for gfx1153 (890M iGPU)
-    HSA_OVERRIDE_GFX_VERSION=11.5.1 $BINARY \
+    # Run the test with HSA override for gfx1153 (890M iGPU uses gfx1100 kernels)
+    HSA_OVERRIDE_GFX_VERSION=11.0.0 $BINARY \
         --test-input "$TEST_AUDIO" \
         --llama-url http://localhost:8080 \
         -mw ./whisper.cpp/models/ggml-base.en.bin \
