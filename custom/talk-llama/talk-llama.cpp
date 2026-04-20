@@ -1804,7 +1804,8 @@ int run(int argc, const char **argv)
 	// Whisper GPU warmup — first inference initializes GPU kernels and can take
 	// 2-5x longer. Without this, the speech-start warmup transcription blocks
 	// long enough that the user's first utterance exceeds the silence timeout.
-	if (!test_mode) {
+	// Skip warmup if GPU is disabled (e.g., using NPU encoder or CPU-only mode).
+	if (!test_mode && params.use_gpu) {
 		printf("Warming up Whisper GPU...\n");
 		std::vector<float> whisper_warmup_audio(WHISPER_SAMPLE_RATE, 0.0f);
 		float prob_dummy = 0.0f;
