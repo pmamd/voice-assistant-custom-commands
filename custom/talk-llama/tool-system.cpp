@@ -186,7 +186,10 @@ std::string ToolRegistry::getToolsPrompt() const {
 
     oss << "To use a tool, output ONLY the tool call with no preamble or explanation:\n";
     oss << "<tool_call>{\"name\": \"tool_name\", \"arguments\": {...}, \"id\": \"unique_id\"}</tool_call>\n";
-    oss << "Call tools immediately when requested. Do not say 'I'm sorry' or 'I didn't understand' — just execute the tool.\n";
+    oss << "\n";
+    oss << "IMPORTANT: Only use tools when the user explicitly requests an action (e.g., 'set temperature to 72', 'navigate to home').\n";
+    oss << "For normal conversation, greetings, or unclear requests, respond conversationally WITHOUT using tools.\n";
+    oss << "When a tool is needed, call it immediately with no preamble or explanation.\n";
 
     return oss.str();
 }
