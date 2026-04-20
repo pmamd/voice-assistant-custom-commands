@@ -35,23 +35,73 @@ Tests pass → commit → push → deploy to target
 ### Deploy to target after tests pass
 
 ```bash
+# Pull code and rebuild (preserves existing NPU build configuration)
 ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && git pull && cmake --build build -j"
+
+# If CMakeLists.txt changed, reconfigure NPU build
+ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && rm -rf build && cmake -B build -DWHISPER_SDL2=ON -DWHISPER_VITISAI=ON && cmake --build build -j"
 ```
 
-## Build
+## Build Configuration
+
+**CRITICAL: Each machine requires a different build configuration. GPU and NPU cannot be enabled together.**
+
+### Dev Machine (.74) - GPU Build
 
 ```bash
 cd ~/git/voice-assistant-custom-commands
 
-# Configure (only needed once or after CMakeLists changes)
-# Note: -DGGML_HIP=ON required after ROCm 7.x update
+# Clean build (if switching from NPU build)
+rm -rf build
+
+# Configure with GPU support (ROCm/HIP)
 cmake -B build -DWHISPER_SDL2=ON -DGGML_HIP=ON
 
 # Build
 cmake --build build -j
 
+# Verify GPU support
+strings build/bin/talk-llama-custom | grep -i "rocm\|hip"
+
 # Binary at: build/bin/talk-llama-custom
 ```
+
+Hardware: AMD W6800 GPU (gfx1030), ROCm 7.2.1
+
+### Target Machine (.26) - NPU Build
+
+```bash
+# SSH to target
+ssh amd@192.168.86.26
+
+cd ~/git/voice-assistant-custom-commands
+
+# Clean build (if switching from GPU build)
+rm -rf build
+
+# Configure with NPU support ONLY (no GPU)
+cmake -B build -DWHISPER_SDL2=ON -DWHISPER_VITISAI=ON
+
+# Build
+cmake --build build -j
+
+# Verify NPU support
+strings build/bin/talk-llama-custom | grep -i "vitisai\|flexml"
+
+# Test NPU with environment
+export HSA_OVERRIDE_GFX_VERSION=11.0.3
+source /opt/xilinx/xrt/setup.sh
+./build/bin/whisper-cli -m ./whisper.cpp/models/ggml-base.bin -f tests/audio/inputs/make_it_warmer.wav
+```
+
+Hardware: AMD 890M iGPU (gfx1153) + NPU, ROCm 7.1.1, VitisAI/FlexML runtime
+
+**Why separate builds?**
+
+Enabling both `-DGGML_HIP=ON` (GPU) and `-DWHISPER_VITISAI=ON` (NPU) simultaneously causes segfaults. The HIP runtime conflicts with the NPU encoder during Whisper inference. Each machine must choose one acceleration method:
+
+- Dev machine: GPU for Whisper and LLM (faster development, no NPU hardware)
+- Target machine: NPU for Whisper encoder (production deployment, low power)
 
 ## Test
 
@@ -114,9 +164,24 @@ kill $(lsof -ti tcp:10200) && sleep 1
 # Check for errors
 cmake --build build -j 2>&1 | grep "error:"
 
-# Full reconfigure if needed
-cmake -B build -DWHISPER_SDL2=ON
+# Full reconfigure (use correct flags for the machine)
+# Dev machine:
+cmake -B build -DWHISPER_SDL2=ON -DGGML_HIP=ON
+# Target machine:
+cmake -B build -DWHISPER_SDL2=ON -DWHISPER_VITISAI=ON
+
 cmake --build build -j
+```
+
+**NPU segfaults on target machine:**
+```bash
+# Verify build has ONLY NPU support (no GPU)
+ssh amd@192.168.86.26 'cat ~/git/voice-assistant-custom-commands/build/CMakeCache.txt | grep -E "(GGML_HIP|WHISPER_VITISAI)"'
+# Should show: WHISPER_VITISAI:BOOL=ON
+# Should NOT show: GGML_HIP:BOOL=ON
+
+# If GPU is enabled, rebuild:
+ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && rm -rf build && cmake -B build -DWHISPER_SDL2=ON -DWHISPER_VITISAI=ON && cmake --build build -j"
 ```
 
 **aplay left running after tests:**
