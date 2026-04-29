@@ -183,7 +183,7 @@ _llama_start() {
     echo "  Model:  $model"
     echo "  Port:   $port"
 
-    "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 0 --ctx-size 4096 --cache-prompt \
+    CUDA_VISIBLE_DEVICES=-1 "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 0 --ctx-size 4096 --cache-prompt --no-warmup \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
