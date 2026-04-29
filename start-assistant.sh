@@ -183,7 +183,7 @@ _llama_start() {
     echo "  Model:  $model"
     echo "  Port:   $port"
 
-    "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 999 \
+    "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 99 --ctx-size 4096 --cache-prompt \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
