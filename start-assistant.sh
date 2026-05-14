@@ -24,7 +24,7 @@ PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
 WHISPER_MODEL="./whisper.cpp/models/ggml-base.en.bin"
-LLAMA_MODEL="${LLAMA_MODEL:-$HOME/models/Ministral-3b-instruct.Q4_K_M.gguf}"
+LLAMA_MODEL="./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
 TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
 
 # llama-server configuration
