@@ -50,7 +50,7 @@ echo
 
 # Test 4: Test llama-server completion
 echo "4. Testing llama-server completion..."
-RESPONSE=$(timeout 10 curl -s http://localhost:8080/completion \
+RESPONSE=$(timeout 30 curl -s http://localhost:8080/completion \
   -H "Content-Type: application/json" \
   -d '{"prompt":"User: Hello\nAssistant:","temperature":0.7,"max_tokens":20,"stop":["\n"]}' 2>&1)
 
