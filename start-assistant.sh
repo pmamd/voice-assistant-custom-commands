@@ -320,6 +320,8 @@ echo "=========================================="
 echo ""
 
 # Start the voice assistant
+# Note: Using multilingual base model with --language en because NPU encoder
+# is incompatible with ggml-base.en.bin (produces garbage transcription)
 $TALK_LLAMA_BIN \
     -mw "$WHISPER_MODEL" \
     --llama-url "$LLAMA_SERVER_URL" \
@@ -330,7 +332,8 @@ $TALK_LLAMA_BIN \
     -n 300 \
     --allow-newline \
     -p Driver \
-    -c "$CAPTURE_DEVICE"
+    -c "$CAPTURE_DEVICE" \
+    --language en
 
 # Cleanup on exit
 echo ""
