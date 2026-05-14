@@ -39,8 +39,9 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Check common locations
+    # Check common locations - prefer kitt2k binary first (known working)
     for candidate in \
+        "$HOME/Documents/llama.cpp/build/bin/llama-server" \
         "$HOME/.local/bin/llama-server" \
         "/usr/local/bin/llama-server" \
         "/usr/bin/llama-server" \
