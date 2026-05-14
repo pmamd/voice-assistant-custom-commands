@@ -200,7 +200,8 @@ _llama_start() {
             echo -e "\n${GREEN}✓ llama-server ready${NC}"
             return 0
         fi
-        if ! kill -0 "$LLAMA_SERVER_PID" 2>/dev/null; then
+        # Check if process is running by searching process table (disown breaks kill -0 check)
+        if ! pgrep -f "llama-server.*${LLAMA_SERVER_PORT}" > /dev/null; then
             echo -e "\n${RED}✗ llama-server process died — check: cat /tmp/llama-server.log${NC}"
             exit 1
         fi
