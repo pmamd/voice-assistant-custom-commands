@@ -182,9 +182,13 @@ _llama_start() {
     echo "  Binary: $bin"
     echo "  Model:  $model"
     echo "  Port:   $port"
+    echo "  Using HSA_OVERRIDE_GFX_VERSION=11.5.1 for gfx1153 GPU"
 
-    CUDA_VISIBLE_DEVICES=-1 "$bin" --model "$model" --host 0.0.0.0 --port "$port" -ngl 0 --ctx-size 4096 --cache-prompt --no-warmup \
-        > /tmp/llama-server.log 2>&1 &
+    # Run llama-server with HSA override for gfx1153 compatibility (same as kitt2k)
+    # --flash-attn 0 is critical to avoid GPU crashes on this hardware
+    bash -c "export HSA_OVERRIDE_GFX_VERSION=11.5.1 && \
+        '$bin' --model '$model' --host 0.0.0.0 --port '$port' -ngl 999 -c 4096 --flash-attn 0 --no-warmup --cache-prompt \
+        > /tmp/llama-server.log 2>&1 &" &
     LLAMA_SERVER_PID=$!
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
 
