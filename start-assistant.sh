@@ -183,12 +183,13 @@ _llama_start() {
     echo "  Binary: $bin"
     echo "  Model:  $model"
     echo "  Port:   $port"
-    echo "  Using HSA_OVERRIDE_GFX_VERSION=11.5.1 for gfx1153 GPU"
+    echo "  Using HSA_OVERRIDE_GFX_VERSION=11.0.2 for gfx1153 GPU"
 
     # Run llama-server with HSA override for gfx1153 compatibility (same as kitt2k)
+    # HSA 11.0.2 is correct for gfx1153 - 11.5.1 causes crashes during generation
     # --flash-attn 0 is critical to avoid GPU crashes on this hardware
     # --no-warmup avoids crashes during startup warmup phase
-    HSA_OVERRIDE_GFX_VERSION=11.5.1 "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
+    HSA_OVERRIDE_GFX_VERSION=11.0.2 "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
         -ngl 999 -c 4096 --flash-attn 0 --cache-prompt --no-warmup \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
