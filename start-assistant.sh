@@ -187,8 +187,9 @@ _llama_start() {
 
     # Run llama-server with HSA override for gfx1153 compatibility (same as kitt2k)
     # --flash-attn 0 is critical to avoid GPU crashes on this hardware
+    # --no-warmup avoids crashes during startup warmup phase
     HSA_OVERRIDE_GFX_VERSION=11.5.1 "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
-        -ngl 999 -c 4096 --flash-attn 0 --cache-prompt \
+        -ngl 999 -c 4096 --flash-attn 0 --cache-prompt --no-warmup \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
     disown
