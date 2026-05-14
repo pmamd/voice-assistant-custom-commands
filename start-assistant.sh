@@ -190,6 +190,7 @@ _llama_start() {
         -ngl 999 -c 4096 --flash-attn 0 --no-warmup --cache-prompt \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
+    disown
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
 
     echo "Waiting for llama-server to load model..."
