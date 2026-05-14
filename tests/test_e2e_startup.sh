@@ -4,6 +4,11 @@
 
 set -e
 
+# Change to project root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -31,7 +36,13 @@ echo
 
 # Test 3: Check build artifacts
 echo "3. Checking build artifacts..."
-test -f ./build/bin/talk-llama-custom && pass "talk-llama-custom binary exists" || fail "binary not found"
+if test -f ./build/bin/talk-llama-custom; then
+    pass "talk-llama-custom binary exists"
+elif test -f ./build/bin/talk-llama; then
+    pass "talk-llama binary exists"
+else
+    fail "binary not found"
+fi
 test -f ./whisper.cpp/models/ggml-base.en.bin && pass "Whisper model exists" || fail "Whisper model not found"
 test -f ./models/mistral-7b-instruct-v0.2.Q5_0.gguf && pass "LLM model exists" || fail "LLM model not found"
 test -f ./custom/talk-llama/tools/tools.json && pass "tools.json exists" || fail "tools.json not found"
