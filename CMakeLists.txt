@@ -28,10 +28,11 @@ endif()
 if(WHISPER_VITISAI)
     set(VITISAI_ENCODER_FILE "${CMAKE_SOURCE_DIR}/external/whisper.cpp/src/vitisai/whisper-vitisai-encoder.cpp")
     if(EXISTS ${VITISAI_ENCODER_FILE})
-        # Check if already patched
+        # Check if already patched by looking for commented-out line
         file(READ ${VITISAI_ENCODER_FILE} VITISAI_CONTENT)
-        string(FIND "${VITISAI_CONTENT}" "std::fprintf(stdout, \"%s: Vitis AI model inference completed" VERBOSE_LINE_POS)
-        if(NOT VERBOSE_LINE_POS EQUAL -1)
+        string(FIND "${VITISAI_CONTENT}" "// std::fprintf(stdout, \"%s: Vitis AI model inference completed" PATCHED_LINE_POS)
+        if(PATCHED_LINE_POS EQUAL -1)
+            # Not yet patched
             message(STATUS "Patching VitisAI encoder to silence verbose output...")
             execute_process(
                 COMMAND sed -i "s|std::fprintf(stdout, \"%s: Vitis AI model inference completed|// &|g" ${VITISAI_ENCODER_FILE}
