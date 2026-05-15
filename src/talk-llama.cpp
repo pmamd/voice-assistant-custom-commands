@@ -1543,7 +1543,7 @@ int run(int argc, const char **argv)
 
 	// Initialize tool calling system early (needed for prompt injection)
 	tool_system::ToolRegistry& tool_registry = tool_system::ToolRegistry::getInstance();
-	std::string tools_json_path = "custom/talk-llama/tools/tools.json";
+	std::string tools_json_path = "src/tools/tools.json";
 	if (!tool_registry.loadFromFile(tools_json_path)) {
 		fprintf(stderr, "WARNING: Failed to load tools from %s\n", tools_json_path.c_str());
 	} else {
