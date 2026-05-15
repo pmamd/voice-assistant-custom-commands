@@ -104,7 +104,8 @@ bool WyomingClient::sendEvent(const std::string& event_type, const std::string& 
         return false;
     }
 
-    fprintf(stdout, "[Wyoming Client] Sent event: %s", event_json.c_str());
+    // Debug output disabled by default - too noisy
+    // fprintf(stdout, "[Wyoming Client] Sent event: %s", event_json.c_str());
     return true;
 }
 
