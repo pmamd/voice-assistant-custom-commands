@@ -1,9 +1,9 @@
-[submodule "whisper.cpp"]
-	path = whisper.cpp
+[submodule "external/whisper.cpp"]
+	path = external/whisper.cpp
 	url = https://github.com/amd/whisper.cpp
-[submodule "tests/external/piper"]
-	path = tests/external/piper
-	url = https://github.com/OHF-Voice/piper1-gpl.git
 [submodule "external/piper"]
 	path = external/piper
 	url = https://github.com/OHF-Voice/piper1-gpl.git
+[submodule "external/llama.cpp"]
+	path = external/llama.cpp
+	url = https://github.com/ggerganov/llama.cpp

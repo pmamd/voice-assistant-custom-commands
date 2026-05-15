@@ -25,7 +25,7 @@ A voice assistant combining Whisper STT, Mistral LLM, and Piper TTS with a tool 
                      │
                      ▼
      ┌───────────────────────────────┐
-     │    talk-llama-custom          │
+     │    voice-assistant            │
      │                               │
      │  Whisper STT                  │
      │       │                       │
@@ -61,28 +61,29 @@ cmake -B build -DWHISPER_SDL2=ON && cmake --build build -j
 
 ```
 voice-assistant-custom-commands/
-├── custom/talk-llama/        # Modified talk-llama application
-│   ├── talk-llama.cpp        # Main application
+├── src/                      # Application code
+│   ├── talk-llama.cpp        # Main voice assistant application
 │   ├── tool-system.h/.cpp    # Tool registry and executors
 │   ├── tool-parser.h/.cpp    # Streaming Mistral tool call parser
 │   ├── wyoming-client.h/.cpp # Wyoming protocol TCP client
 │   └── tools/tools.json      # Tool definitions (JSON)
-├── wyoming-piper/            # Modified Wyoming-Piper TTS server
-│   └── wyoming_piper/
-│       └── handler.py        # Stop/pause/resume event handling
-├── whisper.cpp/              # Submodule: upstream Whisper STT
+├── external/                 # Third-party dependencies
+│   ├── whisper.cpp/          # Submodule: Whisper STT (AMD fork)
+│   ├── wyoming-piper/        # Modified Wyoming-Piper TTS server
+│   ├── piper/                # Submodule: Piper TTS models
+│   └── llama.cpp/            # Submodule: llama-server (optional build)
 ├── tests/                    # Test suite
 │   ├── run_tests.py          # End-to-end test runner
 │   ├── test_real_interrupt.py    # Wyoming stop mechanics tests
-│   └── test_wyoming_piper_unit.py  # TTS output quality tests
+│   └── test_wyoming_piper_unit.py # TTS output quality tests
 ├── docs/                     # Documentation
 │   ├── TOOL_SYSTEM.md        # Tool calling architecture
 │   ├── WYOMING.md            # Wyoming protocol integration
-│   ├── TTS_FEEDBACK_PREVENTION.md  # VAD/echo mitigation
-│   └── FUTURE.md             # Features for future re-integration
+│   └── TTS_FEEDBACK_PREVENTION.md # VAD/echo mitigation
+├── models/                   # GGUF models for LLM
 ├── start-assistant.sh        # Main startup script
 ├── QUICKSTART.md             # Installation and setup guide
-└── CMakeLists.txt
+└── CMakeLists.txt            # Build configuration
 ```
 
 ## Tool System
@@ -92,7 +93,7 @@ Voice commands are handled in two modes:
 - **Fast path** — keyword-matched commands execute instantly, bypassing the LLM (e.g. "stop", "pause")
 - **Smart path** — the LLM generates a structured `<tool_call>` response which is parsed and executed
 
-Tools are defined in `custom/talk-llama/tools/tools.json`. See [docs/TOOL_SYSTEM.md](./docs/TOOL_SYSTEM.md) for how to add new tools.
+Tools are defined in `src/tools/tools.json`. See [docs/TOOL_SYSTEM.md](./docs/TOOL_SYSTEM.md) for how to add new tools.
 
 ## Building
 
@@ -126,8 +127,8 @@ python3 tests/run_tests.py --config tests/test_cases.yaml --group all
 
 ## License
 
-- **Custom code** (`custom/`, `wyoming-piper/` modifications): see LICENSE
-- **whisper.cpp**: MIT License — see `whisper.cpp/LICENSE`
+- **Custom code** (`custom/`, `external/wyoming-piper/` modifications): see LICENSE
+- **whisper.cpp**: MIT License — see `external/whisper.cpp/LICENSE`
 - **Mistral models**: Mistral AI license — see model terms
 - **LLaMA models**: Meta AI license — see model terms
 

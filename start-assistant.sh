@@ -16,16 +16,16 @@ echo "=========================================="
 echo ""
 
 # Note: HSA_OVERRIDE_GFX_VERSION is intentionally NOT set here.
-# talk-llama-custom uses CPU only (no GPU/HIP). llama-server manages
+# voice-assistant uses CPU only (no GPU/HIP). llama-server manages
 # its own GPU context and must NOT inherit any HSA overrides.
 
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
-WHISPER_MODEL="./whisper.cpp/models/ggml-base.bin"
+WHISPER_MODEL="./external/whisper.cpp/models/ggml-base.bin"
 LLAMA_MODEL="./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
-TALK_LLAMA_BIN="./build/bin/talk-llama-custom"
+TALK_LLAMA_BIN="./build/bin/voice-assistant"
 
 # llama-server configuration
 LLAMA_SERVER_PORT=8080
@@ -62,11 +62,11 @@ if pgrep -x aplay > /dev/null 2>&1; then
     pkill -9 -x aplay || true
 fi
 
-# Check if talk-llama-custom is already running and kill it
-if pgrep -f "talk-llama-custom" > /dev/null; then
-    echo -e "${YELLOW}⚠ Found existing talk-llama-custom process(es)${NC}"
+# Check if voice-assistant is already running and kill it
+if pgrep -f "voice-assistant" > /dev/null; then
+    echo -e "${YELLOW}⚠ Found existing voice-assistant process(es)${NC}"
     echo "Killing previous instances..."
-    pkill -9 -f "talk-llama-custom" || true
+    pkill -9 -f "voice-assistant" || true
     sleep 1
     echo -e "${GREEN}✓ Cleaned up previous instances${NC}"
     echo ""
@@ -240,14 +240,14 @@ fi
 echo "Checking required files..."
 
 if [ ! -f "$TALK_LLAMA_BIN" ]; then
-    echo -e "${RED}✗ Error: talk-llama-custom not found at $TALK_LLAMA_BIN${NC}"
+    echo -e "${RED}✗ Error: voice-assistant not found at $TALK_LLAMA_BIN${NC}"
     echo "Please build it with: cmake -B build -DWHISPER_SDL2=ON && cmake --build build"
     exit 1
 fi
 
 if [ ! -f "$WHISPER_MODEL" ]; then
     echo -e "${RED}✗ Error: Whisper model not found at $WHISPER_MODEL${NC}"
-    echo "Please download it with: cd whisper.cpp/models && bash download-ggml-model.sh tiny.en"
+    echo "Please download it with: cd external/whisper.cpp/models && bash download-ggml-model.sh tiny.en"
     exit 1
 fi
 

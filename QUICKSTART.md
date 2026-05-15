@@ -41,7 +41,7 @@ export PATH="$HOME/.local/bin:$PATH"
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 # 7. Download Whisper model
-cd whisper.cpp/models && bash download-ggml-model.sh tiny.en && cd ../..
+cd external/whisper.cpp/models && bash download-ggml-model.sh tiny.en && cd ../..
 
 # 8. Download LLM (Mistral recommended)
 mkdir -p models
@@ -58,8 +58,8 @@ file $(which piper)            # → "Python script" (not "ELF")
 pipx list | grep piper-tts    # → version 1.4.1
 
 # Builds present
-ls build/bin/talk-llama-custom
-ls whisper.cpp/models/*.bin
+ls build/bin/voice-assistant
+ls external/whisper.cpp/models/*.bin
 ls models/*.gguf
 ```
 
@@ -106,9 +106,9 @@ python3 -m wyoming_piper \
 
 **Terminal 2 — Voice assistant:**
 ```bash
-./build/bin/talk-llama-custom \
+./build/bin/voice-assistant \
     -ml ./models/mistral-7b-instruct-v0.2.Q5_0.gguf \
-    -mw ./whisper.cpp/models/ggml-tiny.en.bin \
+    -mw ./external/whisper.cpp/models/ggml-tiny.en.bin \
     --xtts-url http://localhost:10200/ \
     --xtts-voice en_US-lessac-medium \
     --temp 0.5 \
@@ -142,13 +142,13 @@ Edit `start-assistant.sh` to change:
 
 **Better Whisper accuracy** (larger model, slower):
 ```bash
-cd whisper.cpp/models && bash download-ggml-model.sh base.en
+cd external/whisper.cpp/models && bash download-ggml-model.sh base.en
 # Then update WHISPER_MODEL in start-assistant.sh
 ```
 
 **Custom system prompt:**
 ```bash
-./build/bin/talk-llama-custom ... -p "You are a helpful driving assistant. Be concise."
+./build/bin/voice-assistant ... -p "You are a helpful driving assistant. Be concise."
 ```
 
 ---

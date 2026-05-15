@@ -115,11 +115,11 @@ fi # end ROCm block
 # ---------------------------------------------------------------------------
 info "Checking pre-built binaries..."
 
-DIST_BIN="$SCRIPT_DIR/dist/bin/talk-llama-custom"
+DIST_BIN="$SCRIPT_DIR/dist/bin/voice-assistant"
 DIST_LIBWHISPER="$SCRIPT_DIR/dist/lib/libwhisper.so.1.6.2"
 DIST_LIBGGML="$SCRIPT_DIR/dist/lib/libggml.so"
 
-[[ -f "$DIST_BIN" ]]        || fail "dist/bin/talk-llama-custom not found. Is the repo up to date?"
+[[ -f "$DIST_BIN" ]]        || fail "dist/bin/voice-assistant not found. Is the repo up to date?"
 [[ -f "$DIST_LIBWHISPER" ]] || fail "dist/lib/libwhisper.so.1.6.2 not found."
 [[ -f "$DIST_LIBGGML" ]]    || fail "dist/lib/libggml.so not found."
 ok "Pre-built binaries present"
@@ -147,9 +147,9 @@ ok "System packages installed"
 info "Installing binary to build/bin/..."
 
 mkdir -p "$SCRIPT_DIR/build/bin"
-cp "$DIST_BIN" "$SCRIPT_DIR/build/bin/talk-llama-custom"
-chmod +x "$SCRIPT_DIR/build/bin/talk-llama-custom"
-ok "Binary installed → build/bin/talk-llama-custom"
+cp "$DIST_BIN" "$SCRIPT_DIR/build/bin/voice-assistant"
+chmod +x "$SCRIPT_DIR/build/bin/voice-assistant"
+ok "Binary installed → build/bin/voice-assistant"
 
 info "Installing shared libraries to /usr/local/lib/..."
 sudo cp "$DIST_LIBWHISPER" /usr/local/lib/libwhisper.so.1.6.2
@@ -160,7 +160,7 @@ sudo ldconfig
 ok "Shared libraries installed and ldconfig updated"
 
 info "Verifying binary links cleanly..."
-MISSING=$(ldd "$SCRIPT_DIR/build/bin/talk-llama-custom" 2>&1 | grep "not found" || true)
+MISSING=$(ldd "$SCRIPT_DIR/build/bin/voice-assistant" 2>&1 | grep "not found" || true)
 if [[ -n "$MISSING" ]]; then
     fail "Binary has unresolved library dependencies:\n$MISSING\nInstall the missing libraries and re-run."
 fi
@@ -202,7 +202,7 @@ fi
 info "Installing Wyoming-Piper (custom version)..."
 
 WYOMING_DIR="$SCRIPT_DIR/wyoming-piper"
-[[ -d "$WYOMING_DIR" ]] || fail "wyoming-piper/ directory not found. Did you clone with --recursive?"
+[[ -d "$WYOMING_DIR" ]] || fail "external/wyoming-piper/ directory not found. Did you clone with --recursive?"
 
 # Check if already installed AND pointing to the correct directory.
 # pipx editable installs record their source path in direct_url.json — if it
@@ -276,17 +276,17 @@ fi
 # 7. Whisper model
 # ---------------------------------------------------------------------------
 echo ""
-WHISPER_MODEL="$SCRIPT_DIR/whisper.cpp/models/ggml-tiny.en.bin"
+WHISPER_MODEL="$SCRIPT_DIR/external/whisper.cpp/models/ggml-tiny.en.bin"
 if [[ -f "$WHISPER_MODEL" ]]; then
     ok "Whisper model already present: ggml-tiny.en.bin"
 else
     if prompt_yes_no "Download Whisper model (ggml-tiny.en, ~75MB)?" "y"; then
-        mkdir -p "$SCRIPT_DIR/whisper.cpp/models"
-        wget --show-progress -O "$SCRIPT_DIR/whisper.cpp/models/ggml-tiny.en.bin" \
+        mkdir -p "$SCRIPT_DIR/external/whisper.cpp/models"
+        wget --show-progress -O "$SCRIPT_DIR/external/whisper.cpp/models/ggml-tiny.en.bin" \
             "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin"
         ok "Whisper model downloaded"
     else
-        warn "Whisper model not downloaded. Place ggml-tiny.en.bin in whisper.cpp/models/ before running."
+        warn "Whisper model not downloaded. Place ggml-tiny.en.bin in external/whisper.cpp/models/ before running."
     fi
 fi
 
@@ -346,7 +346,7 @@ check() {
     fi
 }
 
-check "Binary"           "$SCRIPT_DIR/build/bin/talk-llama-custom"
+check "Binary"           "$SCRIPT_DIR/build/bin/voice-assistant"
 check "libwhisper.so.1"  "/usr/local/lib/libwhisper.so.1"
 check "libggml.so"       "/usr/local/lib/libggml.so"
 check "piper"            "$HOME/.local/bin/piper"

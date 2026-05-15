@@ -24,8 +24,28 @@ if(WHISPER_VITISAI)
     message(STATUS "FlexML runtime: ${FLEXMLRT_ROOT}")
 endif()
 
+# Optional llama.cpp build (for llama-server binary)
+option(BUILD_LLAMA_SERVER "Build llama-server from submodule" OFF)
+
+if(BUILD_LLAMA_SERVER)
+    # Configure llama.cpp with same GPU/NPU flags as whisper
+    if(GGML_HIP)
+        set(LLAMA_HIPBLAS ON CACHE BOOL "Enable hipBLAS" FORCE)
+    endif()
+
+    if(WHISPER_VITISAI)
+        # Note: llama.cpp uses LLAMA_VITISAI flag, not WHISPER_VITISAI
+        set(LLAMA_VITISAI ON CACHE BOOL "Enable VitisAI NPU backend" FORCE)
+    endif()
+
+    add_subdirectory(external/llama.cpp)
+    message(STATUS "llama-server will be built from submodule")
+else()
+    message(STATUS "llama-server not being built - use external installation")
+endif()
+
 # Build whisper.cpp submodule
-add_subdirectory(whisper.cpp)
+add_subdirectory(external/whisper.cpp)
 
 # Build our custom talk-llama with modifications
 if (WHISPER_SDL2)
@@ -46,25 +66,25 @@ if (WHISPER_SDL2)
     endif()
     message(STATUS "CJSON_LIBRARY = ${CJSON_LIBRARY}")
 
-    set(TARGET talk-llama-custom)
+    set(TARGET voice-assistant)
 
     # Our custom source files
     # Note: console.cpp is #included in talk-llama.cpp, not compiled separately
     # LLM inference is handled by llama-server over HTTP (no embedded llama.cpp)
     add_executable(${TARGET}
-        custom/talk-llama/talk-llama.cpp
-        custom/talk-llama/tts-socket.c
-        custom/talk-llama/tts-request.c
-        custom/talk-llama/tool-system.cpp
-        custom/talk-llama/tool-parser.cpp
-        custom/talk-llama/wyoming-client.cpp
+        src/talk-llama.cpp
+        src/tts-socket.c
+        src/tts-request.c
+        src/tool-system.cpp
+        src/tool-parser.cpp
+        src/wyoming-client.cpp
     )
 
     # Include directories (order matters - local files before system)
     target_include_directories(${TARGET} BEFORE PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/custom/talk-llama
-        ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp/examples
-        ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/whisper.cpp/examples
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/whisper.cpp
     )
 
     target_include_directories(${TARGET} PRIVATE
@@ -103,12 +123,12 @@ if (WHISPER_SDL2)
         target_compile_definitions(${TARGET} PRIVATE -D_WIN32_WINNT=0x0602)
     endif()
 
-    include(whisper.cpp/cmake/DefaultTargetOptions.cmake)
+    include(external/whisper.cpp/cmake/DefaultTargetOptions.cmake)
 
     # Wyoming client test program
     add_executable(test-wyoming-client
-        custom/talk-llama/test-wyoming-client.cpp
-        custom/talk-llama/wyoming-client.cpp
+        src/test-wyoming-client.cpp
+        src/wyoming-client.cpp
     )
     set_target_properties(test-wyoming-client PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"

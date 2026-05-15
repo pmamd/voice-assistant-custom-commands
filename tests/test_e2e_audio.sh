@@ -28,7 +28,7 @@ source /opt/xilinx/xrt/setup.sh 2>/dev/null || true
 export HSA_OVERRIDE_GFX_VERSION=11.0.3
 
 WHISPER_OUTPUT=$(./build/bin/whisper-cli \
-    -m ./whisper.cpp/models/ggml-base.bin \
+    -m ./external/whisper.cpp/models/ggml-base.bin \
     -f tests/audio/inputs/make_it_warmer.wav \
     --language en 2>&1)
 

@@ -61,9 +61,9 @@ cmake -B build -DWHISPER_SDL2=ON -DGGML_HIP=ON
 cmake --build build -j
 
 # Verify GPU support
-strings build/bin/talk-llama-custom | grep -i "rocm\|hip"
+strings build/bin/voice-assistant | grep -i "rocm\|hip"
 
-# Binary at: build/bin/talk-llama-custom
+# Binary at: build/bin/voice-assistant
 ```
 
 Hardware: AMD W6800 GPU (gfx1030), ROCm 7.2.1
@@ -86,12 +86,12 @@ cmake -B build -DWHISPER_SDL2=ON -DWHISPER_VITISAI=ON
 cmake --build build -j
 
 # Verify NPU support
-strings build/bin/talk-llama-custom | grep -i "vitisai\|flexml"
+strings build/bin/voice-assistant | grep -i "vitisai\|flexml"
 
 # Test NPU with environment
 export HSA_OVERRIDE_GFX_VERSION=11.0.3
 source /opt/xilinx/xrt/setup.sh
-./build/bin/whisper-cli -m ./whisper.cpp/models/ggml-base.bin -f tests/audio/inputs/make_it_warmer.wav
+./build/bin/whisper-cli -m ./external/whisper.cpp/models/ggml-base.bin -f tests/audio/inputs/make_it_warmer.wav
 ```
 
 Hardware: AMD 890M iGPU (gfx1153) + NPU, ROCm 7.1.1, VitisAI/FlexML runtime
@@ -130,9 +130,9 @@ python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics \
 | Item | Path |
 |------|------|
 | Project | `~/git/voice-assistant-custom-commands/` |
-| Binary | `~/git/voice-assistant-custom-commands/build/bin/talk-llama-custom` |
+| Binary | `~/git/voice-assistant-custom-commands/build/bin/voice-assistant` |
 | LLM model | `~/git/voice-assistant-custom-commands/models/mistral-7b-instruct-v0.2.Q5_0.gguf` |
-| Whisper model | `~/git/voice-assistant-custom-commands/whisper.cpp/models/ggml-tiny.en.bin` |
+| Whisper model | `~/git/voice-assistant-custom-commands/external/whisper.cpp/models/ggml-tiny.en.bin` |
 | Piper binary | `~/.local/bin/piper` |
 | Wyoming-Piper | `~/.local/bin/wyoming-piper-custom` |
 | TTS log | `/tmp/wyoming-piper.log` |

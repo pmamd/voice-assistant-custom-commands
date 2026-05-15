@@ -22,7 +22,7 @@ else
     # Try pipx first (recommended for CLI tools)
     if command -v pipx &> /dev/null; then
         echo "   Using pipx for installation..."
-        cd wyoming-piper
+        cd external/wyoming-piper
         pipx install -e . || {
             echo "   ⚠ pipx install failed, trying pip..."
             pip install -e . 2>/dev/null || {
@@ -33,7 +33,7 @@ else
         cd ..
     else
         echo "   pipx not found, trying pip..."
-        cd wyoming-piper
+        cd external/wyoming-piper
         pip install -e . || {
             echo "   ⚠ pip install failed (externally-managed-environment?)"
             echo "   Consider installing pipx: sudo apt install pipx"
@@ -45,10 +45,10 @@ fi
 # Step 2: Verify custom modifications are present
 echo ""
 echo "2. Verifying custom modifications are in place..."
-# Custom modifications are already built into wyoming-piper/ directory
+# Custom modifications are already built into external/wyoming-piper/ directory
 # (No overlay needed - wyoming-piper is our custom fork)
-HAS_PIPER=$(grep -c '"--piper"' wyoming-piper/wyoming_piper/__main__.py || echo 0)
-HAS_APLAY=$(grep -c 'aplay' wyoming-piper/wyoming_piper/handler.py || echo 0)
+HAS_PIPER=$(grep -c '"--piper"' external/wyoming-piper/wyoming_piper/__main__.py || echo 0)
+HAS_APLAY=$(grep -c 'aplay' external/wyoming-piper/wyoming_piper/handler.py || echo 0)
 
 if [ "$HAS_PIPER" -gt 0 ] && [ "$HAS_APLAY" -gt 0 ]; then
     echo "   ✓ Custom modifications confirmed"
