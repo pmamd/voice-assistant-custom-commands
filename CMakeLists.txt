@@ -24,6 +24,30 @@ if(WHISPER_VITISAI)
     message(STATUS "FlexML runtime: ${FLEXMLRT_ROOT}")
 endif()
 
+# Patch VitisAI verbose output (silence "inference completed" message)
+if(WHISPER_VITISAI)
+    set(VITISAI_ENCODER_FILE "${CMAKE_SOURCE_DIR}/external/whisper.cpp/src/vitisai/whisper-vitisai-encoder.cpp")
+    if(EXISTS ${VITISAI_ENCODER_FILE})
+        # Check if already patched
+        file(READ ${VITISAI_ENCODER_FILE} VITISAI_CONTENT)
+        string(FIND "${VITISAI_CONTENT}" "std::fprintf(stdout, \"%s: Vitis AI model inference completed" VERBOSE_LINE_POS)
+        if(NOT VERBOSE_LINE_POS EQUAL -1)
+            message(STATUS "Patching VitisAI encoder to silence verbose output...")
+            execute_process(
+                COMMAND sed -i "s|std::fprintf(stdout, \"%s: Vitis AI model inference completed|// &|g" ${VITISAI_ENCODER_FILE}
+                RESULT_VARIABLE PATCH_RESULT
+            )
+            if(PATCH_RESULT EQUAL 0)
+                message(STATUS "VitisAI verbose output silenced")
+            else()
+                message(WARNING "Failed to patch VitisAI encoder")
+            endif()
+        else()
+            message(STATUS "VitisAI encoder already patched (verbose output silenced)")
+        endif()
+    endif()
+endif()
+
 # Optional llama.cpp build (for llama-server binary)
 option(BUILD_LLAMA_SERVER "Build llama-server from submodule" OFF)
 
