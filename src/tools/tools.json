@@ -51,21 +51,21 @@
     },
     {
       "name": "set_temperature",
-      "description": "Adjust the climate control temperature. Use get_temperature first for relative adjustments like 'make it warmer'",
+      "description": "Set the climate control temperature to a specific value. IMPORTANT: For requests like 'make it warmer/cooler', you MUST call get_temperature first to get the current value, then calculate the new value (e.g., current + 3 degrees), then call this tool.",
       "fast_path": false,
       "parameters": {
         "type": "object",
         "properties": {
           "value": {
             "type": "number",
-            "description": "Temperature in Fahrenheit (60-85)",
+            "description": "Target temperature in Fahrenheit (60-85)",
             "minimum": 60,
             "maximum": 85
           },
           "zone": {
             "type": "string",
             "enum": ["driver", "passenger", "both"],
-            "description": "Which zone to adjust"
+            "description": "Which zone to adjust (defaults to driver)"
           }
         },
         "required": ["value"]
