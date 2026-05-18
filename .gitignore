@@ -70,3 +70,6 @@ CTestTestfile.cmake
 
 # Testing
 test_output/
+
+# Claude Code session files
+claude.resume
