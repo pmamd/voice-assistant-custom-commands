@@ -51,7 +51,7 @@
     },
     {
       "name": "set_temperature",
-      "description": "Set the climate control temperature to a specific value. IMPORTANT: For requests like 'make it warmer/cooler', you MUST call get_temperature first to get the current value, then calculate the new value (e.g., current + 3 degrees), then call this tool.",
+      "description": "Set climate control to a specific temperature value",
       "fast_path": false,
       "parameters": {
         "type": "object",

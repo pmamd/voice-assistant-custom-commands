@@ -2009,7 +2009,8 @@ int run(int argc, const char **argv)
 					}
 					recent_energy /= check_samples;
 
-					if (speech_duration_ms >= 300.0 && speech_duration_ms <= 600.0 && recent_energy > 0.01f) {
+					// Increased from 300-600ms to 1200-1800ms to prevent mid-sentence cutoff
+					if (speech_duration_ms >= 1200.0 && speech_duration_ms <= 1800.0 && recent_energy > 0.01f) {
 						early_trigger = true;
 						if (params.print_energy) {
 							fprintf(stderr, "\n[Early Stop Trigger: dur=%.0fms, energy=%.6f]\n", speech_duration_ms, recent_energy);

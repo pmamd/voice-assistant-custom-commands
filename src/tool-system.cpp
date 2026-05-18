@@ -184,18 +184,11 @@ std::string ToolRegistry::getToolsPrompt() const {
         oss << "\n";
     }
 
-    oss << "TOOL CALLING FORMAT:\n";
-    oss << "When calling a tool, output ONLY the XML-wrapped JSON below with NO OTHER TEXT:\n";
+    oss << "When you need to perform an action, respond with ONLY this format:\n";
     oss << "<tool_call>{\"name\": \"tool_name\", \"arguments\": {...}}</tool_call>\n";
     oss << "\n";
-    oss << "CRITICAL RULES:\n";
-    oss << "1. NO preamble, explanation, or natural language before the tool call\n";
-    oss << "2. NO text after the tool call - the tool result will be spoken for you\n";
-    oss << "3. For relative adjustments like 'make it warmer', call get_temperature first, then set_temperature\n";
-    oss << "4. Only use tools for explicit actions - respond conversationally to greetings, questions, etc.\n";
-    oss << "\n";
-    oss << "WRONG: \"Adjusting temperature...{\\\"name\\\": \\\"set_temperature\\\", ...}\"\n";
-    oss << "RIGHT: <tool_call>{\"name\": \"set_temperature\", \"arguments\": {\"value\": 75}}</tool_call>\n";
+    oss << "Do NOT explain the tool call or add any other text - just output the XML tag.\n";
+    oss << "The tool will execute and speak its own result.\n";
 
     return oss.str();
 }
