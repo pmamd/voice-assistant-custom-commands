@@ -80,6 +80,7 @@ namespace executors {
     ToolResult stop_speaking(const json& args);
     ToolResult pause_speaking(const json& args);
     ToolResult resume_speaking(const json& args);
+    ToolResult get_temperature(const json& args);
     ToolResult set_temperature(const json& args);
     ToolResult set_fan_speed(const json& args);
     ToolResult enable_defrost(const json& args);

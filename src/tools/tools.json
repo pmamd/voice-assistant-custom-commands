@@ -34,15 +34,33 @@
       }
     },
     {
+      "name": "get_temperature",
+      "description": "Get the current climate control temperature setting",
+      "fast_path": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "enum": ["driver", "passenger"],
+            "description": "Which zone to query (defaults to driver)"
+          }
+        },
+        "required": []
+      }
+    },
+    {
       "name": "set_temperature",
-      "description": "Adjust the climate control temperature",
+      "description": "Adjust the climate control temperature. Use get_temperature first for relative adjustments like 'make it warmer'",
       "fast_path": false,
       "parameters": {
         "type": "object",
         "properties": {
           "value": {
             "type": "number",
-            "description": "Temperature in Fahrenheit (60-85)"
+            "description": "Temperature in Fahrenheit (60-85)",
+            "minimum": 60,
+            "maximum": 85
           },
           "zone": {
             "type": "string",

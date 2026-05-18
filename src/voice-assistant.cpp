@@ -1204,6 +1204,12 @@ static size_t llama_stream_write_callback(char* ptr, size_t size, size_t nmemb, 
 							ctx->done = true;
 						} else {
 							fprintf(stderr, "[Tool execution failed: %s]\n", result.message.c_str());
+							// Speak the error message and stop LLM generation
+							// This prevents the LLM from hallucinating that the tool succeeded
+							if (!result.message.empty()) {
+								dispatch_tts_sentence(ctx, result.message);
+							}
+							ctx->done = true;
 						}
 					}
 					ctx->tool_parser->reset();

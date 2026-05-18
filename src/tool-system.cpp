@@ -246,6 +246,25 @@ ToolResult resume_speaking(const json& args) {
     }
 }
 
+// Simulated current temperature state (in a real system, this would query vehicle CAN bus)
+static double g_driver_temp = 72.0;
+static double g_passenger_temp = 72.0;
+
+ToolResult get_temperature(const json& args) {
+    std::string zone = args.value("zone", "driver");
+
+    double current_temp = (zone == "passenger") ? g_passenger_temp : g_driver_temp;
+
+    fprintf(stdout, "[Tool] get_temperature: %.1f°F (%s)\n", current_temp, zone.c_str());
+
+    json result_data;
+    result_data["temperature"] = current_temp;
+    result_data["zone"] = zone;
+
+    return ToolResult(true, "The " + zone + " temperature is currently set to " +
+                      std::to_string((int)current_temp) + " degrees", result_data);
+}
+
 ToolResult set_temperature(const json& args) {
     if (!args.contains("value")) {
         return ToolResult(false, "Missing 'value' parameter");
@@ -256,10 +275,19 @@ ToolResult set_temperature(const json& args) {
 
     // Validate range
     if (temp < 60.0 || temp > 85.0) {
-        return ToolResult(false, "Temperature must be between 60 and 85 degrees");
+        return ToolResult(false, "I can't set the temperature to " + std::to_string((int)temp) +
+                         " degrees. The temperature must be between 60 and 85 degrees.");
     }
 
     fprintf(stdout, "[Tool] set_temperature: %.1f°F (%s)\n", temp, zone.c_str());
+
+    // Update simulated state
+    if (zone == "driver" || zone == "both") {
+        g_driver_temp = temp;
+    }
+    if (zone == "passenger" || zone == "both") {
+        g_passenger_temp = temp;
+    }
 
     json result_data;
     result_data["temperature"] = temp;
@@ -393,6 +421,7 @@ void registerBuiltinExecutors(ToolRegistry& registry) {
     registry.registerExecutor("stop_speaking", executors::stop_speaking);
     registry.registerExecutor("pause_speaking", executors::pause_speaking);
     registry.registerExecutor("resume_speaking", executors::resume_speaking);
+    registry.registerExecutor("get_temperature", executors::get_temperature);
     registry.registerExecutor("set_temperature", executors::set_temperature);
     registry.registerExecutor("set_fan_speed", executors::set_fan_speed);
     registry.registerExecutor("enable_defrost", executors::enable_defrost);
