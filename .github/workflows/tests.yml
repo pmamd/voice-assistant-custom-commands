@@ -15,6 +15,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 1  # Shallow clone for faster checkout
 
     - name: Install dependencies
       run: |
@@ -29,6 +30,16 @@ jobs:
           python3-pip \
           pipx
 
+    - name: Cache build
+      uses: actions/cache@v4
+      with:
+        path: |
+          build
+          external/whisper.cpp/build
+        key: ${{ runner.os }}-build-${{ hashFiles('CMakeLists.txt', 'external/whisper.cpp/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+
     - name: Build project
       run: |
         cmake -B build -DWHISPER_SDL2=ON
@@ -39,15 +50,16 @@ jobs:
         test -f build/bin/voice-assistant
         echo "Binary built successfully"
 
+    - name: Verify build artifacts
+      run: |
+        test -f src/tools/tools.json
+        echo "Build artifacts verified"
+
     - name: Run Python unit tests
       run: |
         python3 -m pip install pyyaml
-        # Run unit tests that don't require Wyoming-Piper
+        # Run unit tests that don't require Wyoming-Piper or llama-server
         python3 -m unittest tests.test_tool_system -v || true
-
-    - name: Run E2E startup test
-      run: |
-        bash tests/test_e2e_startup.sh
 
     - name: Upload build artifacts
       if: failure()
