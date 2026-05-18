@@ -1452,9 +1452,27 @@ int run(int argc, const char **argv)
 	struct whisper_context *ctx_wsp = whisper_init_from_file_with_params(params.model_wsp.c_str(), cparams);
 
 	if (!ctx_wsp) {
-        fprintf(stderr, "No whisper.cpp model specified. Please provide using -mw <modelfile>\n");
-        return 1;
-    }
+		fprintf(stderr, "\n");
+		fprintf(stderr, "========================================\n");
+		fprintf(stderr, "ERROR: Failed to initialize Whisper\n");
+		fprintf(stderr, "========================================\n");
+		fprintf(stderr, "\n");
+		fprintf(stderr, "Possible causes:\n");
+		fprintf(stderr, "  1. Model file not found: %s\n", params.model_wsp.c_str());
+		fprintf(stderr, "     Solution: Provide a valid model with -mw <modelfile>\n");
+		fprintf(stderr, "\n");
+#ifdef WHISPER_USE_VITISAI
+		fprintf(stderr, "  2. VitisAI NPU not available (this binary requires NPU)\n");
+		fprintf(stderr, "     Expected .rai file: %s-encoder-vitisai.rai\n",
+			params.model_wsp.substr(0, params.model_wsp.find_last_of(".")).c_str());
+		fprintf(stderr, "     Solution: Run on a system with AMD NPU (gfx1153)\n");
+		fprintf(stderr, "               or rebuild without -DWHISPER_VITISAI=ON\n");
+		fprintf(stderr, "\n");
+#endif
+		fprintf(stderr, "Check the error messages above for details.\n");
+		fprintf(stderr, "========================================\n");
+		return 1;
+	}
 
 	// -- llama-server connection check --------------------------------------------
 	fprintf(stderr, "\n");
