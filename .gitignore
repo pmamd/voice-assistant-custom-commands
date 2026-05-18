@@ -75,3 +75,4 @@ test_output/
 .claude/
 .claud.ai/
 claude.resume
+llama-cache/
