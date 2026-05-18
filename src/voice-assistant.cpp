@@ -1344,6 +1344,7 @@ std::string llama_server_generate(
 	request_body["temperature"] = params.temp;
 	request_body["stream"] = true;
 	request_body["cache_prompt"] = true; // reuse KV cache for matching prefix
+	request_body["id_slot"] = 0;  // Always use slot 0 for persistent cache
 	request_body["repeat_penalty"] = params.repeat_penalty;
 
 	// Build stop array
@@ -1798,30 +1799,66 @@ int run(int argc, const char **argv)
 	// Send the system prompt to llama-server so the KV cache is hot before the
 	// first user turn. This turns ~430ms prompt processing into ~0ms on every
 	// subsequent request that shares the same system prompt prefix.
+	// Always use slot 0 for consistency with persistent slot saves.
 	if (!test_mode) {
-		printf("Warming up llama-server KV cache...\n");
-		CURL* warmup_curl = curl_easy_init();
-		if (warmup_curl) {
-			nlohmann::json wb;
-			wb["prompt"] = prompt_llama;
-			wb["n_predict"] = 1;
-			wb["cache_prompt"] = true;
-			wb["stream"] = false;
-			std::string wb_body = wb.dump();
-			std::string wb_url = params.llama_url + "/completion";
-			struct curl_slist* wb_headers = nullptr;
-			wb_headers = curl_slist_append(wb_headers, "Content-Type: application/json");
-			curl_easy_setopt(warmup_curl, CURLOPT_URL, wb_url.c_str());
-			curl_easy_setopt(warmup_curl, CURLOPT_HTTPHEADER, wb_headers);
-			curl_easy_setopt(warmup_curl, CURLOPT_POSTFIELDS, wb_body.c_str());
-			curl_easy_setopt(warmup_curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-			std::string wb_resp;
-			curl_easy_setopt(warmup_curl, CURLOPT_WRITEDATA, &wb_resp);
-			curl_easy_setopt(warmup_curl, CURLOPT_TIMEOUT, 30L);
-			curl_easy_perform(warmup_curl);
-			curl_slist_free_all(wb_headers);
-			curl_easy_cleanup(warmup_curl);
-			printf("KV cache warmed.\n\n");
+		// Check if slot 0 already has cached content
+		bool slot_cached = false;
+		CURL* check_curl = curl_easy_init();
+		if (check_curl) {
+			std::string check_url = params.llama_url + "/slots";
+			std::string check_resp;
+			curl_easy_setopt(check_curl, CURLOPT_URL, check_url.c_str());
+			curl_easy_setopt(check_curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+			curl_easy_setopt(check_curl, CURLOPT_WRITEDATA, &check_resp);
+			curl_easy_setopt(check_curl, CURLOPT_TIMEOUT, 5L);
+			CURLcode res = curl_easy_perform(check_curl);
+			curl_easy_cleanup(check_curl);
+
+			if (res == CURLE_OK && !check_resp.empty()) {
+				try {
+					nlohmann::json slots = nlohmann::json::parse(check_resp);
+					if (slots.is_array() && slots.size() > 0) {
+						auto slot0 = slots[0];
+						if (slot0.contains("cache_tokens") && slot0["cache_tokens"].is_number()) {
+							int cached_tokens = slot0["cache_tokens"].get<int>();
+							if (cached_tokens > 100) {
+								slot_cached = true;
+								printf("Slot 0 already has %d cached tokens, skipping warmup\n\n", cached_tokens);
+							}
+						}
+					}
+				} catch (...) {
+					// JSON parse failed, continue with warmup
+				}
+			}
+		}
+
+		if (!slot_cached) {
+			printf("Warming up llama-server KV cache...\n");
+			CURL* warmup_curl = curl_easy_init();
+			if (warmup_curl) {
+				nlohmann::json wb;
+				wb["prompt"] = prompt_llama;
+				wb["n_predict"] = 1;
+				wb["cache_prompt"] = true;
+				wb["stream"] = false;
+				wb["id_slot"] = 0;  // Always use slot 0 for persistence
+				std::string wb_body = wb.dump();
+				std::string wb_url = params.llama_url + "/completion";
+				struct curl_slist* wb_headers = nullptr;
+				wb_headers = curl_slist_append(wb_headers, "Content-Type: application/json");
+				curl_easy_setopt(warmup_curl, CURLOPT_URL, wb_url.c_str());
+				curl_easy_setopt(warmup_curl, CURLOPT_HTTPHEADER, wb_headers);
+				curl_easy_setopt(warmup_curl, CURLOPT_POSTFIELDS, wb_body.c_str());
+				curl_easy_setopt(warmup_curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+				std::string wb_resp;
+				curl_easy_setopt(warmup_curl, CURLOPT_WRITEDATA, &wb_resp);
+				curl_easy_setopt(warmup_curl, CURLOPT_TIMEOUT, 30L);
+				curl_easy_perform(warmup_curl);
+				curl_slist_free_all(wb_headers);
+				curl_easy_cleanup(warmup_curl);
+				printf("KV cache warmed.\n\n");
+			}
 		}
 	}
 
