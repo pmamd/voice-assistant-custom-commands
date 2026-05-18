@@ -4,11 +4,11 @@ Documents how the voice assistant uses and extends the Wyoming protocol for TTS 
 
 ## Architecture
 
-Wyoming-Piper acts as the TTS server. talk-llama sends synthesize requests over TCP;
+Wyoming-Piper acts as the TTS server. voice-assistant sends synthesize requests over TCP;
 Wyoming-Piper synthesizes audio with Piper and plays it directly via `aplay`.
 
 ```
-talk-llama  ──synthesize──▶  Wyoming-Piper  ──aplay──▶  Speaker
+voice-assistant  ──synthesize──▶  Wyoming-Piper  ──aplay──▶  Speaker
             ◀─ (no reply) ─                 ──kill──▶   (stop)
 ```
 
@@ -21,11 +21,11 @@ and sends no response back. This reduces latency at the cost of protocol complia
 
 | Event | Direction | Purpose |
 |-------|-----------|---------|
-| `synthesize` | talk-llama → Wyoming | Request TTS synthesis and playback |
-| `audio-stop` | talk-llama → Wyoming | Kill current aplay process immediately |
-| `audio-pause` | talk-llama → Wyoming | Pause current playback |
-| `audio-resume` | talk-llama → Wyoming | Resume paused playback |
-| `new-response` | talk-llama → Wyoming | Signal start of new user turn; resets `STOP_CMD` so queued chunks play normally |
+| `synthesize` | voice-assistant → Wyoming | Request TTS synthesis and playback |
+| `audio-stop` | voice-assistant → Wyoming | Kill current aplay process immediately |
+| `audio-pause` | voice-assistant → Wyoming | Pause current playback |
+| `audio-resume` | voice-assistant → Wyoming | Resume paused playback |
+| `new-response` | voice-assistant → Wyoming | Signal start of new user turn; resets `STOP_CMD` so queued chunks play normally |
 
 `new-response` is a custom event specific to this project. It must be sent before the
 first TTS chunk of each new response, otherwise the stop state from the previous turn
@@ -34,7 +34,7 @@ would silence new audio.
 ## Control Flow for Stop Command
 
 1. User says "stop" → fast-path matches → `WyomingClient::sendAudioStop()` called
-2. talk-llama also sends `new-response` at the start of the **next** generation to reset
+2. voice-assistant also sends `new-response` at the start of the **next** generation to reset
    Wyoming-Piper's stop state
 3. Wyoming-Piper: `audio-stop` sets `STOP_CMD = True`, kills active aplay, and re-checks
    `STOP_CMD` inside the aplay lock so queued chunks that passed the initial check are
@@ -61,7 +61,7 @@ Server → {"type": "audio-stop", "data": {}}
 
 ## C++ Client
 
-`WyomingClient` (`custom/talk-llama/wyoming-client.h/.cpp`) manages a persistent TCP
+`WyomingClient` (`src/wyoming-client.h/.cpp`) manages a persistent TCP
 connection to Wyoming-Piper and exposes:
 
 ```cpp
@@ -112,7 +112,7 @@ compliance would enable:
 - Standard Wyoming satellites
 
 Restoring compliance would require Wyoming-Piper to stream `AudioStart/Chunk/Stop` back
-to the client instead of playing locally, and talk-llama to receive and play those chunks.
+to the client instead of playing locally, and voice-assistant to receive and play those chunks.
 
 ## Audio Device Configuration
 

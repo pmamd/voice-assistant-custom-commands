@@ -62,7 +62,7 @@ To confirm this is pre-existing, we tested the master branch in a separate direc
 cd ~/git && git clone https://github.com/pmamd/voice-assistant-custom-commands.git voice-assistant-main
 cd voice-assistant-main && git checkout master
 cmake -B build -DWHISPER_SDL2=ON && cmake --build build -j
-./build/bin/talk-llama-custom --test-input <audio> ...
+./build/bin/voice-assistant --test-input <audio> ...
 ```
 
 **Result:** Master branch shows **identical failures**:
@@ -92,7 +92,7 @@ cmake -B build -DWHISPER_SDL2=ON && cmake --build build -j
 
 ### Changes Made
 
-Modified `custom/talk-llama/tool-parser.cpp` to handle malformed JSON:
+Modified `src/tool-parser.cpp` to handle malformed JSON:
 
 ```cpp
 bool ToolCallParser::parseToolCall() {
@@ -243,7 +243,7 @@ To reproduce the bug:
 llama-server --model mistral-7b-instruct-v0.2.Q5_0.gguf --port 8080 -ngl 999
 
 # Run test
-./build/bin/talk-llama-custom \
+./build/bin/voice-assistant \
     --test-input tests/audio/inputs/make_it_warmer.wav \
     -mw ./whisper.cpp/models/ggml-base.en.bin \
     --llama-url http://localhost:8080 \
@@ -264,10 +264,10 @@ llama-server --model mistral-7b-instruct-v0.2.Q5_0.gguf --port 8080 -ngl 999
 
 ## Related Files
 
-- `custom/talk-llama/tool-parser.cpp` - Tool call parser implementation
-- `custom/talk-llama/tool-parser.h` - Parser interface
-- `custom/talk-llama/tool-system.cpp` - Tool registry and execution
-- `custom/talk-llama/talk-llama.cpp` - Integration with LLM streaming (line ~1190)
+- `src/tool-parser.cpp` - Tool call parser implementation
+- `src/tool-parser.h` - Parser interface
+- `src/tool-system.cpp` - Tool registry and execution
+- `src/talk-llama.cpp` - Integration with LLM streaming (line ~1190)
 
 ---
 

@@ -33,10 +33,10 @@ User Speech → Whisper STT → text_heard
 
 | File | Description |
 |------|-------------|
-| `custom/talk-llama/tool-system.h/.cpp` | Tool registry, executor plugin system, fast-path keyword matching, Mistral prompt generation |
-| `custom/talk-llama/tool-parser.h/.cpp` | Streaming state machine parser for `<tool_call>` blocks — token-by-token, no buffering |
-| `custom/talk-llama/wyoming-client.h/.cpp` | Wyoming protocol client — sends stop/pause/resume/new-response events to Wyoming-Piper |
-| `custom/talk-llama/tools/tools.json` | JSON tool definitions — add tools here without touching C++ |
+| `src/tool-system.h/.cpp` | Tool registry, executor plugin system, fast-path keyword matching, Mistral prompt generation |
+| `src/tool-parser.h/.cpp` | Streaming state machine parser for `<tool_call>` blocks — token-by-token, no buffering |
+| `src/wyoming-client.h/.cpp` | Wyoming protocol client — sends stop/pause/resume/new-response events to Wyoming-Piper |
+| `src/tools/tools.json` | JSON tool definitions — add tools here without touching C++ |
 
 ## Automotive Tools
 
@@ -89,7 +89,7 @@ registry.registerExecutor("new_tool", executors::new_tool);
 
 **4. Rebuild:**
 ```bash
-ssh paul@192.168.86.74 "cd ~/Projects/git/talk-llama-fast && cmake --build build -j"
+cmake --build build -j
 ```
 
 ## Vehicle System Integration
@@ -136,13 +136,13 @@ ToolResult set_temperature(const json& args) {
 ## Troubleshooting
 
 **"Failed to load tools from tools.json"**
-→ Verify the file exists at `custom/talk-llama/tools/tools.json` relative to the working directory.
+→ Verify the file exists at `src/tools/tools.json` relative to the working directory.
 
 **"Undefined reference to tool_system::ToolRegistry"**
 → Check that `tool-system.cpp`, `tool-parser.cpp`, and `wyoming-client.cpp` are listed in `CMakeLists.txt`.
 
 **"Cannot find json.hpp"**
-→ Include path must point to `whisper.cpp/examples/json.hpp`.
+→ Include path must point to `external/whisper.cpp/examples/json.hpp`.
 
 **Tools not triggering**
 → Run with `--debug` and look for `[Tool Parser]` messages. Confirm the LLM is outputting `<tool_call>` blocks — this depends on the Mistral Instruct model being used.

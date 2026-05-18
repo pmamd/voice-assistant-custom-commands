@@ -35,7 +35,7 @@ While allowing:
 - Removed VAD checks that ran every 2 tokens during LLM response generation
 - Removed VAD checks after sending TTS chunks
 - These were causing premature interruption when TTS audio was detected as "user speech"
-- Not present in baseline whisper.cpp (talk-llama-fast addition)
+- Not present in baseline whisper.cpp (voice-assistant (original: talk-llama-fast) addition)
 
 ## Limitations
 
@@ -204,7 +204,7 @@ if (detect_keyword("stop", pcmf32, stop_threshold)) {
 
 1. Enable energy printing:
    ```bash
-   ./talk-llama-custom --min-energy 0.0012 -pe
+   ./voice-assistant --min-energy 0.0012 -pe
    ```
 
 2. Observe energy values during:
@@ -215,7 +215,7 @@ if (detect_keyword("stop", pcmf32, stop_threshold)) {
 3. Set threshold between TTS and speech:
    ```bash
    # If TTS energy is 0.0008 and speech is 0.002
-   ./talk-llama-custom --min-energy 0.0012
+   ./voice-assistant --min-energy 0.0012
    ```
 
 ### Testing Echo Cancellation
