@@ -32,7 +32,7 @@ WHISPER_OUTPUT=$(./build/bin/whisper-cli \
     -f tests/audio/inputs/make_it_warmer.wav \
     --language en 2>&1)
 
-if echo "$WHISPER_OUTPUT" | grep -q "whisper_vitisai_encode: Vitis AI model inference completed"; then
+if echo "$WHISPER_OUTPUT" | grep -q "WHISPER : VITISAI = 1"; then
     pass "NPU encoder executed"
 else
     fail "NPU encoder not used"
