@@ -20,7 +20,7 @@ This document describes the **initial validation testing** performed to verify c
 ## Bugs Fixed
 
 ### 1. Buffer Overflow in TTS Request Encoding ⚠️ CRITICAL
-**File**: `custom/talk-llama/tts-request.c:60`
+**File**: `src/tts-request.c:60`
 
 **Bug**:
 ```c
@@ -45,7 +45,7 @@ returnString = (char*)malloc(strlen(headerString) + strlen(payloadString) + 2);
 ---
 
 ### 2. Test Mode Exit Crashes
-**File**: `custom/talk-llama/talk-llama.cpp:3029`
+**File**: `src/talk-llama.cpp:3029`
 
 **Bug**: Setting `is_running = false` caused normal cleanup destructors to run while TTS threads were still active, resulting in "terminate called without an active exception".
 
@@ -72,7 +72,7 @@ Generated using Piper TTS (en_US-lessac-medium voice)
 
 ### Test Command
 ```bash
-./build/bin/talk-llama-custom \
+./build/bin/voice-assistant \
   --model-whisper /path/to/ggml-tiny.en.bin \
   --model-llama /path/to/ggml-llama-7B.bin \
   --xtts-url http://localhost:10200/ \
@@ -203,11 +203,11 @@ The fix captures the index by value **before** incrementing, ensuring each threa
 ## Files Modified
 
 ### Local Repository
-- `custom/talk-llama/talk-llama.cpp` - Thread race fix + test mode exit
-- `custom/talk-llama/tts-request.c` - Buffer overflow fix
-- `custom/talk-llama/tts-request.h` - extern "C" linkage
-- `custom/talk-llama/tts-socket.h` - extern "C" linkage
-- `custom/talk-llama/tts-socket.c` - (restored from history)
+- `src/talk-llama.cpp` - Thread race fix + test mode exit
+- `src/tts-request.c` - Buffer overflow fix
+- `src/tts-request.h` - extern "C" linkage
+- `src/tts-socket.h` - extern "C" linkage
+- `src/tts-socket.c` - (restored from history)
 - `CMakeLists.txt` - Build configuration fixes
 
 ### Dev Machine (Synchronized)

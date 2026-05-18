@@ -163,13 +163,13 @@ tests/
 
 ### Build Requirements
 
-**talk-llama-custom** with test mode:
+**voice-assistant** with test mode:
 ```bash
 cmake -B build -DWHISPER_SDL2=ON
 cmake --build build -j
 ```
 
-Binary location: `./build/bin/talk-llama-custom`
+Binary location: `./build/bin/voice-assistant`
 
 **Wyoming-Piper** with test mode:
 ```bash
@@ -181,7 +181,7 @@ pip install -e .
 
 ### talk-llama Test Mode
 
-The `talk-llama-custom` binary supports test mode for automated testing:
+The `voice-assistant` binary supports test mode for automated testing:
 
 **Parameter**: `--test-input <wav_file>`
 
@@ -193,7 +193,7 @@ The `talk-llama-custom` binary supports test mode for automated testing:
 
 **Example**:
 ```bash
-./build/bin/talk-llama-custom \
+./build/bin/voice-assistant \
     --model models/llama-2-7b-chat.Q5_K_M.gguf \
     --model-whisper models/ggml-base.en.bin \
     --test-input tests/audio/inputs/hello.wav \
@@ -288,7 +288,7 @@ config:
 
   # System under test
   talk_llama:
-    binary: "./build/bin/talk-llama-custom"
+    binary: "./build/bin/voice-assistant"
     whisper_model: "./models/ggml-base.en.bin"
     llama_model: "./models/llama-2-7b-chat.Q5_K_M.gguf"
     test_mode: true
@@ -531,7 +531,7 @@ Enable verbose logging:
 python3 tests/run_tests.py --verbose
 
 # talk-llama debug output
-./build/bin/talk-llama-custom --test-input test.wav -d
+./build/bin/voice-assistant --test-input test.wav -d
 
 # Wyoming-Piper debug
 wyoming-piper --debug ...
@@ -539,7 +539,7 @@ wyoming-piper --debug ...
 
 ## Known Issues
 
-1. **Long Response Crashes**: talk-llama-custom crashes when generating responses longer than ~100 tokens
+1. **Long Response Crashes**: voice-assistant crashes when generating responses longer than ~100 tokens
    - **Status**: Application bug, not test harness issue
    - **Workaround**: Use shorter prompts or skip long_response test
 
@@ -650,7 +650,7 @@ jobs:
    ↓
 4. For each test case:
    a. Generate test audio (audio_generator.py + Piper TTS)
-   b. Inject into talk-llama-custom (--test-input)
+   b. Inject into voice-assistant (--test-input)
    c. Whisper STT → LLaMA → Wyoming-Piper TTS
    d. Wyoming-Piper saves output.wav (test mode)
    e. Verify output.wav (audio_verifier.py + Whisper STT)
@@ -669,13 +669,13 @@ jobs:
 **Warmup Transcription Bug**:
 - **Problem**: Whisper was called twice (warmup + real), consuming test audio
 - **Fix**: Skip warmup transcription in test mode
-- **Location**: `custom/talk-llama/talk-llama.cpp:1950`
+- **Location**: `src/talk-llama.cpp:1950`
 - **Impact**: Essential for test mode to work
 
 **Thread Blocking**:
 - **Problem**: Thread joins waiting for keyboard input that never comes
 - **Fix**: Skip thread joins in test mode
-- **Location**: `custom/talk-llama/talk-llama.cpp:3022-3029`
+- **Location**: `src/talk-llama.cpp:3022-3029`
 - **Impact**: Prevents test hangs
 
 **Audio Resampling**:
