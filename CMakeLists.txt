@@ -117,6 +117,11 @@ if (WHISPER_SDL2)
         ${CURL_INCLUDE_DIRS}
     )
 
+    # Define WHISPER_USE_VITISAI for our code when VitisAI is enabled
+    if(WHISPER_VITISAI)
+        target_compile_definitions(${TARGET} PRIVATE WHISPER_USE_VITISAI)
+    endif()
+
     # Link whisper libraries
     if (WHISPER_CLBLAST)
         set(CLBLAST_LIBNAME clblast)
