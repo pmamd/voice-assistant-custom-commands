@@ -194,9 +194,10 @@ _llama_start() {
     # --flash-attn 0 is critical to avoid GPU crashes on this hardware
     # --no-warmup avoids crashes during startup warmup phase
     # --slot-save-path enables persistent KV cache (eliminates warmup delay on subsequent runs)
+    # -np 4 sets number of parallel slots to 4
     HSA_OVERRIDE_GFX_VERSION=11.0.2 "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
         -ngl 999 -c 4096 --flash-attn 0 --cache-prompt --no-warmup \
-        --slot-save-path ./llama-cache --slots 4 \
+        --slot-save-path ./llama-cache -np 4 \
         > /tmp/llama-server.log 2>&1 &
     LLAMA_SERVER_PID=$!
     disown
