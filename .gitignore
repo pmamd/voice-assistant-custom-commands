@@ -71,5 +71,7 @@ CTestTestfile.cmake
 # Testing
 test_output/
 
-# Claude Code session files
+# Claude Code files
+.claude/
+.claud.ai/
 claude.resume
