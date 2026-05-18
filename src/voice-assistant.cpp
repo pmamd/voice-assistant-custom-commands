@@ -2046,11 +2046,30 @@ int run(int argc, const char **argv)
 					}
 					recent_energy /= check_samples;
 
-					// Increased from 300-600ms to 1200-1800ms to prevent mid-sentence cutoff
+					// Check if we should trigger early stop (1200-1800ms)
+					// Only trigger if audio contains interrupt keywords like "stop", "pause"
 					if (speech_duration_ms >= 1200.0 && speech_duration_ms <= 1800.0 && recent_energy > 0.01f) {
-						early_trigger = true;
-						if (params.print_energy) {
-							fprintf(stderr, "\n[Early Stop Trigger: dur=%.0fms, energy=%.6f]\n", speech_duration_ms, recent_energy);
+						// Quick transcribe to check for trigger words
+						std::string quick_check = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms));
+						std::transform(quick_check.begin(), quick_check.end(), quick_check.begin(), ::tolower);
+
+						bool has_trigger_word = (quick_check.find("stop") != std::string::npos ||
+						                         quick_check.find("pause") != std::string::npos ||
+						                         quick_check.find("quiet") != std::string::npos ||
+						                         quick_check.find("silence") != std::string::npos);
+
+						if (has_trigger_word) {
+							early_trigger = true;
+							if (params.print_energy) {
+								fprintf(stderr, "\n[Early Stop Trigger: dur=%.0fms, trigger word detected: '%s']\n",
+								        speech_duration_ms, quick_check.c_str());
+							}
+						} else {
+							// No trigger word - keep listening, audio stays in buffer
+							if (params.print_energy) {
+								fprintf(stderr, "\n[Early Stop Check: dur=%.0fms, no trigger word in '%s', continuing...]\n",
+								        speech_duration_ms, quick_check.c_str());
+							}
 						}
 					}
 				}
