@@ -32,9 +32,9 @@ pipx install piper-tts==1.4.1
 pipx inject piper-tts pathvalidate
 
 # 5. Install Wyoming-Piper (custom version from this repo)
-cd wyoming-piper
+cd external/wyoming-piper
 pipx install -e .
-cd ..
+cd ../..
 
 # 6. Add pipx binaries to PATH
 export PATH="$HOME/.local/bin:$PATH"
@@ -96,11 +96,11 @@ If you need to start components separately:
 
 **Terminal 1 — TTS server:**
 ```bash
-cd wyoming-piper
+cd external/wyoming-piper
 python3 -m wyoming_piper \
     --piper ~/.local/bin/piper \
     --voice en_US-lessac-medium \
-    --data-dir ../piper-data \
+    --data-dir ../../piper-data \
     --uri tcp://0.0.0.0:10200
 ```
 
@@ -195,9 +195,9 @@ source ~/.bashrc
 
 **Wyoming-Piper exits immediately:**
 ```bash
-cd wyoming-piper
+cd external/wyoming-piper
 python3 -m wyoming_piper --piper ~/.local/bin/piper \
-    --voice en_US-lessac-medium --data-dir ../piper-data \
+    --voice en_US-lessac-medium --data-dir ../../piper-data \
     --uri tcp://0.0.0.0:10200 --debug
 # Look for the error in the output
 ```
