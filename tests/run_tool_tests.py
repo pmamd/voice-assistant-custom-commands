@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 class ToolSystemTestRunner:
     def __init__(self, project_root: Path):
         self.project_root = project_root
-        self.binary = project_root / "build/bin/talk-llama-custom"
+        self.binary = project_root / "build/bin/voice-assistant"
         self.wyoming_port = 10200
         self.results = []
 

@@ -22,7 +22,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 TEST_AUDIO = PROJECT_ROOT / "tests/audio/inputs/make_it_warmer.wav"
-BINARY = PROJECT_ROOT / "build/bin/talk-llama-custom"
+BINARY = PROJECT_ROOT / "build/bin/voice-assistant"
 
 # Get audio duration
 def get_audio_duration(wav_file):

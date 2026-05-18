@@ -36,7 +36,7 @@ class ToolAudioTester:
             output_dir=str(project_root / "tests/audio/inputs")
         )
 
-        self.talk_llama_bin = project_root / "build/bin/talk-llama-custom"
+        self.talk_llama_bin = project_root / "build/bin/voice-assistant"
         # Use base model for better accuracy than tiny
         self.whisper_model = project_root / "whisper.cpp/models/ggml-base.en.bin"
         self.llama_model = project_root / "models/llama-2-7b-chat.Q4_K_M.gguf"

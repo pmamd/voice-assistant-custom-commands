@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
 # ---------------------------------------------------------------------------
 # Binary-level LLM output tests (unittest-based)
-# These run talk-llama-custom in test mode and inspect its output.
+# These run voice-assistant in test mode and inspect its output.
 # Run with: python3 -m unittest tests/test_wyoming_piper_unit.py -v
 # ---------------------------------------------------------------------------
 
@@ -216,7 +216,7 @@ import subprocess
 import unittest
 
 _PROJECT_ROOT = Path(__file__).parent.parent
-_BINARY = _PROJECT_ROOT / "build/bin/talk-llama-custom"
+_BINARY = _PROJECT_ROOT / "build/bin/voice-assistant"
 _WHISPER_MODEL = _PROJECT_ROOT / "whisper.cpp/models/ggml-base.en.bin"
 _LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8083")
 _STORY_AUDIO = _PROJECT_ROOT / "tests/audio/inputs/story_request.wav"

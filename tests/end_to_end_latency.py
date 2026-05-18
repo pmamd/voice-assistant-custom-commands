@@ -4,7 +4,7 @@ True End-to-End Latency Test
 
 Measures complete pipeline including TTS synthesis by:
 1. Starting Wyoming-Piper in test mode (saves WAV instead of playing)
-2. Running talk-llama-custom with test input
+2. Running voice-assistant with test input
 3. Waiting for TTS output WAV files to be written
 4. Measuring wall time from start to TTS completion
 
@@ -22,7 +22,7 @@ import shutil
 
 PROJECT_ROOT = Path(__file__).parent.parent
 TEST_AUDIO = PROJECT_ROOT / "tests/audio/inputs/make_it_warmer.wav"
-BINARY = PROJECT_ROOT / "build/bin/talk-llama-custom"
+BINARY = PROJECT_ROOT / "build/bin/voice-assistant"
 TTS_OUTPUT_DIR = PROJECT_ROOT / "tests/audio/outputs/e2e_test"
 WYOMING_LOG = "/tmp/wyoming-piper-e2e.log"
 

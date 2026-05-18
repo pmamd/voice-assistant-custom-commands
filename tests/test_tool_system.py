@@ -19,7 +19,7 @@ from pathlib import Path
 class ToolSystemTester:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
-        self.binary = self.project_root / "build/bin/talk-llama-custom"
+        self.binary = self.project_root / "build/bin/voice-assistant"
         self.wyoming_test = self.project_root / "build/bin/test-wyoming-client"
         self.tools_json = self.project_root / "custom/talk-llama/tools/tools.json"
 
@@ -29,7 +29,7 @@ class ToolSystemTester:
         print("-" * 50)
 
         tests = [
-            (self.binary, "talk-llama-custom binary"),
+            (self.binary, "voice-assistant binary"),
             (self.wyoming_test, "test-wyoming-client binary"),
             (self.tools_json, "tools.json config"),
         ]
