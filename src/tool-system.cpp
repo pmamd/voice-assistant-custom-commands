@@ -184,11 +184,17 @@ std::string ToolRegistry::getToolsPrompt() const {
         oss << "\n";
     }
 
-    oss << "When you need to perform an action, respond with ONLY this format:\n";
+    oss << "When the user requests an action, respond ONLY with the tool call in this exact format:\n";
     oss << "<tool_call>{\"name\": \"tool_name\", \"arguments\": {...}}</tool_call>\n";
     oss << "\n";
-    oss << "Do NOT explain the tool call or add any other text - just output the XML tag.\n";
-    oss << "The tool will execute and speak its own result.\n";
+    oss << "Examples:\n";
+    oss << "User: \"Set temperature to 72\"\n";
+    oss << "You: <tool_call>{\"name\": \"set_temperature\", \"arguments\": {\"value\": 72}}</tool_call>\n";
+    oss << "\n";
+    oss << "User: \"Navigate to the airport\"\n";
+    oss << "You: <tool_call>{\"name\": \"navigate_to\", \"arguments\": {\"destination\": \"airport\"}}</tool_call>\n";
+    oss << "\n";
+    oss << "IMPORTANT: Output ONLY the <tool_call> tag with NO other text. Do NOT explain what you're doing.\n";
 
     return oss.str();
 }
