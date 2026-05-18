@@ -391,6 +391,102 @@ if (!wyoming_client->healthCheck() && ++failures > 3) {
 
 ---
 
+## llama-server KV Cache Warmup
+
+**Current State:** Every time voice-assistant starts, it performs a KV cache warmup that sends the system prompt (~884 tokens including tool definitions) to llama-server. This takes several seconds on .26 (890M iGPU).
+
+**Why It's Needed Every Time:**
+
+llama-server's KV cache is slot-based and session-based. When voice-assistant exits:
+1. The KV cache slot is cleared (idle slots are freed after timeout)
+2. No session persistence across client disconnections
+3. Cache is tied to slot state, slots don't persist across restarts
+
+Even though llama-server stays running between voice-assistant sessions, it doesn't retain the cached system prompt from the previous session.
+
+**Current Warmup Performance:**
+- Machine .74 (W6800 GPU): ~1-2 seconds
+- Machine .26 (890M iGPU): several seconds
+- System prompt: ~884 tokens (base prompt + 13 tool definitions)
+
+**Optimization Options:**
+
+### Option 1: Persistent KV Cache Slots (Recommended)
+
+Use llama-server's `--slot-save-path` feature to persist slots to disk:
+
+```bash
+llama-server \
+  -m ~/models/mistral-7b-instruct-v0.2.Q5_0.gguf \
+  -ngl 999 \
+  --port 8080 \
+  --host 0.0.0.0 \
+  --slot-save-path /tmp/llama-slots \
+  --slots 4
+```
+
+**voice-assistant changes needed:**
+- Use consistent slot ID (e.g., always slot 0)
+- Check if slot 0 has cached tokens before warmup
+- Only warmup if cache is cold
+
+**Benefits:**
+- Warmup only needed once (first run after reboot)
+- Subsequent runs instant startup
+- Survives llama-server restarts if slot files persist
+
+**Trade-offs:**
+- Slot files consume disk space (~hundreds of MB per slot)
+- Need to manage slot file cleanup
+- Tied to specific model + context size
+
+### Option 2: Keep Slot Alive with Keepalives
+
+Maintain a persistent connection and send periodic keepalive requests to prevent slot cleanup:
+
+```cpp
+// Background thread sends empty request every 60s
+curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "{\"n_predict\": 0, \"cache_prompt\": true}");
+```
+
+**Benefits:**
+- No disk storage needed
+- Works with existing llama-server
+
+**Trade-offs:**
+- Slot lost if voice-assistant exits
+- Adds background network traffic
+- Slot still vulnerable to llama-server restart
+
+### Option 3: Reduce Prompt Size
+
+Move some tool descriptions to a separate context that's only loaded on-demand:
+
+- Keep frequently-used tools (stop, temperature, fan) in system prompt
+- Load other tools (navigation, vehicle status) only when relevant conversation detected
+
+**Benefits:**
+- Reduces warmup time even without persistence
+- Smaller context = faster first token
+
+**Trade-offs:**
+- More complex tool loading logic
+- LLM may not know about tools until they're loaded
+- Context switching adds complexity
+
+### Option 4: Accept the Warmup Cost
+
+The warmup is a one-time cost at startup. For a voice assistant that runs for hours/days, a few seconds of startup time may be acceptable.
+
+**When to implement:**
+- If startup time becomes user-facing issue
+- For production deployments with frequent restarts
+- When optimizing for embedded/resource-constrained devices
+
+**Priority:** Low - Medium (depends on usage pattern)
+
+---
+
 ## Performance and Latency Improvements
 
 ### Expose Split-After Parameter
