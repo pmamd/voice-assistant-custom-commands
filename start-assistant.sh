@@ -39,19 +39,11 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Check common locations
-    for candidate in \
-        "./external/llama.cpp/build/bin/llama-server" \
-        "$HOME/.local/bin/llama-server" \
-        "/usr/local/bin/llama-server" \
-        "/usr/bin/llama-server" \
-        "./build/bin/llama-server" \
-        "./llama-server"; do
-        if [[ -x "$candidate" ]]; then
-            echo "$candidate"
-            return
-        fi
-    done
+    # Use llama-server from this repo's submodule
+    if [[ -x "./external/llama.cpp/build/bin/llama-server" ]]; then
+        echo "./external/llama.cpp/build/bin/llama-server"
+        return
+    fi
     echo ""
 }
 
