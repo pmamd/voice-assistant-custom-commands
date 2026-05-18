@@ -161,7 +161,7 @@ See `docs/latency-test-architecture.svg` for visual diagram of test flow.
 
 **Pipeline:**
 ```
-Audio → talk-llama-custom → Whisper → LLM → Wyoming-Piper → WAV files
+Audio → voice-assistant → Whisper → LLM → Wyoming-Piper → WAV files
  (t=0)                                                          (t=end)
 ```
 

@@ -93,7 +93,7 @@ Based on latency benchmark run on 2026-04-17:
 ### NPU Requirements:
 ```bash
 # Model (MUST match)
--mw ./whisper.cpp/models/ggml-base.bin  # multilingual, NOT .en
+-mw ./external/whisper.cpp/models/ggml-base.bin  # multilingual, NOT .en
 
 # Environment
 export XLNX_VART_FIRMWARE=/opt/xilinx/overlaybins/xclbins
