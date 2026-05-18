@@ -72,9 +72,9 @@ endif()
 # Build whisper.cpp submodule
 add_subdirectory(external/whisper.cpp)
 
-# Build our custom talk-llama with modifications
+# Build our voice assistant application
 if (WHISPER_SDL2)
-    # Find SDL2 (required for talk-llama)
+    # Find SDL2 (required for voice-assistant)
     find_package(SDL2 REQUIRED)
     message(STATUS "SDL2_INCLUDE_DIRS = ${SDL2_INCLUDE_DIRS}")
     message(STATUS "SDL2_LIBRARIES    = ${SDL2_LIBRARIES}")
@@ -94,10 +94,10 @@ if (WHISPER_SDL2)
     set(TARGET voice-assistant)
 
     # Our custom source files
-    # Note: console.cpp is #included in talk-llama.cpp, not compiled separately
+    # Note: console.cpp is #included in voice-assistant.cpp, not compiled separately
     # LLM inference is handled by llama-server over HTTP (no embedded llama.cpp)
     add_executable(${TARGET}
-        src/talk-llama.cpp
+        src/voice-assistant.cpp
         src/tts-socket.c
         src/tts-request.c
         src/tool-system.cpp

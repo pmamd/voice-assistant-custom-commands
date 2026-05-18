@@ -1,5 +1,5 @@
 // =============================================================================
-// talk-llama-custom
+// Voice Assistant with Custom Commands
 // Voice assistant combining Whisper STT, llama-server LLM, and Piper TTS
 // with Wyoming protocol integration and LLM-bypass custom commands.
 //
@@ -26,8 +26,8 @@
 //   Wyoming Protocol   - Rhasspy project
 //
 // License:
-//   Custom code (this file and custom/):  see repository LICENSE
-//   whisper.cpp:  MIT License - see whisper.cpp/LICENSE
+//   Custom code (this file and src/):  see repository LICENSE
+//   whisper.cpp:  MIT License - see external/whisper.cpp/LICENSE
 //   LLaMA models: Meta AI license - see individual model terms
 // =============================================================================
 
