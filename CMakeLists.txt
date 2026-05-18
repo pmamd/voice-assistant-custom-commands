@@ -49,8 +49,8 @@ if(WHISPER_VITISAI)
     endif()
 endif()
 
-# Optional llama.cpp build (for llama-server binary)
-option(BUILD_LLAMA_SERVER "Build llama-server from submodule" OFF)
+# Build llama-server from submodule (default ON)
+option(BUILD_LLAMA_SERVER "Build llama-server from submodule" ON)
 
 if(BUILD_LLAMA_SERVER)
     # Configure llama.cpp with same GPU/NPU flags as whisper
@@ -62,6 +62,11 @@ if(BUILD_LLAMA_SERVER)
         # Note: llama.cpp uses LLAMA_VITISAI flag, not WHISPER_VITISAI
         set(LLAMA_VITISAI ON CACHE BOOL "Enable VitisAI NPU backend" FORCE)
     endif()
+
+    # Enable llama-server build in llama.cpp
+    set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build llama common library" FORCE)
+    set(LLAMA_BUILD_TOOLS ON CACHE BOOL "Build llama tools" FORCE)
+    set(LLAMA_BUILD_SERVER ON CACHE BOOL "Build llama-server" FORCE)
 
     add_subdirectory(external/llama.cpp)
     message(STATUS "llama-server will be built from submodule")
