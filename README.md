@@ -127,7 +127,7 @@ python3 tests/run_tests.py --config tests/test_cases.yaml --group all
 
 ## License
 
-- **Custom code** (`custom/`, `external/wyoming-piper/` modifications): see LICENSE
+- **Custom code** (`src/`, `external/wyoming-piper/` modifications): see LICENSE
 - **whisper.cpp**: MIT License — see `external/whisper.cpp/LICENSE`
 - **Mistral models**: Mistral AI license — see model terms
 - **LLaMA models**: Meta AI license — see model terms
@@ -145,7 +145,7 @@ python3 tests/run_tests.py --config tests/test_cases.yaml --group all
 
 ## Links
 
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
+- [whisper.cpp (AMD fork with VitisAI NPU support)](https://github.com/amd/whisper.cpp)
 - [talk-llama-fast](https://github.com/Mozer/talk-llama-fast) (inspiration)
 - [Wyoming-Piper](https://github.com/rhasspy/wyoming-piper)
 - [Piper TTS](https://github.com/rhasspy/piper)
