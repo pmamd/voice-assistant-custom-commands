@@ -41,11 +41,12 @@ _find_llama_server() {
     fi
     # Check common locations - prefer kitt2k binary first (known working)
     for candidate in \
-        "$HOME/Documents/llama.cpp/build/bin/llama-server" \
+        "$HOME/git/kitt2k/external/llama.cpp/build/bin/llama-server" \
         "$HOME/.local/bin/llama-server" \
         "/usr/local/bin/llama-server" \
         "/usr/bin/llama-server" \
         "./build/bin/llama-server" \
+        "$HOME/Documents/llama.cpp/build/bin/llama-server" \
         "./llama-server"; do
         if [[ -x "$candidate" ]]; then
             echo "$candidate"
@@ -336,6 +337,7 @@ $TALK_LLAMA_BIN \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
     -vth 1.2 \
+    --vad-last-ms 700 \
     -n 300 \
     --allow-newline \
     -p Driver \
