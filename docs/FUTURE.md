@@ -1,6 +1,6 @@
 # Commented-Out Features Reference
 
-Features that were removed from `talk-llama.cpp` during the cleanup pass but are worth
+Features that were removed from `voice-assistant.cpp` during the cleanup pass but are worth
 considering for future re-implementation, along with any known issues that caused their
 original removal.
 
@@ -225,7 +225,7 @@ input becomes unreliable, adding back a `std::mutex` or switching to a lock-free
 
 **Why XTTS:**
 - ✅ Best quality-to-integration-effort ratio
-- ✅ Proven to work with talk-llama design (Mozer/talk-llama-fast used it)
+- ✅ Proven to work with voice assistant design (Mozer/talk-llama-fast used it)
 - ✅ Ready-to-use server wrapper (xtts-api-server)
 - ✅ 500ms-1s latency acceptable for conversational AI
 - ✅ Voice cloning capability (clone your own voice from 6-second sample)
@@ -244,7 +244,7 @@ input becomes unreliable, adding back a `std::mutex` or switching to a lock-free
 pip install xtts-api-server
 xtts-api-server --port 8020 --device cuda
 
-# Modify talk-llama Wyoming client to HTTP client
+# Modify Wyoming client to HTTP client
 # Change send_tts_async() to POST to http://localhost:8020/tts_to_audio
 ```
 
