@@ -39,9 +39,14 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Use llama-server from this repo's submodule
+    # Prefer llama-server from this repo's submodule
     if [[ -x "./external/llama.cpp/build/bin/llama-server" ]]; then
         echo "./external/llama.cpp/build/bin/llama-server"
+        return
+    fi
+    # Fallback to system installation (until submodule build is integrated)
+    if command -v llama-server &>/dev/null; then
+        command -v llama-server
         return
     fi
     echo ""
