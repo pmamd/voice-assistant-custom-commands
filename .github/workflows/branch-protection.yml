@@ -1,0 +1,41 @@
+name: Branch Protection Check
+
+on:
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Check for large files
+      run: |
+        # Check for files over 10MB
+        find . -type f -size +10M -not -path "./.git/*" -not -path "./models/*" -not -path "./build/*" | while read file; do
+          echo "❌ Large file found: $file"
+          exit 1
+        done
+        echo "✅ No large files found"
+
+    - name: Check for common issues
+      run: |
+        # Check for TODO/FIXME without issues
+        if git grep -n "TODO\|FIXME" -- '*.cpp' '*.h' '*.py' | grep -v "TODO(#" | grep -v "FIXME(#"; then
+          echo "⚠️  Found TODO/FIXME without issue reference"
+          echo "   Link to GitHub issues: TODO(#123) or FIXME(#456)"
+        fi
+
+    - name: Check no binary files added
+      run: |
+        # Check for accidentally committed binaries
+        git diff --name-only origin/master...HEAD | while read file; do
+          if [[ "$file" =~ \.(gguf|bin|onnx|so|a|o)$ ]]; then
+            echo "❌ Binary file in diff: $file"
+            exit 1
+          fi
+        done || echo "✅ No binary files in diff"

@@ -1,0 +1,19 @@
+# This file defines code owners for the repository
+# Changes to files will automatically request review from owners
+
+# Default owner for everything
+* @pmamd
+
+# Documentation requires review
+*.md @pmamd
+docs/ @pmamd
+
+# Build configuration requires review
+CMakeLists.txt @pmamd
+*.cmake @pmamd
+
+# Source code requires review
+src/ @pmamd
+
+# Test configuration requires review
+tests/*.yaml @pmamd

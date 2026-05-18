@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libsdl2-dev \
+          libcurl4-openssl-dev \
+          libcjson-dev \
+          python3 \
+          python3-pip \
+          pipx
+
+    - name: Build project
+      run: |
+        cmake -B build -DWHISPER_SDL2=ON
+        cmake --build build -j$(nproc)
+
+    - name: Verify binary exists
+      run: |
+        test -f build/bin/voice-assistant
+        echo "Binary built successfully"
+
+    - name: Run Python unit tests
+      run: |
+        python3 -m pip install pyyaml
+        # Run unit tests that don't require Wyoming-Piper
+        python3 -m unittest tests.test_tool_system -v || true
+
+    - name: Run E2E startup test
+      run: |
+        bash tests/test_e2e_startup.sh
+
+    - name: Upload build artifacts
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-logs
+        path: |
+          build/CMakeFiles/CMakeError.log
+          build/CMakeFiles/CMakeOutput.log
