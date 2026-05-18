@@ -1992,7 +1992,11 @@ int run(int argc, const char **argv)
 				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
-				// SMART EARLY STOP DETECTION
+				// SMART EARLY STOP DETECTION - DISABLED
+				// This was triggering too early (300-600ms) and cutting off longer utterances
+				// like "navigate to the nearest Starbucks" after just "navigate to the new"
+				// Keeping code for reference in case we want to re-enable with higher thresholds
+				/*
 				static double early_trigger_start_time = -1; // -1 = uninitialized
 				if (early_trigger_start_time < 0) early_trigger_start_time = get_current_time_ms();
 				bool early_trigger = false;
@@ -2023,6 +2027,14 @@ int run(int argc, const char **argv)
 					} else {
 						vad_result = 1;
 					}
+				} else {
+					vad_result = (vad_result_prev == 1) ? 2 : 0;
+				}
+				*/
+
+				// Simplified VAD result without early stop
+				if (is_speech) {
+					vad_result = 1;
 				} else {
 					vad_result = (vad_result_prev == 1) ? 2 : 0;
 				}
