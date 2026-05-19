@@ -39,9 +39,14 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Use llama-server from this repo's build (built from submodule)
+    # Prefer llama-server from this repo's build (if built)
     if [[ -x "./build/bin/llama-server" ]]; then
         echo "./build/bin/llama-server"
+        return
+    fi
+    # Fall back to ~/Documents/llama.cpp (known working version on .26)
+    if [[ -x "$HOME/Documents/llama.cpp/build/bin/llama-server" ]]; then
+        echo "$HOME/Documents/llama.cpp/build/bin/llama-server"
         return
     fi
     echo ""

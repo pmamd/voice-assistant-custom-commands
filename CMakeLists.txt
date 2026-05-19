@@ -49,8 +49,8 @@ if(WHISPER_VITISAI)
     endif()
 endif()
 
-# Build llama-server from submodule (default ON)
-option(BUILD_LLAMA_SERVER "Build llama-server from submodule" ON)
+# Build llama-server from submodule (default OFF due to 'common' library conflict)
+option(BUILD_LLAMA_SERVER "Build llama-server from submodule" OFF)
 
 if(BUILD_LLAMA_SERVER)
     # llama-server runs as a separate process from voice-assistant, so GPU can be
