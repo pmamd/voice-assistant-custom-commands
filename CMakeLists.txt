@@ -53,11 +53,16 @@ endif()
 option(BUILD_LLAMA_SERVER "Build llama-server from submodule" ON)
 
 if(BUILD_LLAMA_SERVER)
-    # llama-server always uses GPU when available (separate from whisper backend)
-    # whisper.cpp uses NPU (VITISAI) or GPU (HIP), but llama-server always uses GPU
-    if(GGML_HIP)
+    # CRITICAL: GGML_HIP and WHISPER_VITISAI cannot be enabled simultaneously
+    # The HIP runtime conflicts with VitisAI/FlexML runtime, causing segfaults
+    # When whisper uses NPU, llama-server must use CPU only
+    if(WHISPER_VITISAI)
+        message(STATUS "llama-server will use CPU (VITISAI conflicts with HIP)")
+    elseif(GGML_HIP)
         set(LLAMA_HIPBLAS ON CACHE BOOL "Enable hipBLAS for llama-server" FORCE)
         message(STATUS "llama-server will use GPU (HIPBLAS)")
+    else()
+        message(STATUS "llama-server will use CPU")
     endif()
 
     # Enable llama-server build in llama.cpp
