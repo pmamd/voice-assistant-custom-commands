@@ -2029,64 +2029,11 @@ int run(int argc, const char **argv)
 				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
 
-				// SMART EARLY STOP DETECTION
-				static double early_trigger_start_time = -1; // -1 = uninitialized
-				static bool early_check_done = false; // Track if we already did the early check this session
-				if (early_trigger_start_time < 0) early_trigger_start_time = get_current_time_ms();
-				bool early_trigger = false;
-
-				if (is_speech && vad_result_prev != 1) {
-					early_trigger_start_time = get_current_time_ms();
-					early_check_done = false; // Reset for new speech session
-				} else if (is_speech && vad_result_prev == 1) {
-					double speech_duration_ms = get_current_time_ms() - early_trigger_start_time;
-
-					int check_samples = std::min((int)pcmf32_cur.size(), (WHISPER_SAMPLE_RATE * 500) / 1000);
-					float recent_energy = 0.0f;
-					for (int i = pcmf32_cur.size() - check_samples; i < (int)pcmf32_cur.size(); i++) {
-						recent_energy += fabsf(pcmf32_cur[i]);
-					}
-					recent_energy /= check_samples;
-
-					// Check if we should trigger early stop (1200-1800ms)
-					// Only trigger if audio contains interrupt keywords like "stop", "pause"
-					// IMPORTANT: Only do this check ONCE per speech session to avoid multiple partial transcriptions
-					if (!early_check_done && speech_duration_ms >= 1200.0 && speech_duration_ms <= 1800.0 && recent_energy > 0.01f) {
-						early_check_done = true; // Mark that we've done the check for this speech session
-
-						// Quick transcribe to check for trigger words
-						std::string quick_check = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms));
-						std::transform(quick_check.begin(), quick_check.end(), quick_check.begin(), ::tolower);
-
-						bool has_trigger_word = (quick_check.find("stop") != std::string::npos ||
-						                         quick_check.find("pause") != std::string::npos ||
-						                         quick_check.find("quiet") != std::string::npos ||
-						                         quick_check.find("silence") != std::string::npos);
-
-						if (has_trigger_word) {
-							early_trigger = true;
-							if (params.print_energy) {
-								fprintf(stderr, "\n[Early Stop Trigger: dur=%.0fms, trigger word detected: '%s']\n",
-								        speech_duration_ms, quick_check.c_str());
-							}
-						} else {
-							// No trigger word - keep listening, audio stays in buffer
-							if (params.print_energy) {
-								fprintf(stderr, "\n[Early Stop Check: dur=%.0fms, no trigger word in '%s', continuing...]\n",
-								        speech_duration_ms, quick_check.c_str());
-							}
-						}
-					}
-				}
-
+				// VAD result: 0=no speech, 1=speech detected, 2=speech ended
 				if (is_speech) {
-					if (early_trigger) {
-						vad_result = 2; // Trigger early end for interrupt commands
-					} else {
-						vad_result = 1;
-					}
+					vad_result = 1; // Speech detected
 				} else {
-					vad_result = (vad_result_prev == 1) ? 2 : 0;
+					vad_result = (vad_result_prev == 1) ? 2 : 0; // Speech ended if was speaking
 				}
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
