@@ -333,7 +333,7 @@ $TALK_LLAMA_BIN \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
     -vth 1.2 \
-    --vad-last-ms 1500 \
+    --vad-last-ms 700 \
     -n 300 \
     --allow-newline \
     -p Driver \
