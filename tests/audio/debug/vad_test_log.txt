@@ -1,0 +1,51 @@
+2026-05-19 14:15:50,322 - audio_generator - INFO - AudioGenerator initialized with Piper at /home/paul/.local/bin/piper
+2026-05-19 14:15:50,322 - audio_verifier - INFO - AudioVerifier initialized with Whisper at build/bin/main
+2026-05-19 14:15:50,322 - audio_verifier - WARNING - sentence-transformers not available - using keyword matching only
+2026-05-19 14:15:50,322 - audio_verifier - WARNING - Install with: pip install sentence-transformers
+2026-05-19 14:15:50,322 - __main__ - INFO - Checking Wyoming-Piper status...
+2026-05-19 14:15:50,530 - __main__ - INFO - Starting Wyoming-Piper: /home/paul/.local/bin/wyoming-piper-custom --piper /home/paul/.local/bin/piper --voice en_US-lessac-medium --data-dir ./piper-data --uri tcp://0.0.0.0:10200 --test-mode --test-output-dir ./tests/audio/outputs
+2026-05-19 14:15:50,531 - __main__ - INFO - Waiting for Wyoming-Piper to start...
+2026-05-19 14:15:53,736 - __main__ - INFO - ✓ Wyoming-Piper started successfully on port 10200
+2026-05-19 14:15:53,737 - __main__ - INFO - Checking llama-server status...
+2026-05-19 14:15:53,761 - __main__ - INFO - Starting llama-server: llama-server -m ./models/mistral-7b-instruct-v0.2.Q5_0.gguf --port 8080 --ctx-size 4096 -ngl 99
+2026-05-19 14:15:53,762 - __main__ - INFO - Waiting for llama-server to start (loading model)...
+2026-05-19 14:15:55,767 - __main__ - INFO - ✓ llama-server started successfully at http://localhost:8080
+2026-05-19 14:15:55,767 - __main__ - INFO - Running 1 tests...
+2026-05-19 14:15:55,767 - __main__ - INFO - Running test: vad_split_utterance (vad_validation)
+2026-05-19 14:15:55,767 - __main__ - INFO - Running VAD validation test: vad_split_utterance
+2026-05-19 14:15:55,767 - __main__ - INFO -   Input: 'Navigate to the closest Starbucks near me'
+2026-05-19 14:15:55,767 - __main__ - INFO -   Max expected Driver prompts: 1
+2026-05-19 14:15:55,767 - __main__ - INFO - Generating audio for: 'Navigate to the closest Starbucks near me'
+2026-05-19 14:15:55,767 - audio_generator - INFO - Using cached audio file: tests/audio/inputs/vad_split_utterance_input.wav
+2026-05-19 14:15:55,814 - __main__ - INFO -   Generated audio duration: 2.49s
+2026-05-19 14:15:55,814 - __main__ - INFO - Running voice assistant with VAD args: ['--vad-last-ms', '700', '-vth', '1.2']
+2026-05-19 14:15:55,814 - __main__ - INFO - Running: ./build/bin/voice-assistant --test-input tests/audio/inputs/vad_split_utterance_input.wav -mw ./external/whisper.cpp/models/ggml-base.en.bin --llama-url http://localhost:8080 --verbose --temp 0.5 --vad-last-ms 700 -vth 1.2
+2026-05-19 14:16:00,760 - __main__ - INFO - Found 1 audio chunks for timestamp 1779225356
+2026-05-19 14:16:00,762 - __main__ - INFO - Captured output audio: tests/audio/outputs/vad_split_utterance_output.wav (single chunk)
+2026-05-19 14:16:00,762 - __main__ - INFO -   Found 1 user transcription(s) in output
+2026-05-19 14:16:00,762 - __main__ - INFO -   Early stop trigger: no
+2026-05-19 14:16:00,762 - __main__ - INFO -   User prompt 1: Georgi: Navigate to the closest Starbucks near me
+2026-05-19 14:16:00,762 - __main__ - INFO - Stopping Wyoming-Piper...
+2026-05-19 14:16:00,778 - __main__ - INFO - ✓ Wyoming-Piper stopped
+2026-05-19 14:16:00,778 - __main__ - INFO - Stopping llama-server...
+2026-05-19 14:16:00,858 - __main__ - INFO - ✓ llama-server stopped
+2026-05-19 14:16:00,858 - __main__ - INFO - Report saved to: tests/results/test_report_20260519_141600.txt
+[PASS] vad_split_utterance (4995ms)
+
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-19 14:16:00
+Total Tests: 1
+Passed: 1
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] vad_split_utterance
+  Duration: 4995ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================
