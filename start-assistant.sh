@@ -19,11 +19,31 @@ echo ""
 # voice-assistant uses CPU only (no GPU/HIP). llama-server manages
 # its own GPU context and must NOT inherit any HSA overrides.
 
+# Detect GPU hardware
+GPU_ARCH=$(rocminfo 2>/dev/null | grep "Name:" | grep "gfx" | head -1 | awk '{print $2}' || echo "unknown")
+
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
-WHISPER_MODEL="./external/whisper.cpp/models/ggml-base.bin"
+
+# Set paths based on hardware
+if [[ "$GPU_ARCH" == "gfx1153" ]]; then
+    # Target machine (.26 Kraken-2E)
+    # NPU encoder requires multilingual base model with --language en flag
+    WHISPER_MODEL="${WHISPER_MODEL:-./external/whisper.cpp/models/ggml-base.bin}"
+    WHISPER_LANG_FLAG="--language en"
+    USE_HSA_OVERRIDE="11.0.2"
+    LLAMA_EXTRA_FLAGS="--flash-attn 0 --no-warmup"
+else
+    # Dev machine (.74 W6800 gfx1030) or other
+    # English-only model, no language flag needed
+    WHISPER_MODEL="${WHISPER_MODEL:-./external/whisper.cpp/models/ggml-base.en.bin}"
+    WHISPER_LANG_FLAG=""
+    USE_HSA_OVERRIDE=""
+    LLAMA_EXTRA_FLAGS=""
+fi
+
 LLAMA_MODEL="./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
 TALK_LLAMA_BIN="./build/bin/voice-assistant"
 
@@ -183,15 +203,19 @@ _llama_start() {
     echo "  Binary: $bin"
     echo "  Model:  $model"
     echo "  Port:   $port"
-    echo "  Using HSA_OVERRIDE_GFX_VERSION=11.0.2 for gfx1153 GPU"
+    echo "  GPU:    $GPU_ARCH"
 
-    # Run llama-server with HSA override for gfx1153 compatibility (same as kitt2k)
-    # HSA 11.0.2 is correct for gfx1153 - 11.5.1 causes crashes during generation
-    # --flash-attn 0 is critical to avoid GPU crashes on this hardware
-    # --no-warmup avoids crashes during startup warmup phase
-    HSA_OVERRIDE_GFX_VERSION=11.0.2 "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
-        -ngl 999 -c 4096 --flash-attn 0 --cache-prompt --no-warmup \
-        > /tmp/llama-server.log 2>&1 &
+    if [[ -n "$USE_HSA_OVERRIDE" ]]; then
+        echo "  Using HSA_OVERRIDE_GFX_VERSION=$USE_HSA_OVERRIDE for gfx1153"
+        HSA_OVERRIDE_GFX_VERSION="$USE_HSA_OVERRIDE" "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
+            -ngl 999 -c 4096 --cache-prompt $LLAMA_EXTRA_FLAGS \
+            > /tmp/llama-server.log 2>&1 &
+    else
+        echo "  No HSA override needed (native ROCm support)"
+        "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
+            -ngl 999 -c 4096 --cache-prompt \
+            > /tmp/llama-server.log 2>&1 &
+    fi
     LLAMA_SERVER_PID=$!
     disown
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
@@ -320,8 +344,6 @@ echo "=========================================="
 echo ""
 
 # Start the voice assistant
-# Note: Using multilingual base model with --language en because NPU encoder
-# is incompatible with ggml-base.en.bin (produces garbage transcription)
 $TALK_LLAMA_BIN \
     -mw "$WHISPER_MODEL" \
     --llama-url "$LLAMA_SERVER_URL" \
@@ -333,7 +355,7 @@ $TALK_LLAMA_BIN \
     --allow-newline \
     -p Driver \
     -c "$CAPTURE_DEVICE" \
-    --language en
+    $WHISPER_LANG_FLAG
 
 # Cleanup on exit
 echo ""

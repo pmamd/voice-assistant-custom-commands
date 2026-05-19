@@ -153,30 +153,40 @@ test_cases:
     min_confidence: 0.85
     test_type: "quality"
 
+  # VAD validation tests
+  - name: "vad_split_utterance"
+    description: "Test that VAD does not split long utterances into multiple LLM prompts"
+    input: "Navigate to the closest Starbucks near me"
+    test_type: "vad_validation"
+    max_driver_prompts: 1
+    vad_args:
+      - "--vad-last-ms"
+      - "700"
+      - "-vth"
+      - "1.2"
+
 # Test configuration
 config:
   # Audio generation settings
   audio_generator:
-    # Note: Built Piper from submodule currently fails (espeak-ng build issue)
-    # Using system-installed Piper until build is fixed
     piper_bin: "/home/paul/.local/bin/piper"
-    model_dir: "./piper-data"  # Download voice models here
+    model_dir: "./piper-data"
     default_voice: "en_US-lessac-medium"
-    output_dir: "./audio/inputs"
+    output_dir: "./tests/audio/inputs"
 
   # System under test
   talk_llama:
-    binary: "./build/bin/talk-llama-custom"
-    whisper_model: "./whisper.cpp/models/ggml-base.en.bin"
-    llama_model: "../models/llama-2-7b-chat.Q4_K_M.gguf"
+    binary: "./build/bin/voice-assistant"
+    whisper_model: "./external/whisper.cpp/models/ggml-base.en.bin"
+    llama_url: "http://localhost:8080"
     temperature: 0.5  # Lower temperature for more consistent responses
     test_mode: true
 
   # Verification settings
   audio_verifier:
     whisper_bin: "./build/bin/main"
-    whisper_model: "./whisper.cpp/models/ggml-base.en.bin"
-    output_dir: "./audio/outputs"
+    whisper_model: "./external/whisper.cpp/models/ggml-base.en.bin"
+    output_dir: "./tests/audio/outputs"
 
   # Wyoming-Piper TTS server settings
   wyoming_piper:
@@ -192,8 +202,22 @@ config:
       - "tcp://0.0.0.0:10200"
       - "--test-mode"
       - "--test-output-dir"
-      - "./audio/outputs"
+      - "./tests/audio/outputs"
     port: 10200
+    auto_start: true  # Automatically start if not running
+
+  # llama-server settings
+  llama_server:
+    command: "llama-server"
+    args:
+      - "-m"
+      - "./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
+      - "--port"
+      - "8080"
+      - "--ctx-size"
+      - "4096"
+      - "-ngl"
+      - "99"
     auto_start: true  # Automatically start if not running
 
   # Test execution
@@ -235,6 +259,9 @@ test_groups:
   performance:
     - "latency_test"
 
+  vad:
+    - "vad_split_utterance"
+
   all:
     - "simple_greeting"
     - "question_response"
@@ -248,3 +275,4 @@ test_groups:
     - "latency_test"
     - "multiple_turns"
     - "clear_speech"
+    - "vad_split_utterance"
