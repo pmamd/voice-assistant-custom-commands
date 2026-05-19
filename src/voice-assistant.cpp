@@ -2031,11 +2031,13 @@ int run(int argc, const char **argv)
 
 				// SMART EARLY STOP DETECTION
 				static double early_trigger_start_time = -1; // -1 = uninitialized
+				static bool early_check_done = false; // Track if we already did the early check this session
 				if (early_trigger_start_time < 0) early_trigger_start_time = get_current_time_ms();
 				bool early_trigger = false;
 
 				if (is_speech && vad_result_prev != 1) {
 					early_trigger_start_time = get_current_time_ms();
+					early_check_done = false; // Reset for new speech session
 				} else if (is_speech && vad_result_prev == 1) {
 					double speech_duration_ms = get_current_time_ms() - early_trigger_start_time;
 
@@ -2048,7 +2050,10 @@ int run(int argc, const char **argv)
 
 					// Check if we should trigger early stop (1200-1800ms)
 					// Only trigger if audio contains interrupt keywords like "stop", "pause"
-					if (speech_duration_ms >= 1200.0 && speech_duration_ms <= 1800.0 && recent_energy > 0.01f) {
+					// IMPORTANT: Only do this check ONCE per speech session to avoid multiple partial transcriptions
+					if (!early_check_done && speech_duration_ms >= 1200.0 && speech_duration_ms <= 1800.0 && recent_energy > 0.01f) {
+						early_check_done = true; // Mark that we've done the check for this speech session
+
 						// Quick transcribe to check for trigger words
 						std::string quick_check = ::trim(::transcribe(ctx_wsp, params, pcmf32_cur, prompt_whisper, prob0, t_ms));
 						std::transform(quick_check.begin(), quick_check.end(), quick_check.begin(), ::tolower);
