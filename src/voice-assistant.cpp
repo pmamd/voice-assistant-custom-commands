@@ -1511,6 +1511,7 @@ int run(int argc, const char **argv)
 	bool test_mode = !params.test_input_file.empty();
 	std::vector<float> test_audio_data;
 	bool test_audio_injected = false;
+	bool test_audio_processed = false;
 
 	if (test_mode) {
 		std::vector<std::vector<float>> test_audio_stereo;
@@ -1518,10 +1519,10 @@ int run(int argc, const char **argv)
 			fprintf(stderr, "%s: failed to read test input file: %s\n", __func__, params.test_input_file.c_str());
 			return 1;
 		}
-		// Pad test audio to simulate the real 10-second capture window.
-		// Without context, Whisper fails on short inputs (< ~1.5s).
-		// Add 1 second of silence before the speech and pad total to 10 seconds.
-		{
+		// Don't pad test audio - the audio files already have appropriate padding
+		// from audio_generator.py (500ms leading + trailing to 1500ms total).
+		// Over-padding drowns out the speech and causes Whisper to return empty.
+		if (false) {
 			const int target   = WHISPER_SAMPLE_RATE * 10; // 10s total
 			const int prefix   = WHISPER_SAMPLE_RATE * 1;  // 1s silence before speech
 			if ((int)test_audio_data.size() < target) {
@@ -1968,25 +1969,30 @@ int run(int argc, const char **argv)
 		// -- Audio capture --------------------------------------------------------
 		// Gets the latest 1-second chunk of microphone audio (or injects test audio).
 		{
-			// In test mode, inject the test audio data once
-			if (test_mode && !test_audio_data.empty()) {
+			// In test mode, inject the test audio data once and keep it until processed
+			if (test_mode && !test_audio_data.empty() && !test_audio_injected) {
 				pcmf32_cur = test_audio_data;
-				test_audio_data.clear(); // Use only once
 				test_audio_injected = true;
 			} else if (!test_mode) {
 				audio.get(1000, pcmf32_cur); // step_ms, async - reduced to 1s for better responsiveness
+			} else if (test_mode && test_audio_injected && !test_audio_processed) {
+				// Keep test audio in buffer until VAD processing completes
+				pcmf32_cur = test_audio_data;
 			}
 
 			// -- Voice Activity Detection (VAD) -----------------------------------
 			// Determines whether speech has started or ended in the captured audio.
 			// Includes smart early-stop detection for short high-energy commands like "stop".
 			int vad_result;
-			if (test_mode && test_audio_injected && !pcmf32_cur.empty()) {
+			if (test_mode && test_audio_injected && !test_audio_processed && !pcmf32_cur.empty()) {
 				// Simulate VAD: speech started then ended
+				// Set speech_start_ms to calculate proper duration from audio buffer
 				if (vad_result_prev != 1) {
 					vad_result = 1; // Speech started
+					speech_start_ms = get_current_time_ms();
 				} else {
 					vad_result = 2; // Speech ended - trigger processing
+					test_audio_processed = true;
 				}
 			} else {
 				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
@@ -2075,6 +2081,11 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				speech_end_ms = get_current_time_ms();
 				latency_vad_end = speech_end_ms;
 				speech_len = speech_end_ms - speech_start_ms;
+
+				// In test mode, calculate duration from actual audio buffer size
+				if (test_mode && test_audio_injected && !pcmf32_cur.empty()) {
+					speech_len = pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE;
+				}
 
 				// DEBUG: Log speech details
 				if (vad_result >= 2 && vad_result_prev == 1) {

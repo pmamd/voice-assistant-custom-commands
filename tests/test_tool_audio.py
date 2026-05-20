@@ -32,7 +32,7 @@ class ToolAudioTester:
         # Initialize audio generator
         self.generator = AudioGenerator(
             piper_bin="/home/paul/.local/bin/piper",
-            model_dir=str(project_root / "external/piper-voices"),
+            model_dir=str(project_root / "piper-data"),
             output_dir=str(project_root / "tests/audio/inputs")
         )
 

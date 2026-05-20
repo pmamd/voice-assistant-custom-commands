@@ -24,7 +24,7 @@ class RealInterruptTester:
         
         self.generator = AudioGenerator(
             piper_bin="/home/paul/.local/bin/piper",
-            model_dir=str(project_root / "external/piper-voices"),
+            model_dir=str(project_root / "piper-data"),
             output_dir=str(project_root / "tests/audio/inputs")
         )
     
@@ -40,10 +40,10 @@ class RealInterruptTester:
         # Use a prompt that WILL generate a long response
         # Ask for enumeration which forces the model to generate many tokens
         long_prompt = "Count from one to one hundred and say something about each number"
-        long_audio = self.generator.generate(long_prompt, "long_request")
+        long_audio = self.generator.generate(long_prompt, output_name="long_request")
         print(f"   Long request audio: {long_audio}")
-        
-        stop_audio = self.generator.generate("stop", "stop_request")
+
+        stop_audio = self.generator.generate("stop", output_name="stop_request")
         print(f"   Stop audio: {stop_audio}")
         
         # Start talk-llama in background
@@ -60,7 +60,7 @@ class RealInterruptTester:
             proc = subprocess.Popen(
                 [
                     str(self.talk_llama_bin),
-                    "--llama-url", "http://127.0.0.1:8083",
+                    "--llama-url", "http://127.0.0.1:8080",
                     "-mw", str(self.whisper_model),
                     "--xtts-url", "http://localhost:10200/",
                     "--xtts-voice", "en_US-lessac-medium",
