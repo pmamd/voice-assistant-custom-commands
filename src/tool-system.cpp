@@ -89,7 +89,7 @@ std::string ToolRegistry::normalizeText(const std::string& text) const {
 }
 
 // Match fast path keywords
-std::pair<bool, ToolDefinition> ToolRegistry::matchFastPath(const std::string& text) const {
+std::pair<bool, ToolDefinition> ToolRegistry::matchFastPath(const std::string& text, bool tts_active) const {
     std::string normalized = normalizeText(text);
 
     // Only match if text is short (fast commands should be brief)
@@ -103,9 +103,18 @@ std::pair<bool, ToolDefinition> ToolRegistry::matchFastPath(const std::string& t
         for (const auto& keyword : tool.keywords) {
             std::string norm_keyword = normalizeText(keyword);
 
-            // Exact match or keyword at start of text
-            if (normalized == norm_keyword ||
-                normalized.find(norm_keyword) == 0) {
+            // When TTS is active: ANY mention of the keyword triggers the tool (relaxed matching)
+            // When TTS is NOT active: keyword must be at start (strict matching to avoid false positives)
+            bool matches = false;
+            if (tts_active) {
+                // Relaxed: find keyword anywhere in the text
+                matches = (normalized.find(norm_keyword) != std::string::npos);
+            } else {
+                // Strict: exact match or keyword at start of text
+                matches = (normalized == norm_keyword || normalized.find(norm_keyword) == 0);
+            }
+
+            if (matches) {
                 return {true, tool};
             }
         }

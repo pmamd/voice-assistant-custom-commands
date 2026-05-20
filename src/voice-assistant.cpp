@@ -2318,7 +2318,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				// -- Fast-path tool execution -----------------------------------------
 				// Checks if the heard text matches a registered fast-path tool (e.g. "stop").
 				// If matched, executes the tool immediately and skips LLM generation entirely.
-				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
+				// When TTS is active, use relaxed matching (keyword anywhere in text)
+				bool tts_active = g_generation_running.load();
+				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard, tts_active);
 				// Skip resume_speaking if we're not actually paused — pass through to LLM
 				bool skip_fast_path = (tool_def.name == "resume_speaking" && !tool_system::g_wyoming_paused);
 				if (matched && tool_def.fast_path && !skip_fast_path) {
