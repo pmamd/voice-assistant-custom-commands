@@ -350,7 +350,6 @@ $TALK_LLAMA_BIN \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
-    -vth 1.2 \
     -n 300 \
     --allow-newline \
     -p Driver \
