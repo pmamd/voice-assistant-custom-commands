@@ -387,6 +387,7 @@ class TestHarness:
 
             # Determine verification method
             expected_response = test_case.get('expected_response')  # Full response for semantic
+            alternate_responses = test_case.get('alternate_responses', [])  # Alternate acceptable responses
             expected_text = test_case.get('expected_fuzzy')  # For fuzzy match
             keywords = test_case.get('expected_contains')  # For keyword match
 
@@ -410,7 +411,7 @@ class TestHarness:
             else:
                 min_keyword_matches = None
 
-            # Run verification
+            # Run verification - try primary expected response first
             results = self.verifier.verify(
                 output_wav,
                 expected_text=expected_text,
@@ -421,6 +422,24 @@ class TestHarness:
                 semantic_threshold=semantic_threshold,
                 use_semantic=use_semantic
             )
+
+            # If primary verification failed and we have alternates, try them
+            if not results['overall_passed'] and alternate_responses:
+                logger.debug(f"Primary verification failed, trying {len(alternate_responses)} alternate(s)")
+                for alt_response in alternate_responses:
+                    alt_results = self.verifier.verify(
+                        output_wav,
+                        expected_text=alt_response,
+                        fuzzy_threshold=fuzzy_threshold,
+                        min_confidence=min_confidence,
+                        semantic_threshold=semantic_threshold,
+                        use_semantic=use_semantic
+                    )
+                    if alt_results['overall_passed']:
+                        logger.info(f"Alternate response matched: '{alt_response}'")
+                        results = alt_results
+                        expected_text = alt_response  # Update for reporting
+                        break
 
             duration_ms = (time.time() - start_time) * 1000
 

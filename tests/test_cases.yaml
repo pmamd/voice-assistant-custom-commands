@@ -109,6 +109,8 @@ test_cases:
     input: "Count from one to five"
     verification_method: "semantic"
     expected_response: "One, two, three, four, five."
+    alternate_responses:
+      - "1, 2, 3, 4, 5."
     semantic_threshold: 0.70
     min_confidence: 0.70
     test_type: "functional"
