@@ -133,8 +133,11 @@ class AudioVerifier:
             )
 
             if result.returncode != 0:
-                logger.error(f"Whisper failed: {result.stderr}")
-                raise RuntimeError(f"Whisper failed: {result.stderr}")
+                logger.error(f"Whisper command: {' '.join(cmd)}")
+                logger.error(f"Whisper returncode: {result.returncode}")
+                logger.error(f"Whisper stdout: {result.stdout[:500]}")
+                logger.error(f"Whisper stderr: {result.stderr[:500]}")
+                raise RuntimeError(f"Whisper failed with return code {result.returncode}: {result.stderr[:200]}")
 
             # Parse output
             text = ""
@@ -159,10 +162,15 @@ class AudioVerifier:
                     json_file.unlink()
                 else:
                     logger.warning(f"JSON file not created: {json_file}")
-                    # Fall back to parsing stdout
-                    text = result.stdout.strip()
+                    # Fall back to parsing stderr (whisper-cli outputs to stderr)
+                    # The transcription is the last non-empty line before timing stats
+                    lines = [l.strip() for l in result.stderr.split('\n') if l.strip() and not l.strip().startswith('whisper_')]
+                    text = lines[-1] if lines else ""
             else:
-                text = result.stdout.strip()
+                # whisper-cli outputs transcription to stderr, not stdout
+                # The transcription is the last non-empty line before timing stats
+                lines = [l.strip() for l in result.stderr.split('\n') if l.strip() and not l.strip().startswith('whisper_')]
+                text = lines[-1] if lines else ""
 
             logger.info(f"Transcribed: '{text}' (confidence: {confidence:.2f})")
             return text, confidence

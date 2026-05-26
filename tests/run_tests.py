@@ -63,8 +63,8 @@ class TestHarness:
 
         ver_config = self.config.get('config', {}).get('audio_verifier', {})
         self.verifier = AudioVerifier(
-            whisper_bin=ver_config.get('whisper_bin', './build/bin/main'),
-            model_path=ver_config.get('whisper_model', './models/ggml-base.en.bin')
+            whisper_bin=ver_config.get('whisper_bin', './build/bin/whisper-cli'),
+            model_path=ver_config.get('whisper_model', './external/whisper.cpp/models/ggml-base.en.bin')
         )
 
         self.test_cases = self.config.get('test_cases', [])
