@@ -30,6 +30,8 @@ _LOGGER = logging.getLogger(__name__)
 STOP_CMD = False
 # List to track all active aplay processes
 ACTIVE_APLAY_PROCESSES = []
+# Counter for test output files (persists across handler instances)
+TEST_OUTPUT_COUNTER = 0
 
 class PiperEventHandler(AsyncEventHandler):
     def __init__(
@@ -45,10 +47,9 @@ class PiperEventHandler(AsyncEventHandler):
         self.cli_args = cli_args
         self.wyoming_info_event = wyoming_info.event()
         self.process_manager = process_manager
-        self.test_output_counter = 0  # Counter for test output files
 
     async def handle_event(self, event: Event) -> bool:
-        global STOP_CMD, ACTIVE_APLAY_PROCESSES
+        global STOP_CMD, ACTIVE_APLAY_PROCESSES, TEST_OUTPUT_COUNTER
 
         # Handle service discovery
         if Describe.is_type(event.type):
@@ -59,8 +60,9 @@ class PiperEventHandler(AsyncEventHandler):
         # Handle new-response event: talk-llama signals start of a new user response.
         # This is the only place STOP_CMD is reset to False.
         if event.type == "new-response":
-            _LOGGER.debug("Received new-response event - resetting STOP_CMD")
+            _LOGGER.debug("Received new-response event - resetting STOP_CMD and TEST_OUTPUT_COUNTER")
             STOP_CMD = False
+            TEST_OUTPUT_COUNTER = 0  # Reset counter for new response
             return True
 
         # Handle AudioStop event (standard Wyoming protocol)
@@ -195,14 +197,16 @@ class PiperEventHandler(AsyncEventHandler):
         test_output_dir = getattr(self.cli_args, 'test_output_dir', None)
 
         if test_mode and test_output_dir:
+            global TEST_OUTPUT_COUNTER
             # Test mode: copy file to test output directory instead of playing
             test_output_dir_path = Path(test_output_dir)
             test_output_dir_path.mkdir(parents=True, exist_ok=True)
 
             # Generate output filename with timestamp and counter
             timestamp = int(time.time())
-            self.test_output_counter += 1
-            test_output_path = test_output_dir_path / f"output_{timestamp}_{self.test_output_counter}.wav"
+            TEST_OUTPUT_COUNTER += 1
+            _LOGGER.debug(f"Test output counter after increment: {TEST_OUTPUT_COUNTER}")
+            test_output_path = test_output_dir_path / f"output_{timestamp}_{TEST_OUTPUT_COUNTER}.wav"
 
             shutil.copy(output_path, test_output_path)
             _LOGGER.info(f"Test mode: saved audio to {test_output_path}")
