@@ -96,6 +96,21 @@ source /opt/xilinx/xrt/setup.sh
 
 Hardware: AMD 890M iGPU (gfx1153) + NPU, ROCm 7.1.1, VitisAI/FlexML runtime
 
+**llama.cpp for .26 (gfx1153):**
+
+Due to ROCm 7.2.1 codegen bug with gfx1153, llama.cpp must be built for generic gfx1102:
+
+```bash
+cd external/llama.cpp
+rm -rf build
+cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'
+cmake --build build -j --target llama-server
+
+# Verify correct architecture
+strings build/bin/libggml-hip.so.0.9.5 | grep gfx | head -1
+# Should show: hipv4-amdgcn-amd-amdhsa--gfx1102
+```
+
 **Why separate builds?**
 
 Enabling both `-DGGML_HIP=ON` (GPU) and `-DWHISPER_VITISAI=ON` (NPU) simultaneously causes segfaults. The HIP runtime conflicts with the NPU encoder during Whisper inference. Each machine must choose one acceleration method:

@@ -59,8 +59,12 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Check common locations - prefer kitt2k binary first (known working)
+    # Check common locations
+    # NOTE: For gfx1153 (RDNA3 iGPU), external/llama.cpp MUST be built with:
+    #   cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'
+    # ROCm 7.2.1 has codegen bug with gfx1153 target. Use gfx1102 + HSA_OVERRIDE instead.
     for candidate in \
+        "./external/llama.cpp/build/bin/llama-server" \
         "$HOME/Documents/llama.cpp/build/bin/llama-server" \
         "$HOME/.local/bin/llama-server" \
         "/usr/local/bin/llama-server" \
