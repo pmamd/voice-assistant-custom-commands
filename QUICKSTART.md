@@ -23,27 +23,35 @@ sudo apt-get update && sudo apt-get install -y \
     libsdl2-dev libcurl4-openssl-dev libcjson-dev \
     alsa-utils python3 python3-pip pipx
 
-# 3. Build
+# 3. Build voice-assistant
 cmake -B build -DWHISPER_SDL2=ON
 cmake --build build -j
 
-# 4. Install Piper TTS (exact version required)
+# 4. Build llama-server
+cd external/llama.cpp
+# For AMD RDNA3 iGPUs (gfx1153), use GPU_TARGETS='gfx1102'
+# For other AMD GPUs or NVIDIA, just use -DGGML_HIP=ON or -DGGML_CUDA=ON
+cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'
+cmake --build build -j --target llama-server
+cd ../..
+
+# 5. Install Piper TTS (exact version required)
 pipx install piper-tts==1.4.1
 pipx inject piper-tts pathvalidate
 
-# 5. Install Wyoming-Piper (custom version from this repo)
+# 6. Install Wyoming-Piper (custom version from this repo)
 cd external/wyoming-piper
 pipx install -e .
 cd ../..
 
-# 6. Add pipx binaries to PATH
+# 7. Add pipx binaries to PATH
 export PATH="$HOME/.local/bin:$PATH"
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
-# 7. Download Whisper model
+# 8. Download Whisper model
 cd external/whisper.cpp/models && bash download-ggml-model.sh tiny.en && cd ../..
 
-# 8. Download LLM (Mistral recommended)
+# 9. Download LLM (Mistral recommended)
 mkdir -p models
 wget -P models https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_0.gguf
 ```

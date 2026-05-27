@@ -59,23 +59,19 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Check common locations
-    # NOTE: For gfx1153 (RDNA3 iGPU), external/llama.cpp MUST be built with:
+
+    # Only use the llama-server built in this repo for reproducibility
+    # NOTE: For gfx1153 (RDNA3 iGPU), MUST be built with:
+    #   cd external/llama.cpp
     #   cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'
+    #   cmake --build build -j --target llama-server
     # ROCm 7.2.1 has codegen bug with gfx1153 target. Use gfx1102 + HSA_OVERRIDE instead.
-    for candidate in \
-        "./external/llama.cpp/build/bin/llama-server" \
-        "$HOME/Documents/llama.cpp/build/bin/llama-server" \
-        "$HOME/.local/bin/llama-server" \
-        "/usr/local/bin/llama-server" \
-        "/usr/bin/llama-server" \
-        "./build/bin/llama-server" \
-        "./llama-server"; do
-        if [[ -x "$candidate" ]]; then
-            echo "$candidate"
-            return
-        fi
-    done
+    local repo_binary="./external/llama.cpp/build/bin/llama-server"
+    if [[ -x "$repo_binary" ]]; then
+        echo "$repo_binary"
+        return
+    fi
+
     echo ""
 }
 
@@ -194,8 +190,18 @@ _llama_start() {
     port="$LLAMA_SERVER_PORT"
 
     if [[ -z "$bin" ]]; then
-        echo -e "${RED}✗ llama-server binary not found${NC}"
-        echo "  Install llama-server to ~/.local/bin/ or set LLAMA_SERVER_BIN"
+        echo -e "${RED}✗ llama-server not found at external/llama.cpp/build/bin/llama-server${NC}"
+        echo ""
+        echo "Build llama-server first:"
+        echo "  cd external/llama.cpp"
+        if [[ "$GPU_ARCH" == "gfx1153" ]]; then
+            echo "  cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'  # gfx1102 for RDNA3 iGPU"
+        else
+            echo "  cmake -B build -DGGML_HIP=ON"
+        fi
+        echo "  cmake --build build -j --target llama-server"
+        echo ""
+        echo "Or set LLAMA_SERVER_BIN to use a different binary"
         exit 1
     fi
     if [ ! -f "$model" ]; then

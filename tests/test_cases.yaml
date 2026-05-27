@@ -210,7 +210,7 @@ config:
 
   # llama-server settings
   llama_server:
-    command: "llama-server"
+    command: "./external/llama.cpp/build/bin/llama-server"
     args:
       - "-m"
       - "./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
