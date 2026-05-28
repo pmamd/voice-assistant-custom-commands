@@ -75,8 +75,22 @@ class PiperEventHandler(AsyncEventHandler):
                 try:
                     if aplay_proc.proc.returncode is None:
                         _LOGGER.debug(f"Killing aplay process {aplay_proc.proc.pid}")
-                        aplay_proc.proc.kill()  # Use kill() instead of terminate() for immediate stop
-                        ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
+                        # Kill the entire process group to ensure child processes (aplay under timeout) are killed too
+                        try:
+                            import os
+                            import signal
+                            os.killpg(os.getpgid(aplay_proc.proc.pid), signal.SIGKILL)
+                        except ProcessLookupError:
+                            # Process already exited
+                            pass
+                        # Wait for the process to actually exit
+                        try:
+                            await asyncio.wait_for(aplay_proc.proc.wait(), timeout=0.5)
+                        except asyncio.TimeoutError:
+                            _LOGGER.warning(f"Timeout waiting for PID {aplay_proc.proc.pid} to exit")
+                        # Remove from list - may already be removed by the wait() task finishing
+                        if aplay_proc in ACTIVE_APLAY_PROCESSES:
+                            ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
                 except Exception as e:
                     _LOGGER.warning(f"Error killing aplay: {e}")
 
