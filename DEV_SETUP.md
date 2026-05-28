@@ -88,6 +88,12 @@ cmake --build build -j
 # Verify NPU support
 strings build/bin/voice-assistant | grep -i "vitisai\|flexml"
 
+# Download NPU encoder model (required for NPU builds)
+# IMPORTANT: The .rai file is not in git - must be obtained separately
+# Contact AMD or check https://github.com/amd/whisper.cpp releases
+# File: ggml-base-encoder-vitisai.rai (25MB)
+# Place in: external/whisper.cpp/models/
+
 # Test NPU with environment
 export HSA_OVERRIDE_GFX_VERSION=11.0.3
 source /opt/xilinx/xrt/setup.sh
@@ -95,6 +101,8 @@ source /opt/xilinx/xrt/setup.sh
 ```
 
 Hardware: AMD 890M iGPU (gfx1153) + NPU, ROCm 7.1.1, VitisAI/FlexML runtime
+
+**CRITICAL: NPU builds require the VitisAI encoder model file `ggml-base-encoder-vitisai.rai` (25MB) in `external/whisper.cpp/models/`. This file is not included in the repository and must be obtained from AMD or built from source.**
 
 **llama.cpp for .26 (gfx1153):**
 
