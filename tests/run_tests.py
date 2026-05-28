@@ -930,6 +930,7 @@ class TestHarness:
         talk_llama_config = self.config.get('config', {}).get('talk_llama', {})
         binary = talk_llama_config.get('binary', './build/bin/talk-llama')
         whisper_model = talk_llama_config.get('whisper_model', './models/ggml-base.en.bin')
+        whisper_language = talk_llama_config.get('whisper_language', None)
         llama_url = talk_llama_config.get('llama_url', 'http://127.0.0.1:8083')
         temperature = talk_llama_config.get('temperature', None)
         max_tokens = talk_llama_config.get('max_tokens', None)
@@ -942,6 +943,10 @@ class TestHarness:
             '--llama-url', llama_url,
             '--verbose'
         ]
+
+        # Add whisper language if specified (required for multilingual models on NPU)
+        if whisper_language is not None:
+            cmd.extend(['--language', str(whisper_language)])
 
         # Add temperature if specified
         if temperature is not None:
