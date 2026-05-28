@@ -1996,7 +1996,7 @@ int run(int argc, const char **argv)
 				}
 			} else {
 				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
-				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, true);
+				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.debug);
 
 				// DEBUG: Log VAD state every cycle
 				if (params.debug) {

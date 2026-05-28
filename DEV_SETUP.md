@@ -163,10 +163,56 @@ python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics \
 
 ## Testing Discipline
 
+### MANDATORY C++ Change Protocol
+
+**For EVERY C++ source file change, Claude MUST complete all 6 steps below and show the output in the conversation before claiming "done" or "working":**
+
+1. **Build on .74**
+   ```bash
+   cmake --build build -j 2>&1 | tail -20
+   ```
+   Must show build succeeded (exit code 0)
+
+2. **Test on .74**
+   - Run appropriate test with correct model for .74:
+     - Model: `./external/whisper.cpp/models/ggml-base.en.bin`
+     - No `--language` flag
+   - Show actual test output proving it works
+
+3. **Commit and push**
+   ```bash
+   git add -A && git commit -m "..." && git push
+   ```
+   Must show commit hash
+
+4. **Pull on .26**
+   ```bash
+   ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && git pull"
+   ```
+   Must show matching commit hash
+
+5. **Build on .26**
+   ```bash
+   ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && cmake --build build -j 2>&1 | tail -20"
+   ```
+   Must show build succeeded (exit code 0)
+
+6. **Test on .26**
+   - Run same test with correct model for .26:
+     - Model: `./external/whisper.cpp/models/ggml-base.bin` (multilingual)
+     - Flag: `--language en`
+     - NPU encoder: `ggml-base-encoder-vitisai.rai` must exist
+   - Show actual test output proving it works
+
+**CRITICAL:** Saying "it works" or "tests pass" without showing output from both .74 AND .26 is a lie. No exceptions.
+
+### General Testing Rules
+
 - **Never** claim something works without running tests
 - **Never** ask the user to test code that hasn't been built and tested locally first
 - **Never** merge untested code to main
 - Only after `python3 -m unittest` shows all green is it valid to claim it works
+- For C++ changes, "all green" means successful output from steps 1-6 above on BOTH machines
 
 ## Common Issues
 
