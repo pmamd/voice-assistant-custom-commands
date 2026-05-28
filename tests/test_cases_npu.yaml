@@ -185,7 +185,7 @@ config:
   # For GPU builds (gfx1030), use test_cases.yaml instead
   talk_llama:
     binary: "./build/bin/voice-assistant"
-    whisper_model: "./external/whisper.cpp/models/ggml-base.bin"  # Multilingual model for NPU
+    whisper_model: "./external/whisper.cpp/models/ggml-small.bin"  # Small multilingual model for better accuracy
     whisper_language: "en"  # Required for multilingual model
     llama_url: "http://localhost:8080"
     temperature: 0.0  # Deterministic for repeatable tests
@@ -195,7 +195,7 @@ config:
   # Verification settings
   audio_verifier:
     whisper_bin: "./build/bin/whisper-cli"
-    whisper_model: "./external/whisper.cpp/models/ggml-base.bin"  # Must match talk_llama whisper_model for NPU
+    whisper_model: "./external/whisper.cpp/models/ggml-small.bin"  # Must match talk_llama whisper_model for NPU
     output_dir: "./tests/audio/outputs"
 
   # Wyoming-Piper TTS server settings
