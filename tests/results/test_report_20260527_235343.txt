@@ -1,0 +1,97 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-27 23:53:43
+Total Tests: 14
+Passed: 14
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 16297ms
+  Transcription: 'Hello Georgie, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 85.13%
+  Similarity: 96.20%
+
+[PASS] question_response
+  Duration: 17351ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 94.91%
+  Similarity: 100.00%
+
+[PASS] simple_question
+  Duration: 16152ms
+  Transcription: 'Yes, Georgie, I'm here to help.'
+  Expected: 'Yes, Georgi. I'm always here to help.'
+  Confidence: 88.45%
+  Similarity: 85.29%
+
+[PASS] long_response
+  Duration: 15054ms
+  Transcription: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robbie was created. Unlike other robots, Robbie had the ability to learn and feel emotions. He was programmed to help humans in their daily lives.'
+  Expected: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robby was created. Robby was designed to be helpful and kind, just like me! He was programmed to learn from his environment and interact with humans.'
+  Confidence: 97.44%
+
+[PASS] stop_command_basic
+  Duration: 17674ms
+  Transcription: 'I'm sorry, Georgie. I didn't understand your request. Could you please specify which tool or action you would like me to perform? Here are some options. Stop backslash speaking, pause backslash speaking, resume backslash speaking, get backslash temperature, set backslash fan backslash speed, enable backslash defrost, navigate backslash to, find backslash nearby, get backslash eta, check backslash tire backslash pressure, or get backslash fuel backslash range.'
+  Expected: 'None'
+  Confidence: 93.94%
+
+[PASS] stop_command_variations
+  Duration: 56043ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1503ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[PASS] long_sentence
+  Duration: 19163ms
+  Transcription: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Expected: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Confidence: 93.65%
+  Similarity: 100.00%
+
+[PASS] numbers
+  Duration: 24310ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: '1, 2, 3, 4, 5.'
+  Confidence: 82.60%
+  Similarity: 100.00%
+
+[PASS] special_characters
+  Duration: 18423ms
+  Transcription: 'I'm just an AI, Georgie. I don't have feelings or emotions, but I'm here to help you. How can I make your day better?'
+  Expected: 'I'm just an AI, Georgi. I don't have feelings or emotions. But I'm here to help you! How can I assist you today?'
+  Confidence: 91.04%
+  Similarity: 89.96%
+
+[PASS] latency_test
+  Duration: 17306ms
+  Transcription: 'Hello Georgie. How may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 86.18%
+  Similarity: 96.20%
+
+[PASS] multiple_turns
+  Duration: 49917ms
+  Transcription: 'All 3 turns passed'
+
+[PASS] clear_speech
+  Duration: 17406ms
+  Transcription: 'That's a sentence in English called a pangram. It contains every letter of the alphabet at least once.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 92.27%
+  Similarity: 72.46%
+
+[PASS] vad_split_utterance
+  Duration: 8487ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

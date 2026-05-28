@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:42:32
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] numbers
+  Duration: 15780ms
+  Transcription: 'Voice assistant initialized.'
+  Expected: 'The numbers are one, two, three, four, five'
+  Confidence: 76.29%
+  Similarity: 11.27%
+
+================================================================================

@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:38:38
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] special_characters
+  Duration: 16779ms
+  Transcription: 'How can I make your day better?'
+  Expected: 'Hello, I'm doing well. How are you today?'
+  Confidence: 95.77%
+  Similarity: 41.67%
+
+================================================================================

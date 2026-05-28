@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:39:23
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] clear_speech
+  Duration: 17628ms
+  Transcription: 'It's called a pangram, which is a sentence that uses every letter of the alphabet at least once.'
+  Expected: 'The quick brown fox jumps over the lazy dog'
+  Confidence: 96.77%
+  Similarity: 24.46%
+
+================================================================================

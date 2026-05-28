@@ -30,6 +30,10 @@ _LOGGER = logging.getLogger(__name__)
 STOP_CMD = False
 # List to track all active aplay processes
 ACTIVE_APLAY_PROCESSES = []
+# Counter for test output files (persists across handler instances)
+TEST_OUTPUT_COUNTER = 0
+# Session timestamp for test output files (shared across all chunks in one response)
+TEST_SESSION_TIMESTAMP = 0
 
 class PiperEventHandler(AsyncEventHandler):
     def __init__(
@@ -45,10 +49,9 @@ class PiperEventHandler(AsyncEventHandler):
         self.cli_args = cli_args
         self.wyoming_info_event = wyoming_info.event()
         self.process_manager = process_manager
-        self.test_output_counter = 0  # Counter for test output files
 
     async def handle_event(self, event: Event) -> bool:
-        global STOP_CMD, ACTIVE_APLAY_PROCESSES
+        global STOP_CMD, ACTIVE_APLAY_PROCESSES, TEST_OUTPUT_COUNTER, TEST_SESSION_TIMESTAMP
 
         # Handle service discovery
         if Describe.is_type(event.type):
@@ -59,8 +62,10 @@ class PiperEventHandler(AsyncEventHandler):
         # Handle new-response event: talk-llama signals start of a new user response.
         # This is the only place STOP_CMD is reset to False.
         if event.type == "new-response":
-            _LOGGER.debug("Received new-response event - resetting STOP_CMD")
+            _LOGGER.debug("Received new-response event - resetting STOP_CMD, TEST_OUTPUT_COUNTER, and TEST_SESSION_TIMESTAMP")
             STOP_CMD = False
+            TEST_OUTPUT_COUNTER = 0  # Reset counter for new response
+            TEST_SESSION_TIMESTAMP = int(time.time())  # Set session timestamp for this response
             return True
 
         # Handle AudioStop event (standard Wyoming protocol)
@@ -73,8 +78,22 @@ class PiperEventHandler(AsyncEventHandler):
                 try:
                     if aplay_proc.proc.returncode is None:
                         _LOGGER.debug(f"Killing aplay process {aplay_proc.proc.pid}")
-                        aplay_proc.proc.kill()  # Use kill() instead of terminate() for immediate stop
-                        ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
+                        # Kill the entire process group to ensure child processes (aplay under timeout) are killed too
+                        try:
+                            import os
+                            import signal
+                            os.killpg(os.getpgid(aplay_proc.proc.pid), signal.SIGKILL)
+                        except ProcessLookupError:
+                            # Process already exited
+                            pass
+                        # Wait for the process to actually exit
+                        try:
+                            await asyncio.wait_for(aplay_proc.proc.wait(), timeout=0.5)
+                        except asyncio.TimeoutError:
+                            _LOGGER.warning(f"Timeout waiting for PID {aplay_proc.proc.pid} to exit")
+                        # Remove from list - may already be removed by the wait() task finishing
+                        if aplay_proc in ACTIVE_APLAY_PROCESSES:
+                            ACTIVE_APLAY_PROCESSES.remove(aplay_proc)
                 except Exception as e:
                     _LOGGER.warning(f"Error killing aplay: {e}")
 
@@ -195,14 +214,17 @@ class PiperEventHandler(AsyncEventHandler):
         test_output_dir = getattr(self.cli_args, 'test_output_dir', None)
 
         if test_mode and test_output_dir:
+            global TEST_OUTPUT_COUNTER, TEST_SESSION_TIMESTAMP
             # Test mode: copy file to test output directory instead of playing
             test_output_dir_path = Path(test_output_dir)
             test_output_dir_path.mkdir(parents=True, exist_ok=True)
 
-            # Generate output filename with timestamp and counter
-            timestamp = int(time.time())
-            self.test_output_counter += 1
-            test_output_path = test_output_dir_path / f"output_{timestamp}_{self.test_output_counter}.wav"
+            # Use session timestamp (set when new-response event received) for all chunks
+            # If not set yet (shouldn't happen), fall back to current time
+            timestamp = TEST_SESSION_TIMESTAMP if TEST_SESSION_TIMESTAMP > 0 else int(time.time())
+            TEST_OUTPUT_COUNTER += 1
+            _LOGGER.debug(f"Test output counter after increment: {TEST_OUTPUT_COUNTER} (timestamp: {timestamp})")
+            test_output_path = test_output_dir_path / f"output_{timestamp}_{TEST_OUTPUT_COUNTER}.wav"
 
             shutil.copy(output_path, test_output_path)
             _LOGGER.info(f"Test mode: saved audio to {test_output_path}")

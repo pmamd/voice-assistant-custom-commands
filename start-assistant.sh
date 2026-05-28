@@ -19,11 +19,31 @@ echo ""
 # voice-assistant uses CPU only (no GPU/HIP). llama-server manages
 # its own GPU context and must NOT inherit any HSA overrides.
 
+# Detect GPU hardware
+GPU_ARCH=$(rocminfo 2>/dev/null | grep "Name:" | grep "gfx" | head -1 | awk '{print $2}' || echo "unknown")
+
 # Configuration
 PIPER_VOICE="en_US-lessac-medium"
 PIPER_DATA_DIR="./piper-data"  # Where Piper stores voice models
 WYOMING_PORT=10200
-WHISPER_MODEL="./external/whisper.cpp/models/ggml-base.bin"
+
+# Set paths based on hardware
+if [[ "$GPU_ARCH" == "gfx1153" ]]; then
+    # Target machine (.26 Kraken-2E)
+    # NPU encoder requires multilingual base model with --language en flag
+    WHISPER_MODEL="${WHISPER_MODEL:-./external/whisper.cpp/models/ggml-base.bin}"
+    WHISPER_LANG_FLAG="--language en"
+    USE_HSA_OVERRIDE="11.0.2"
+    LLAMA_EXTRA_FLAGS="--flash-attn 0 --no-warmup"
+else
+    # Dev machine (.74 W6800 gfx1030) or other
+    # English-only model, no language flag needed
+    WHISPER_MODEL="${WHISPER_MODEL:-./external/whisper.cpp/models/ggml-base.en.bin}"
+    WHISPER_LANG_FLAG=""
+    USE_HSA_OVERRIDE=""
+    LLAMA_EXTRA_FLAGS=""
+fi
+
 LLAMA_MODEL="./models/mistral-7b-instruct-v0.2.Q5_0.gguf"
 TALK_LLAMA_BIN="./build/bin/voice-assistant"
 
@@ -39,16 +59,19 @@ _find_llama_server() {
         echo "$LLAMA_SERVER_BIN"
         return
     fi
-    # Prefer llama-server from this repo's build (if built)
-    if [[ -x "./build/bin/llama-server" ]]; then
-        echo "./build/bin/llama-server"
+
+    # Only use the llama-server built in this repo for reproducibility
+    # NOTE: For gfx1153 (RDNA3 iGPU), MUST be built with:
+    #   cd external/llama.cpp
+    #   cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'
+    #   cmake --build build -j --target llama-server
+    # ROCm 7.2.1 has codegen bug with gfx1153 target. Use gfx1102 + HSA_OVERRIDE instead.
+    local repo_binary="./external/llama.cpp/build/bin/llama-server"
+    if [[ -x "$repo_binary" ]]; then
+        echo "$repo_binary"
         return
     fi
-    # Fall back to ~/Documents/llama.cpp (known working version on .26)
-    if [[ -x "$HOME/Documents/llama.cpp/build/bin/llama-server" ]]; then
-        echo "$HOME/Documents/llama.cpp/build/bin/llama-server"
-        return
-    fi
+
     echo ""
 }
 
@@ -167,8 +190,18 @@ _llama_start() {
     port="$LLAMA_SERVER_PORT"
 
     if [[ -z "$bin" ]]; then
-        echo -e "${RED}✗ llama-server binary not found${NC}"
-        echo "  Install llama-server to ~/.local/bin/ or set LLAMA_SERVER_BIN"
+        echo -e "${RED}✗ llama-server not found at external/llama.cpp/build/bin/llama-server${NC}"
+        echo ""
+        echo "Build llama-server first:"
+        echo "  cd external/llama.cpp"
+        if [[ "$GPU_ARCH" == "gfx1153" ]]; then
+            echo "  cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'  # gfx1102 for RDNA3 iGPU"
+        else
+            echo "  cmake -B build -DGGML_HIP=ON"
+        fi
+        echo "  cmake --build build -j --target llama-server"
+        echo ""
+        echo "Or set LLAMA_SERVER_BIN to use a different binary"
         exit 1
     fi
     if [ ! -f "$model" ]; then
@@ -180,22 +213,19 @@ _llama_start() {
     echo "  Binary: $bin"
     echo "  Model:  $model"
     echo "  Port:   $port"
-    echo "  Using HSA_OVERRIDE_GFX_VERSION=11.0.2 for gfx1153 GPU"
-    echo "  Cache:  ./llama-cache (persistent KV cache)"
+    echo "  GPU:    $GPU_ARCH"
 
-    # Create cache directory
-    mkdir -p ./llama-cache
-
-    # Run llama-server with HSA override for gfx1153 compatibility (same as kitt2k)
-    # HSA 11.0.2 is correct for gfx1153 - 11.5.1 causes crashes during generation
-    # --flash-attn 0 is critical to avoid GPU crashes on this hardware
-    # --no-warmup avoids crashes during startup warmup phase
-    # --slot-save-path enables persistent KV cache (eliminates warmup delay on subsequent runs)
-    # -np 4 sets number of parallel slots to 4
-    HSA_OVERRIDE_GFX_VERSION=11.0.2 "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
-        -ngl 999 -c 4096 --flash-attn 0 --cache-prompt --no-warmup \
-        --slot-save-path ./llama-cache -np 4 \
-        > /tmp/llama-server.log 2>&1 &
+    if [[ -n "$USE_HSA_OVERRIDE" ]]; then
+        echo "  Using HSA_OVERRIDE_GFX_VERSION=$USE_HSA_OVERRIDE for gfx1153"
+        HSA_OVERRIDE_GFX_VERSION="$USE_HSA_OVERRIDE" "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
+            -ngl 999 -c 4096 --cache-prompt $LLAMA_EXTRA_FLAGS \
+            > /tmp/llama-server.log 2>&1 &
+    else
+        echo "  No HSA override needed (native ROCm support)"
+        "$bin" --model "$model" --host 0.0.0.0 --port "$port" \
+            -ngl 999 -c 4096 --cache-prompt \
+            > /tmp/llama-server.log 2>&1 &
+    fi
     LLAMA_SERVER_PID=$!
     disown
     echo "llama-server started (PID: $LLAMA_SERVER_PID), log: /tmp/llama-server.log"
@@ -220,21 +250,32 @@ _llama_start() {
 }
 
 # Check/start llama-server — mirrors Wyoming-Piper logic
-if _http_ok "${LLAMA_SERVER_URL}/health"; then
-    echo -e "${YELLOW}⚠ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
-    read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Stopping llama-server..."
+_llama_port_listening() {
+    ss -tlnp | grep -q ":$LLAMA_SERVER_PORT "
+}
+
+if pgrep -f "llama-server.*${LLAMA_SERVER_PORT}" > /dev/null; then
+    if ! _llama_port_listening; then
+        # Process exists but port not listening — zombie or crashed, restart silently
+        echo -e "${YELLOW}⚠ llama-server process found but port $LLAMA_SERVER_PORT not listening (zombie/crashed) — restarting${NC}"
         pkill -f "llama-server.*${LLAMA_SERVER_PORT}" || true
         sleep 2
-        if _http_ok "${LLAMA_SERVER_URL}/health"; then
-            echo -e "${RED}✗ llama-server still running — kill it manually${NC}"
-            exit 1
-        fi
-        _llama_start
     else
-        echo "Continuing with existing llama-server..."
+        echo -e "${YELLOW}⚠ llama-server is already running${NC}"
+        read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Stopping llama-server..."
+            pkill -f "llama-server.*${LLAMA_SERVER_PORT}" || true
+            sleep 2
+            if _llama_port_listening; then
+                echo -e "${RED}✗ Port $LLAMA_SERVER_PORT still in use — kill it manually${NC}"
+                exit 1
+            fi
+            _llama_start
+        else
+            echo "Continuing with existing llama-server..."
+        fi
     fi
 else
     _llama_start
@@ -324,21 +365,17 @@ echo "=========================================="
 echo ""
 
 # Start the voice assistant
-# Note: Using multilingual base model with --language en because NPU encoder
-# is incompatible with ggml-base.en.bin (produces garbage transcription)
 $TALK_LLAMA_BIN \
     -mw "$WHISPER_MODEL" \
     --llama-url "$LLAMA_SERVER_URL" \
     --xtts-url "http://localhost:$WYOMING_PORT/" \
     --xtts-voice "$PIPER_VOICE" \
     --temp 0.5 \
-    -vth 1.2 \
-    --vad-last-ms 700 \
     -n 300 \
     --allow-newline \
     -p Driver \
     -c "$CAPTURE_DEVICE" \
-    --language en
+    $WHISPER_LANG_FLAG
 
 # Cleanup on exit
 echo ""

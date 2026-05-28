@@ -147,7 +147,7 @@ struct whisper_params
 
 	float vad_thold = 0.6f;
 	float vad_start_thold = 0.000270f; // 0 to turn off, you can see your current energy_last (loudness level) when running with --print-energy param
-	int vad_last_ms = 1250;  // Silence duration before ending speech (original value)
+	int vad_last_ms = 700;  // Reduced from 1250ms to 700ms for faster stop response
 	float freq_thold = 100.0f;
 	float min_energy = 0.0012f; // Minimum energy threshold to prevent TTS feedback
 
@@ -515,7 +515,7 @@ std::string transcribe(
 
 	std::vector<whisper_token> prompt_tokens;
 
-	whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+	whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);
 
 	prompt_tokens.resize(1024);
 	prompt_tokens.resize(whisper_tokenize(ctx, prompt_text.c_str(), prompt_tokens.data(), prompt_tokens.size()));
@@ -1344,7 +1344,6 @@ std::string llama_server_generate(
 	request_body["temperature"] = params.temp;
 	request_body["stream"] = true;
 	request_body["cache_prompt"] = true; // reuse KV cache for matching prefix
-	request_body["id_slot"] = 0;  // Always use slot 0 for persistent cache
 	request_body["repeat_penalty"] = params.repeat_penalty;
 
 	// Build stop array
@@ -1512,6 +1511,7 @@ int run(int argc, const char **argv)
 	bool test_mode = !params.test_input_file.empty();
 	std::vector<float> test_audio_data;
 	bool test_audio_injected = false;
+	bool test_audio_processed = false;
 
 	if (test_mode) {
 		std::vector<std::vector<float>> test_audio_stereo;
@@ -1519,10 +1519,10 @@ int run(int argc, const char **argv)
 			fprintf(stderr, "%s: failed to read test input file: %s\n", __func__, params.test_input_file.c_str());
 			return 1;
 		}
-		// Pad test audio to simulate the real 10-second capture window.
-		// Without context, Whisper fails on short inputs (< ~1.5s).
-		// Add 1 second of silence before the speech and pad total to 10 seconds.
-		{
+		// Don't pad test audio - the audio files already have appropriate padding
+		// from audio_generator.py (500ms leading + trailing to 1500ms total).
+		// Over-padding drowns out the speech and causes Whisper to return empty.
+		if (false) {
 			const int target   = WHISPER_SAMPLE_RATE * 10; // 10s total
 			const int prefix   = WHISPER_SAMPLE_RATE * 1;  // 1s silence before speech
 			if ((int)test_audio_data.size() < target) {
@@ -1799,66 +1799,30 @@ int run(int argc, const char **argv)
 	// Send the system prompt to llama-server so the KV cache is hot before the
 	// first user turn. This turns ~430ms prompt processing into ~0ms on every
 	// subsequent request that shares the same system prompt prefix.
-	// Always use slot 0 for consistency with persistent slot saves.
 	if (!test_mode) {
-		// Check if slot 0 already has cached content
-		bool slot_cached = false;
-		CURL* check_curl = curl_easy_init();
-		if (check_curl) {
-			std::string check_url = params.llama_url + "/slots";
-			std::string check_resp;
-			curl_easy_setopt(check_curl, CURLOPT_URL, check_url.c_str());
-			curl_easy_setopt(check_curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-			curl_easy_setopt(check_curl, CURLOPT_WRITEDATA, &check_resp);
-			curl_easy_setopt(check_curl, CURLOPT_TIMEOUT, 5L);
-			CURLcode res = curl_easy_perform(check_curl);
-			curl_easy_cleanup(check_curl);
-
-			if (res == CURLE_OK && !check_resp.empty()) {
-				try {
-					nlohmann::json slots = nlohmann::json::parse(check_resp);
-					if (slots.is_array() && slots.size() > 0) {
-						auto slot0 = slots[0];
-						if (slot0.contains("cache_tokens") && slot0["cache_tokens"].is_number()) {
-							int cached_tokens = slot0["cache_tokens"].get<int>();
-							if (cached_tokens > 100) {
-								slot_cached = true;
-								printf("Slot 0 already has %d cached tokens, skipping warmup\n\n", cached_tokens);
-							}
-						}
-					}
-				} catch (...) {
-					// JSON parse failed, continue with warmup
-				}
-			}
-		}
-
-		if (!slot_cached) {
-			printf("Warming up llama-server KV cache...\n");
-			CURL* warmup_curl = curl_easy_init();
-			if (warmup_curl) {
-				nlohmann::json wb;
-				wb["prompt"] = prompt_llama;
-				wb["n_predict"] = 1;
-				wb["cache_prompt"] = true;
-				wb["stream"] = false;
-				wb["id_slot"] = 0;  // Always use slot 0 for persistence
-				std::string wb_body = wb.dump();
-				std::string wb_url = params.llama_url + "/completion";
-				struct curl_slist* wb_headers = nullptr;
-				wb_headers = curl_slist_append(wb_headers, "Content-Type: application/json");
-				curl_easy_setopt(warmup_curl, CURLOPT_URL, wb_url.c_str());
-				curl_easy_setopt(warmup_curl, CURLOPT_HTTPHEADER, wb_headers);
-				curl_easy_setopt(warmup_curl, CURLOPT_POSTFIELDS, wb_body.c_str());
-				curl_easy_setopt(warmup_curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-				std::string wb_resp;
-				curl_easy_setopt(warmup_curl, CURLOPT_WRITEDATA, &wb_resp);
-				curl_easy_setopt(warmup_curl, CURLOPT_TIMEOUT, 30L);
-				curl_easy_perform(warmup_curl);
-				curl_slist_free_all(wb_headers);
-				curl_easy_cleanup(warmup_curl);
-				printf("KV cache warmed.\n\n");
-			}
+		printf("Warming up llama-server KV cache...\n");
+		CURL* warmup_curl = curl_easy_init();
+		if (warmup_curl) {
+			nlohmann::json wb;
+			wb["prompt"] = prompt_llama;
+			wb["n_predict"] = 1;
+			wb["cache_prompt"] = true;
+			wb["stream"] = false;
+			std::string wb_body = wb.dump();
+			std::string wb_url = params.llama_url + "/completion";
+			struct curl_slist* wb_headers = nullptr;
+			wb_headers = curl_slist_append(wb_headers, "Content-Type: application/json");
+			curl_easy_setopt(warmup_curl, CURLOPT_URL, wb_url.c_str());
+			curl_easy_setopt(warmup_curl, CURLOPT_HTTPHEADER, wb_headers);
+			curl_easy_setopt(warmup_curl, CURLOPT_POSTFIELDS, wb_body.c_str());
+			curl_easy_setopt(warmup_curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+			std::string wb_resp;
+			curl_easy_setopt(warmup_curl, CURLOPT_WRITEDATA, &wb_resp);
+			curl_easy_setopt(warmup_curl, CURLOPT_TIMEOUT, 30L);
+			curl_easy_perform(warmup_curl);
+			curl_slist_free_all(wb_headers);
+			curl_easy_cleanup(warmup_curl);
+			printf("KV cache warmed.\n\n");
 		}
 	}
 
@@ -2005,35 +1969,81 @@ int run(int argc, const char **argv)
 		// -- Audio capture --------------------------------------------------------
 		// Gets the latest 1-second chunk of microphone audio (or injects test audio).
 		{
-			// In test mode, inject the test audio data once
-			if (test_mode && !test_audio_data.empty()) {
+			// In test mode, inject the test audio data once and keep it until processed
+			if (test_mode && !test_audio_data.empty() && !test_audio_injected) {
 				pcmf32_cur = test_audio_data;
-				test_audio_data.clear(); // Use only once
 				test_audio_injected = true;
 			} else if (!test_mode) {
 				audio.get(1000, pcmf32_cur); // step_ms, async - reduced to 1s for better responsiveness
+			} else if (test_mode && test_audio_injected && !test_audio_processed) {
+				// Keep test audio in buffer until VAD processing completes
+				pcmf32_cur = test_audio_data;
 			}
 
 			// -- Voice Activity Detection (VAD) -----------------------------------
 			// Determines whether speech has started or ended in the captured audio.
 			// Includes smart early-stop detection for short high-energy commands like "stop".
 			int vad_result;
-			if (test_mode && test_audio_injected && !pcmf32_cur.empty()) {
+			if (test_mode && test_audio_injected && !test_audio_processed && !pcmf32_cur.empty()) {
 				// Simulate VAD: speech started then ended
+				// Set speech_start_ms to calculate proper duration from audio buffer
 				if (vad_result_prev != 1) {
 					vad_result = 1; // Speech started
+					speech_start_ms = get_current_time_ms();
 				} else {
 					vad_result = 2; // Speech ended - trigger processing
+					test_audio_processed = true;
 				}
 			} else {
 				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
-				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.print_energy);
+				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, params.debug);
 
-				// VAD result: 0=no speech, 1=speech detected, 2=speech ended
+				// DEBUG: Log VAD state every cycle
+				if (params.debug) {
+					fprintf(stderr, "[VAD-DEBUG] t=%.3f is_speech=%d prev=%d buf_samples=%zu (%.2fs)\n",
+							get_current_time_ms(), is_speech, vad_result_prev,
+							pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
+				}
+
+				// SMART EARLY STOP DETECTION - DISABLED
+				// This was causing false triggers on natural speech pauses in longer phrases.
+				// "Navigate to the closest..." [pause] "...Starbucks" would trigger early stop
+				// at the pause, splitting the utterance into multiple prompts.
+				//
+				// TODO: Re-enable with higher energy threshold (0.1+) or explicit "stop" keyword detection
+				bool early_trigger = false;
+				#if 0  // DISABLED - causes VAD split-utterance bug
+				static double early_trigger_start_time = -1; // -1 = uninitialized
+				if (early_trigger_start_time < 0) early_trigger_start_time = get_current_time_ms();
+
+				if (is_speech && vad_result_prev != 1) {
+					early_trigger_start_time = get_current_time_ms();
+				} else if (is_speech && vad_result_prev == 1) {
+					double speech_duration_ms = get_current_time_ms() - early_trigger_start_time;
+
+					int check_samples = std::min((int)pcmf32_cur.size(), (WHISPER_SAMPLE_RATE * 500) / 1000);
+					float recent_energy = 0.0f;
+					for (int i = pcmf32_cur.size() - check_samples; i < (int)pcmf32_cur.size(); i++) {
+						recent_energy += fabsf(pcmf32_cur[i]);
+					}
+					recent_energy /= check_samples;
+
+					// Increased threshold from 0.01 to 0.1 - only trigger on LOUD bursts
+					if (speech_duration_ms >= 300.0 && speech_duration_ms <= 600.0 && recent_energy > 0.1f) {
+						early_trigger = true;
+						fprintf(stderr, "\n[EARLY-STOP] TRIGGERED: dur=%.0fms, energy=%.6f\n", speech_duration_ms, recent_energy);
+					}
+				}
+				#endif
+
 				if (is_speech) {
-					vad_result = 1; // Speech detected
+					if (early_trigger) {
+						vad_result = 2; // Trigger early end for interrupt commands
+					} else {
+						vad_result = 1;
+					}
 				} else {
-					vad_result = (vad_result_prev == 1) ? 2 : 0; // Speech ended if was speaking
+					vad_result = (vad_result_prev == 1) ? 2 : 0;
 				}
 			}
 			if (vad_result == 1 && params.vad_start_thold) // speech started
@@ -2063,9 +2073,29 @@ int run(int argc, const char **argv)
 			// Runs Whisper transcription then dispatches the result to the command/LLM pipeline.
 if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
+				// DEBUG: Log when VAD triggers end-of-speech
+				if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
+					fprintf(stderr, "\n=== VAD TRIGGERED END-OF-SPEECH ===\n");
+					fprintf(stderr, "[SPLIT-DEBUG] Timestamp: %.3f\n", get_current_time_ms());
+					fprintf(stderr, "[SPLIT-DEBUG] vad_result: %d -> 2 (END)\n", vad_result_prev);
+				}
+
 				speech_end_ms = get_current_time_ms();
 				latency_vad_end = speech_end_ms;
 				speech_len = speech_end_ms - speech_start_ms;
+
+				// In test mode, calculate duration from actual audio buffer size
+				if (test_mode && test_audio_injected && !pcmf32_cur.empty()) {
+					speech_len = pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE;
+				}
+
+				// DEBUG: Log speech details
+				if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
+					fprintf(stderr, "[SPLIT-DEBUG] Speech duration: %.0fms\n", speech_len * 1000.0);
+					fprintf(stderr, "[SPLIT-DEBUG] Buffer size: %zu samples (%.2fs)\n",
+							pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
+					fprintf(stderr, "===================================\n\n");
+				}
 				// Log VAD duration for latency measurement
 				if (speech_start_ms > 0) {
 					if (params.debug) {
@@ -2084,6 +2114,52 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 
 				if (!speech_len && !user_typed.size() && !(test_mode && test_audio_injected))
 					continue;
+
+				// DEBUG: Save audio when splits occur (speech < 2 seconds)
+				if (vad_result >= 2 && speech_len < 2.0 && speech_len > 0 && !test_mode) {
+					static int split_counter = 0;
+					char wav_filename[256];
+					snprintf(wav_filename, sizeof(wav_filename),
+							 "tests/audio/debug/split_%03d_dur%.0fms.wav",
+							 split_counter++, speech_len * 1000);
+
+					FILE* f = fopen(wav_filename, "wb");
+					if (f) {
+						// WAV header
+						fwrite("RIFF", 1, 4, f);
+						uint32_t chunk_size = 36 + pcmf32_cur.size() * 2;
+						fwrite(&chunk_size, 4, 1, f);
+						fwrite("WAVE", 1, 4, f);
+						fwrite("fmt ", 1, 4, f);
+						uint32_t subchunk1_size = 16;
+						fwrite(&subchunk1_size, 4, 1, f);
+						uint16_t audio_format = 1;
+						fwrite(&audio_format, 2, 1, f);
+						uint16_t num_channels = 1;
+						fwrite(&num_channels, 2, 1, f);
+						uint32_t sample_rate = WHISPER_SAMPLE_RATE;
+						fwrite(&sample_rate, 4, 1, f);
+						uint32_t byte_rate = WHISPER_SAMPLE_RATE * 2;
+						fwrite(&byte_rate, 4, 1, f);
+						uint16_t block_align = 2;
+						fwrite(&block_align, 2, 1, f);
+						uint16_t bits_per_sample = 16;
+						fwrite(&bits_per_sample, 2, 1, f);
+						fwrite("data", 1, 4, f);
+						uint32_t subchunk2_size = pcmf32_cur.size() * 2;
+						fwrite(&subchunk2_size, 4, 1, f);
+
+						// Convert float to int16 and write
+						for (float sample : pcmf32_cur) {
+							int16_t s = (int16_t)(sample * 32767.0f);
+							fwrite(&s, 2, 1, f);
+						}
+						fclose(f);
+						if (params.debug) {
+							fprintf(stderr, "[SPLIT-DEBUG] Saved audio to %s\n", wav_filename);
+						}
+					}
+				}
 
 				speech_len = speech_len + 0.3; // front padding
 				if (speech_len < 1.10)
@@ -2180,9 +2256,10 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 					std::regex re("\\(.*?\\)");
 					text_heard = std::regex_replace(text_heard, re, "");
 				}
-				// remove all characters, except for letters, numbers, punctuation and ':', '\'', '-', ' '
+				// remove all characters, except for letters, numbers, common punctuation and symbols
+				// Allow: letters, digits, .,:;?!'"-()/@$%*+=  and whitespace
 				if (params.language == "en" && !user_typed_this)
-					text_heard = std::regex_replace(text_heard, std::regex("[^a-zA-Z0-9\\.,\\?!\\s\\:\\'\\-]"), "");
+					text_heard = std::regex_replace(text_heard, std::regex("[^a-zA-Z0-9\\.,\\?!\\s\\:\\'\\-\\+\\*\\/\\=\\%\\$\\@\\(\\)\"]"), "");
 				// take first line
 				text_heard = text_heard.substr(0, text_heard.find_first_of('\n'));
 
@@ -2246,7 +2323,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				// -- Fast-path tool execution -----------------------------------------
 				// Checks if the heard text matches a registered fast-path tool (e.g. "stop").
 				// If matched, executes the tool immediately and skips LLM generation entirely.
-				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard);
+				// When TTS is active, use relaxed matching (keyword anywhere in text)
+				bool tts_active = g_generation_running.load();
+				auto [matched, tool_def] = tool_registry.matchFastPath(text_heard, tts_active);
 				// Skip resume_speaking if we're not actually paused — pass through to LLM
 				bool skip_fast_path = (tool_def.name == "resume_speaking" && !tool_system::g_wyoming_paused);
 				if (matched && tool_def.fast_path && !skip_fast_path) {

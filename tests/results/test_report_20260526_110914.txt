@@ -1,0 +1,98 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:09:14
+Total Tests: 14
+Passed: 4
+Failed: 10
+Success Rate: 28.6%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 16355ms
+  Transcription: 'How may I help you today?'
+  Expected: 'How can I assist you today?'
+  Confidence: 94.22%
+  Similarity: 73.08%
+
+[FAIL] question_response
+  Duration: 16542ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The answer is 4'
+  Confidence: 91.54%
+  Similarity: 56.41%
+
+[FAIL] simple_question
+  Duration: 15812ms
+  Transcription: 'I'm here to help with your requests.'
+  Expected: 'How can I assist you?'
+  Confidence: 96.23%
+  Similarity: 31.58%
+
+[FAIL] long_response
+  Duration: 18673ms
+  Transcription: 'Every morning, Robbie would wake up at sunrise and greet his human family with a cheerful good morning. He would then proceed to make breakfast for them while they got ready for work.'
+  Expected: 'A story about a robot who learns and helps people'
+  Confidence: 94.58%
+  Similarity: 22.41%
+
+[PASS] stop_command_basic
+  Duration: 12778ms
+  Transcription: 'Could you please clarify or specify which tool or action you would like me to perform?'
+  Expected: 'None'
+  Confidence: 96.54%
+
+[PASS] stop_command_variations
+  Duration: 38268ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1502ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[FAIL] long_sentence
+  Duration: 16515ms
+  Transcription: 'Here's the temperature in the driver's own.'
+  Expected: 'The weather today includes temperature and humidity information'
+  Confidence: 90.41%
+  Similarity: 37.74%
+
+[FAIL] numbers
+  Duration: 16172ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: 'The numbers are one, two, three, four, five'
+  Confidence: 82.37%
+  Similarity: 28.07%
+
+[FAIL] special_characters
+  Duration: 15885ms
+  Transcription: 'How may I assist you today?'
+  Expected: 'Hello, I'm doing well. How are you today?'
+  Confidence: 94.08%
+  Similarity: 47.06%
+
+[FAIL] latency_test
+  Duration: 15358ms
+  Transcription: 'How may I help you today?'
+  Expected: 'Hi, how can I help you?'
+  Confidence: 94.03%
+  Similarity: 70.83%
+
+[FAIL] multiple_turns
+  Duration: 46765ms
+  Error: 1 turn(s) failed: Turn 2 failed verification
+
+[FAIL] clear_speech
+  Duration: 15944ms
+  Transcription: 'How can I help you today?'
+  Expected: 'The quick brown fox jumps over the lazy dog'
+  Confidence: 94.99%
+  Similarity: 23.53%
+
+[PASS] vad_split_utterance
+  Duration: 8441ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

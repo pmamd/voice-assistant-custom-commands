@@ -88,6 +88,12 @@ cmake --build build -j
 # Verify NPU support
 strings build/bin/voice-assistant | grep -i "vitisai\|flexml"
 
+# Download NPU encoder model (required for NPU builds)
+# Download from: https://huggingface.co/amd/NPU-Whisper-Base-Small (requires approval)
+# Or compile yourself using RyzenAI tools (see ~/Documents/RyzenAI-SW-main/example/ASR/Whisper-AI/)
+# File needed: ggml-base-encoder-vitisai.rai (25MB)
+# Place in: external/whisper.cpp/models/
+
 # Test NPU with environment
 export HSA_OVERRIDE_GFX_VERSION=11.0.3
 source /opt/xilinx/xrt/setup.sh
@@ -95,6 +101,23 @@ source /opt/xilinx/xrt/setup.sh
 ```
 
 Hardware: AMD 890M iGPU (gfx1153) + NPU, ROCm 7.1.1, VitisAI/FlexML runtime
+
+**CRITICAL: NPU builds require the VitisAI encoder model file `ggml-base-encoder-vitisai.rai` (25MB) in `external/whisper.cpp/models/`. Download from https://huggingface.co/amd/NPU-Whisper-Base-Small (requires approval) or compile yourself using RyzenAI tools.**
+
+**llama.cpp for .26 (gfx1153):**
+
+Due to ROCm 7.2.1 codegen bug with gfx1153, llama.cpp must be built for generic gfx1102:
+
+```bash
+cd external/llama.cpp
+rm -rf build
+cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'
+cmake --build build -j --target llama-server
+
+# Verify correct architecture
+strings build/bin/libggml-hip.so.0.9.5 | grep gfx | head -1
+# Should show: hipv4-amdgcn-amd-amdhsa--gfx1102
+```
 
 **Why separate builds?**
 
@@ -140,10 +163,56 @@ python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics \
 
 ## Testing Discipline
 
+### MANDATORY C++ Change Protocol
+
+**For EVERY C++ source file change, Claude MUST complete all 6 steps below and show the output in the conversation before claiming "done" or "working":**
+
+1. **Build on .74**
+   ```bash
+   cmake --build build -j 2>&1 | tail -20
+   ```
+   Must show build succeeded (exit code 0)
+
+2. **Test on .74**
+   - Run appropriate test with correct model for .74:
+     - Model: `./external/whisper.cpp/models/ggml-base.en.bin`
+     - No `--language` flag
+   - Show actual test output proving it works
+
+3. **Commit and push**
+   ```bash
+   git add -A && git commit -m "..." && git push
+   ```
+   Must show commit hash
+
+4. **Pull on .26**
+   ```bash
+   ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && git pull"
+   ```
+   Must show matching commit hash
+
+5. **Build on .26**
+   ```bash
+   ssh amd@192.168.86.26 "cd ~/git/voice-assistant-custom-commands && cmake --build build -j 2>&1 | tail -20"
+   ```
+   Must show build succeeded (exit code 0)
+
+6. **Test on .26**
+   - Run same test with correct model for .26:
+     - Model: `./external/whisper.cpp/models/ggml-base.bin` (multilingual)
+     - Flag: `--language en`
+     - NPU encoder: `ggml-base-encoder-vitisai.rai` must exist
+   - Show actual test output proving it works
+
+**CRITICAL:** Saying "it works" or "tests pass" without showing output from both .74 AND .26 is a lie. No exceptions.
+
+### General Testing Rules
+
 - **Never** claim something works without running tests
 - **Never** ask the user to test code that hasn't been built and tested locally first
 - **Never** merge untested code to main
 - Only after `python3 -m unittest` shows all green is it valid to claim it works
+- For C++ changes, "all green" means successful output from steps 1-6 above on BOTH machines
 
 ## Common Issues
 

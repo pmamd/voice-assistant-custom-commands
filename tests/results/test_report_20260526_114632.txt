@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:46:32
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] long_response
+  Duration: 17366ms
+  Transcription: 'He was programmed to learn from his environment and to interact with humans.'
+  Expected: 'A story about a robot who learns and helps people'
+  Confidence: 93.54%
+  Similarity: 32.00%
+
+================================================================================

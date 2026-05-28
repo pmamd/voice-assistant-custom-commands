@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:46:55
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] long_sentence
+  Duration: 17240ms
+  Transcription: 'However, I can check the current climate control settings for you if that would be helpful.'
+  Expected: 'The weather today includes temperature and humidity information'
+  Confidence: 94.34%
+  Similarity: 27.27%
+
+================================================================================

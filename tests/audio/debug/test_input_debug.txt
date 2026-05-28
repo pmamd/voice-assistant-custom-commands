@@ -1,0 +1,103 @@
+whisper_init_from_file_with_params_no_state: loading model from './external/whisper.cpp/models/ggml-base.en.bin'
+whisper_init_with_params_no_state: use gpu    = 1
+whisper_init_with_params_no_state: flash attn = 1
+whisper_init_with_params_no_state: gpu_device = 0
+whisper_init_with_params_no_state: dtw        = 0
+ggml_cuda_init: found 1 ROCm devices:
+  Device 0: AMD Radeon PRO W6800, gfx1030 (0x1030), VMM: no, Wave Size: 32
+whisper_init_with_params_no_state: devices    = 2
+whisper_init_with_params_no_state: backends   = 2
+whisper_model_load: loading model
+whisper_model_load: n_vocab       = 51864
+whisper_model_load: n_audio_ctx   = 1500
+whisper_model_load: n_audio_state = 512
+whisper_model_load: n_audio_head  = 8
+whisper_model_load: n_audio_layer = 6
+whisper_model_load: n_text_ctx    = 448
+whisper_model_load: n_text_state  = 512
+whisper_model_load: n_text_head   = 8
+whisper_model_load: n_text_layer  = 6
+whisper_model_load: n_mels        = 80
+whisper_model_load: ftype         = 1
+whisper_model_load: qntvr         = 0
+whisper_model_load: type          = 2 (base)
+whisper_model_load: adding 1607 extra tokens
+whisper_model_load: n_langs       = 99
+whisper_model_load:        ROCm0 total size =   147.37 MB
+whisper_model_load: model size    =  147.37 MB
+whisper_backend_init_gpu: device 0: ROCm0 (type: 1)
+whisper_backend_init_gpu: found GPU device 0: ROCm0 (type: 1, cnt: 0)
+whisper_backend_init_gpu: using ROCm0 backend
+whisper_init_state: kv self size  =    6.29 MB
+whisper_init_state: kv cross size =   18.87 MB
+whisper_init_state: kv pad  size  =    3.15 MB
+whisper_init_state: compute buffer (conv)   =   17.24 MB
+whisper_init_state: compute buffer (encode) =   23.09 MB
+whisper_init_state: compute buffer (cross)  =    4.66 MB
+whisper_init_state: compute buffer (decode) =   97.29 MB
+
+  Connecting to llama-server at http://localhost:8080 ...
+  Attempt 1/3 failed, retrying in 2s...
+  Attempt 2/3 failed, retrying in 2s...
+  Attempt 3/3 failed, retrying in 2s...
+  WARNING: llama-server not responding at http://localhost:8080
+  The assistant will start but LLM requests will fail until the server is available.
+
+read_wav: read 39795 samples from 'tests/audio/inputs/vad_split_utterance_input.wav'
+clear: no audio device to clear!
+[Tool System] Loaded 13 tools from src/tools/tools.json
+[Tool System] Loaded 13 tools from src/tools/tools.json
+[Wyoming Client] Initialized for 0.0.0.0:10200
+[Tool System] Injected 13 tools into system prompt
+Llama stop words: 'Georgi:', 'Georgi :', '
+', 
+Voice commands: Stop (say 'stop' or type it)
+
+=========================================
+Testing Wyoming-Piper TTS Connection...
+=========================================
+TTS URL: http://0.0.0.0:10200
+TTS Voice: emma_1
+LLM URL: http://localhost:8080
+[1m[32mconnect failed.
+: Connection refused
+TTS test sent. If you heard audio, TTS is working.
+=========================================
+
+
+=========================================
+Tool Calling System Status
+=========================================
+Tool system initialized with 13 tools
+  - stop_speaking (fast path)
+  - pause_speaking (fast path)
+  - resume_speaking (fast path)
+  - get_temperature
+  - set_temperature
+  - set_fan_speed
+  - enable_defrost
+  - navigate_to
+  - find_nearby
+  - get_eta
+  - check_tire_pressure
+  - get_fuel_range
+  - check_vehicle_status
+=========================================
+
+Start speaking or typing:
+
+
+Georgi: 
+=== VAD TRIGGERED END-OF-SPEECH ===
+[SPLIT-DEBUG] Timestamp: 1779225494.756
+[SPLIT-DEBUG] vad_result: 1 -> 2 (END)
+[SPLIT-DEBUG] Speech duration: 50ms
+[SPLIT-DEBUG] Buffer size: 160000 samples (10.00s)
+===================================
+
+[Wyoming Client] Failed to connect to 0.0.0.0:10200: Connection refused
+[1m
+Georgi: Navigate to the closest Starbucks near me
+LLaMA:[0m[llama-server] CURL error: Couldn't connect to server
+
+operator(): TEST MODE - processing complete, waiting for TTS threads

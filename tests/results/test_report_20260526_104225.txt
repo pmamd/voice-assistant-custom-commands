@@ -1,0 +1,25 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 10:42:25
+Total Tests: 3
+Passed: 0
+Failed: 3
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 6571ms
+  Error: Whisper failed: 
+
+[FAIL] question_response
+  Duration: 5687ms
+  Error: Whisper failed: 
+
+[FAIL] stop_command_basic
+  Duration: 7268ms
+  Error: Whisper failed: 
+
+================================================================================

@@ -30,15 +30,16 @@ class ToolAudioTester:
         self.project_root = project_root
 
         # Initialize audio generator
+        import os
         self.generator = AudioGenerator(
-            piper_bin="/home/paul/.local/bin/piper",
-            model_dir=str(project_root / "external/piper-voices"),
+            piper_bin=os.path.expanduser("~/.local/bin/piper"),
+            model_dir=str(project_root / "piper-data"),
             output_dir=str(project_root / "tests/audio/inputs")
         )
 
         self.talk_llama_bin = project_root / "build/bin/voice-assistant"
         # Use base model for better accuracy than tiny
-        self.whisper_model = project_root / "whisper.cpp/models/ggml-base.en.bin"
+        self.whisper_model = project_root / "external/whisper.cpp/models/ggml-base.en.bin"
         self.llama_model = project_root / "models/llama-2-7b-chat.Q4_K_M.gguf"
 
     def generate_test_audio(self, text: str, filename: str) -> Path:

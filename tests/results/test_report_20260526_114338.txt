@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:43:38
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] clear_speech
+  Duration: 16728ms
+  Transcription: 'which is a phrase used to test typewriters and fonts.'
+  Expected: 'The quick brown fox jumps over the lazy dog'
+  Confidence: 98.45%
+  Similarity: 22.92%
+
+================================================================================

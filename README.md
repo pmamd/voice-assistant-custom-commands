@@ -53,7 +53,17 @@ The short version:
 ```bash
 git clone --recursive https://github.com/pmamd/voice-assistant-custom-commands.git
 cd voice-assistant-custom-commands
+
+# Build voice-assistant
 cmake -B build -DWHISPER_SDL2=ON && cmake --build build -j
+
+# Build llama-server (required)
+cd external/llama.cpp
+cmake -B build -DGGML_HIP=ON -DGPU_TARGETS='gfx1102'  # or just -DGGML_HIP=ON for other GPUs
+cmake --build build -j --target llama-server
+cd ../..
+
+# Start the assistant
 ./start-assistant.sh
 ```
 

@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-27 22:58:08
+Total Tests: 1
+Passed: 1
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 17652ms
+  Transcription: 'Hello Jorgi, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 83.66%
+  Similarity: 93.51%
+
+================================================================================

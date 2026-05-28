@@ -6,6 +6,7 @@ import asyncio
 import logging
 import time
 import json
+import os
 import subprocess
 import signal
 from pathlib import Path
@@ -63,8 +64,8 @@ class TestHarness:
 
         ver_config = self.config.get('config', {}).get('audio_verifier', {})
         self.verifier = AudioVerifier(
-            whisper_bin=ver_config.get('whisper_bin', './build/bin/main'),
-            model_path=ver_config.get('whisper_model', './models/ggml-base.en.bin')
+            whisper_bin=ver_config.get('whisper_bin', './build/bin/whisper-cli'),
+            model_path=ver_config.get('whisper_model', './external/whisper.cpp/models/ggml-base.en.bin')
         )
 
         self.test_cases = self.config.get('test_cases', [])
@@ -86,11 +87,21 @@ class TestHarness:
 
         # Wyoming-Piper configuration
         wyoming_config = self.config.get('config', {}).get('wyoming_piper', {})
-        self.wyoming_cmd = wyoming_config.get('command', 'wyoming-piper')
-        self.wyoming_args = wyoming_config.get('args', ['--voice', 'en_US-lessac-medium', '--port', '10200'])
+        self.wyoming_cmd = os.path.expanduser(wyoming_config.get('command', 'wyoming-piper'))
+        self.wyoming_args = [os.path.expanduser(arg) for arg in wyoming_config.get('args', ['--voice', 'en_US-lessac-medium', '--port', '10200'])]
         self.wyoming_port = wyoming_config.get('port', 10200)
         self.wyoming_process: Optional[subprocess.Popen] = None
         self.wyoming_started_by_us = False
+
+        # llama-server configuration
+        llama_server_config = self.config.get('config', {}).get('llama_server', {})
+        talk_llama_config = self.config.get('config', {}).get('talk_llama', {})
+        self.llama_server_cmd = llama_server_config.get('command', 'llama-server')
+        self.llama_server_args = llama_server_config.get('args', [])
+        self.llama_server_url = talk_llama_config.get('llama_url', 'http://localhost:8080')
+        self.llama_server_port = int(self.llama_server_url.split(':')[-1].rstrip('/'))
+        self.llama_server_process: Optional[subprocess.Popen] = None
+        self.llama_server_started_by_us = False
 
     def _load_config(self) -> Dict:
         """Load test configuration from YAML file."""
@@ -199,6 +210,92 @@ class TestHarness:
                 self.wyoming_process = None
                 self.wyoming_started_by_us = False
 
+    def _is_llama_server_running(self) -> bool:
+        """Check if llama-server is already running."""
+        try:
+            import urllib.request
+            # Check /health endpoint
+            health_url = f"{self.llama_server_url.rstrip('/')}/health"
+            response = urllib.request.urlopen(health_url, timeout=2)
+            return response.status == 200 and b'ok' in response.read()
+        except:
+            return False
+
+    async def _start_llama_server(self) -> bool:
+        """
+        Start llama-server.
+
+        Returns:
+            True if started successfully, False otherwise
+        """
+        if self._is_llama_server_running():
+            logger.info("llama-server already running")
+            return True
+
+        try:
+            logger.info(f"Starting llama-server: {self.llama_server_cmd} {' '.join(self.llama_server_args)}")
+
+            # Start llama-server process
+            self.llama_server_process = subprocess.Popen(
+                [self.llama_server_cmd] + self.llama_server_args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True  # Detach from parent
+            )
+
+            # Wait for startup (llama-server takes longer to load model)
+            logger.info("Waiting for llama-server to start (loading model)...")
+            max_wait = 60  # 60 seconds max
+            for i in range(max_wait):
+                await asyncio.sleep(1)
+                if self._is_llama_server_running():
+                    break
+                if self.llama_server_process.poll() is not None:
+                    # Process died
+                    stderr = self.llama_server_process.stderr.read().decode()
+                    logger.error(f"llama-server failed to start: {stderr}")
+                    return False
+            else:
+                logger.error("llama-server timed out after 60 seconds")
+                self._stop_llama_server()
+                return False
+
+            self.llama_server_started_by_us = True
+            logger.info(f"✓ llama-server started successfully at {self.llama_server_url}")
+            return True
+
+        except FileNotFoundError:
+            logger.error(f"llama-server command not found: {self.llama_server_cmd}")
+            logger.error("Build llama.cpp first: cd external/llama.cpp && cmake -B build && cmake --build build")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to start llama-server: {e}")
+            return False
+
+    def _stop_llama_server(self):
+        """Stop llama-server if we started it."""
+        if self.llama_server_process and self.llama_server_started_by_us:
+            logger.info("Stopping llama-server...")
+            try:
+                # Send SIGTERM to process group
+                pgid = self.llama_server_process.pid
+                subprocess.run(['pkill', '-TERM', '-g', str(pgid)], timeout=2)
+
+                # Wait for graceful shutdown
+                try:
+                    self.llama_server_process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    # Force kill
+                    self.llama_server_process.kill()
+                    self.llama_server_process.wait()
+
+                logger.info("✓ llama-server stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping llama-server: {e}")
+            finally:
+                self.llama_server_process = None
+                self.llama_server_started_by_us = False
+
     def _get_test_cases(self, group: Optional[str] = None,
                        test_names: Optional[List[str]] = None) -> List[Dict]:
         """
@@ -249,6 +346,8 @@ class TestHarness:
                 return await self._run_interrupt_test(test_case, start_time)
             elif test_type == 'multi_turn':
                 return await self._run_multi_turn_test(test_case, start_time)
+            elif test_type == 'vad_validation':
+                return await self._run_vad_validation_test(test_case, start_time)
             else:
                 return await self._run_simple_test(test_case, start_time)
 
@@ -281,7 +380,7 @@ class TestHarness:
 
         # 2. Run voice assistant with test input
         logger.info(f"Running voice assistant with test input")
-        output_wav = await self._run_assistant(input_wav, name)
+        output_wav, stdout, stderr = await self._run_assistant(input_wav, name)
 
         # 3. Verify output if generated
         if output_wav and output_wav.exists():
@@ -289,6 +388,7 @@ class TestHarness:
 
             # Determine verification method
             expected_response = test_case.get('expected_response')  # Full response for semantic
+            alternate_responses = test_case.get('alternate_responses', [])  # Alternate acceptable responses
             expected_text = test_case.get('expected_fuzzy')  # For fuzzy match
             keywords = test_case.get('expected_contains')  # For keyword match
 
@@ -312,7 +412,7 @@ class TestHarness:
             else:
                 min_keyword_matches = None
 
-            # Run verification
+            # Run verification - try primary expected response first
             results = self.verifier.verify(
                 output_wav,
                 expected_text=expected_text,
@@ -323,6 +423,24 @@ class TestHarness:
                 semantic_threshold=semantic_threshold,
                 use_semantic=use_semantic
             )
+
+            # If primary verification failed and we have alternates, try them
+            if not results['overall_passed'] and alternate_responses:
+                logger.debug(f"Primary verification failed, trying {len(alternate_responses)} alternate(s)")
+                for alt_response in alternate_responses:
+                    alt_results = self.verifier.verify(
+                        output_wav,
+                        expected_text=alt_response,
+                        fuzzy_threshold=fuzzy_threshold,
+                        min_confidence=min_confidence,
+                        semantic_threshold=semantic_threshold,
+                        use_semantic=use_semantic
+                    )
+                    if alt_results['overall_passed']:
+                        logger.info(f"Alternate response matched: '{alt_response}'")
+                        results = alt_results
+                        expected_text = alt_response  # Update for reporting
+                        break
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -540,7 +658,7 @@ class TestHarness:
             )
 
             # Run voice assistant
-            output_wav = await self._run_assistant(input_wav, f"{name}_turn{turn_num}")
+            output_wav, stdout, stderr = await self._run_assistant(input_wav, f"{name}_turn{turn_num}")
 
             # Verify output
             if output_wav and output_wav.exists():
@@ -593,6 +711,147 @@ class TestHarness:
                 duration_ms=duration_ms,
                 error=f"{len(turn_results)} turn(s) failed: {'; '.join(turn_results)}"
             )
+
+    async def _run_vad_validation_test(self, test_case: Dict, start_time: float) -> TestResult:
+        """
+        Run a VAD validation test to detect split-utterance bugs.
+
+        This test checks if Voice Activity Detection incorrectly splits a single
+        utterance into multiple separate LLM prompts.
+
+        Args:
+            test_case: Test case dictionary with:
+                - input: Text to convert to audio (should be >1.2s duration)
+                - max_driver_prompts: Expected number of "Driver:" prompts (default: 1)
+                - vad_args: Additional VAD arguments (e.g., ["--vad-last-ms", "700"])
+
+        Returns:
+            TestResult indicating if VAD correctly handled the utterance
+        """
+        name = test_case['name']
+        input_text = test_case['input']
+        max_driver_prompts = test_case.get('max_driver_prompts', 1)
+        vad_args = test_case.get('vad_args', [])
+
+        logger.info(f"Running VAD validation test: {name}")
+        logger.info(f"  Input: '{input_text}'")
+        logger.info(f"  Max expected Driver prompts: {max_driver_prompts}")
+
+        # 1. Generate test audio (must be >1.2s to trigger early stop)
+        logger.info(f"Generating audio for: '{input_text}'")
+        input_wav = self.generator.generate(
+            input_text,
+            output_name=f"{name}_input.wav"
+        )
+
+        # Check audio duration
+        import subprocess
+        try:
+            duration_result = subprocess.run(
+                ['ffprobe', '-i', str(input_wav), '-show_entries', 'format=duration',
+                 '-v', 'quiet', '-of', 'csv=p=0'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            duration = float(duration_result.stdout.strip())
+            logger.info(f"  Generated audio duration: {duration:.2f}s")
+
+            if duration < 1.2:
+                return TestResult(
+                    name=name,
+                    passed=False,
+                    duration_ms=(time.time() - start_time) * 1000,
+                    error=f"Audio too short: {duration:.2f}s (need >1.2s to trigger VAD early stop)"
+                )
+        except Exception as e:
+            logger.warning(f"Could not check audio duration: {e}")
+
+        # 2. Run voice assistant with VAD-specific args
+        logger.info(f"Running voice assistant with VAD args: {vad_args}")
+        output_wav, stdout, stderr = await self._run_assistant(input_wav, name, extra_args=vad_args)
+
+        # Log stdout/stderr for debugging
+        if stdout:
+            logger.debug(f"Assistant stdout:\n{stdout}")
+        if stderr:
+            logger.debug(f"Assistant stderr:\n{stderr}")
+
+        # 3. Count actual user transcription prompts
+        # Pattern: "Georgi: <transcribed text>" on its own line (not in status messages)
+        import re
+        lines = stdout.split('\n')
+        user_lines = []
+        for i, line in enumerate(lines):
+            # Match lines that start with "Georgi: " followed by actual content
+            # Exclude lines that are part of status/config output (Wyoming Client, etc.)
+            if line.strip().startswith("Georgi: "):
+                # Filter out status messages (Wyoming Client has ANSI codes, so check the content)
+                if "[Wyoming Client]" in line or "Llama stop words:" in line:
+                    continue
+                # Only count if it looks like a transcription (has actual words after "Georgi: ")
+                content = line.strip()[8:]  # Remove "Georgi: " prefix
+                if content and not content.startswith("'") and content != "":
+                    user_lines.append(line.strip())
+
+        user_prompts = len(user_lines)
+        logger.info(f"  Found {user_prompts} user transcription(s) in output")
+
+        # 4. Analyze for split-utterance indicators
+        has_early_stop = "early stop" in stdout.lower()
+
+        logger.info(f"  Early stop trigger: {'YES' if has_early_stop else 'no'}")
+        for i, line in enumerate(user_lines, 1):
+            logger.info(f"  User prompt {i}: {line}")
+
+        # 5. Check if bug is present
+        duration_ms = (time.time() - start_time) * 1000
+
+        if user_prompts > max_driver_prompts:
+            # Bug detected - utterance was split
+            return TestResult(
+                name=name,
+                passed=False,
+                duration_ms=duration_ms,
+                error=f"VAD split-utterance bug detected: {user_prompts} user prompts (expected ≤{max_driver_prompts})",
+                details={
+                    'user_prompts': user_prompts,
+                    'user_lines': user_lines,
+                    'has_early_stop': has_early_stop
+                }
+            )
+
+        # Check for partial transcriptions (another indicator of split)
+        import re
+        for line in user_lines:
+            # Look for incomplete transcriptions that indicate a split
+            # e.g., "Georgi: Navigate to the star" (missing "bucks")
+            if re.search(r'navigate to (the|start|star)\s*$', line, re.IGNORECASE):
+                if 'starbucks' not in line.lower():
+                    return TestResult(
+                        name=name,
+                        passed=False,
+                        duration_ms=duration_ms,
+                        error=f"Partial transcription detected: '{line.strip()}' (incomplete utterance)",
+                        details={
+                            'user_prompts': user_prompts,
+                            'partial_line': line.strip(),
+                            'has_early_stop': has_early_stop
+                        }
+                    )
+
+        # Test passed - VAD correctly handled the utterance
+        return TestResult(
+            name=name,
+            passed=True,
+            duration_ms=duration_ms,
+            actual_text=f"VAD correctly handled utterance: {user_prompts} user prompt(s)",
+            details={
+                'user_prompts': user_prompts,
+                'user_lines': user_lines,
+                'has_early_stop': has_early_stop
+            }
+        )
 
     def _concatenate_wav_files(self, input_files: List[Path], output_file: Path) -> bool:
         """
@@ -657,24 +916,27 @@ class TestHarness:
             logger.debug(traceback.format_exc())
             return False
 
-    async def _run_assistant(self, input_wav: Path, test_name: str) -> Optional[Path]:
+    async def _run_assistant(self, input_wav: Path, test_name: str, extra_args: Optional[List[str]] = None) -> tuple[Optional[Path], str, str]:
         """
         Run the voice assistant with test input.
 
         Args:
             input_wav: Path to input audio file
             test_name: Name of test (for output naming)
+            extra_args: Additional command-line arguments
 
         Returns:
-            Path to output audio file if generated
+            Tuple of (output audio path, stdout, stderr)
         """
         import subprocess
 
         talk_llama_config = self.config.get('config', {}).get('talk_llama', {})
         binary = talk_llama_config.get('binary', './build/bin/talk-llama')
         whisper_model = talk_llama_config.get('whisper_model', './models/ggml-base.en.bin')
+        whisper_language = talk_llama_config.get('whisper_language', None)
         llama_url = talk_llama_config.get('llama_url', 'http://127.0.0.1:8083')
         temperature = talk_llama_config.get('temperature', None)
+        max_tokens = talk_llama_config.get('max_tokens', None)
 
         # Build command
         cmd = [
@@ -685,9 +947,21 @@ class TestHarness:
             '--verbose'
         ]
 
+        # Add whisper language if specified (required for multilingual models on NPU)
+        if whisper_language is not None:
+            cmd.extend(['--language', str(whisper_language)])
+
         # Add temperature if specified
         if temperature is not None:
             cmd.extend(['--temp', str(temperature)])
+
+        # Add max_tokens if specified
+        if max_tokens is not None:
+            cmd.extend(['-n', str(max_tokens)])
+
+        # Add any extra arguments
+        if extra_args:
+            cmd.extend(extra_args)
 
         logger.info(f"Running: {' '.join(cmd)}")
 
@@ -721,7 +995,7 @@ class TestHarness:
 
             if not output_files:
                 logger.warning("Could not find any output audio files")
-                return None
+                return (None, result.stdout, result.stderr)
 
             # Extract timestamp from the most recent file
             # File format: output_<timestamp>_<part_number>.wav
@@ -730,7 +1004,7 @@ class TestHarness:
             if not match:
                 logger.warning(f"Unexpected output file format: {latest_file.name}")
                 shutil.copy(str(latest_file), str(output_wav))
-                return output_wav
+                return (output_wav, result.stdout, result.stderr)
 
             timestamp = match.group(1)
 
@@ -740,7 +1014,7 @@ class TestHarness:
 
             if not chunk_files:
                 logger.warning(f"No chunk files found for timestamp {timestamp}")
-                return None
+                return (None, result.stdout, result.stderr)
 
             # Sort by part number (extract from filename)
             def get_part_number(filepath):
@@ -766,14 +1040,14 @@ class TestHarness:
                     logger.error("Failed to concatenate audio chunks")
                     return None
 
-            return output_wav
+            return (output_wav, result.stdout, result.stderr)
 
         except subprocess.TimeoutExpired:
             logger.error(f"Assistant timed out after 30 seconds")
-            return None
+            return (None, "", "")
         except Exception as e:
             logger.error(f"Failed to run assistant: {e}")
-            return None
+            return (None, "", "")
 
     async def run_all_tests(self, group: Optional[str] = None,
                            test_names: Optional[List[str]] = None) -> List[TestResult]:
@@ -793,6 +1067,12 @@ class TestHarness:
             logger.error("Failed to start Wyoming-Piper - tests may fail")
             print("⚠ WARNING: Wyoming-Piper not running - TTS tests will fail")
 
+        # Start llama-server if needed
+        logger.info("Checking llama-server status...")
+        if not await self._start_llama_server():
+            logger.error("Failed to start llama-server - LLM tests will fail")
+            print("⚠ WARNING: llama-server not running - LLM-dependent tests will fail")
+
         try:
             test_cases = self._get_test_cases(group, test_names)
 
@@ -810,8 +1090,9 @@ class TestHarness:
             return self.results
 
         finally:
-            # Clean up Wyoming-Piper if we started it
+            # Clean up services if we started them
             self._stop_wyoming_piper()
+            self._stop_llama_server()
 
     def generate_report(self, output_format: str = 'text') -> str:
         """

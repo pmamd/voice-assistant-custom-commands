@@ -1,0 +1,33 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-27 09:42:51
+Total Tests: 3
+Passed: 3
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 16915ms
+  Transcription: 'Hello Georgie. How may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 87.29%
+  Similarity: 96.20%
+
+[PASS] question_response
+  Duration: 16081ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 95.86%
+  Similarity: 100.00%
+
+[PASS] stop_command_basic
+  Duration: 14748ms
+  Transcription: 'Set backslash temperature, set backslash fan backslash speed, enable backslash defrost, navigate backslash 2, find backslash nearby, get backslash eta, check backslash tire backslash pressure, or get backslash fuel backslash range.'
+  Expected: 'None'
+  Confidence: 92.53%
+
+================================================================================

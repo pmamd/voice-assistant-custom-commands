@@ -49,7 +49,7 @@ public:
     void registerExecutor(const std::string& tool_name, ToolExecutor executor);
 
     // Check if text matches a fast-path tool keyword
-    std::pair<bool, ToolDefinition> matchFastPath(const std::string& text) const;
+    std::pair<bool, ToolDefinition> matchFastPath(const std::string& text, bool tts_active = false) const;
 
     // Execute a tool by name
     ToolResult execute(const std::string& tool_name, const json& arguments);

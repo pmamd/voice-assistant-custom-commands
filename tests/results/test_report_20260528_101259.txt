@@ -1,0 +1,91 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-28 10:12:59
+Total Tests: 13
+Passed: 13
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 17136ms
+  Transcription: 'Hello Georgie, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 88.61%
+  Similarity: 96.20%
+
+[PASS] question_response
+  Duration: 16084ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 95.16%
+  Similarity: 100.00%
+
+[PASS] simple_question
+  Duration: 16834ms
+  Transcription: 'Yes, Georgie, I'm always here to help.'
+  Expected: 'Yes, Georgi. I'm always here to help.'
+  Confidence: 89.80%
+  Similarity: 96.00%
+
+[PASS] stop_command_basic
+  Duration: 17372ms
+  Transcription: 'I'm sorry, Georgie. I didn't understand your request. Could you please specify which tool or action you would like me to perform? Here are some options.'
+  Expected: 'None'
+  Confidence: 90.22%
+
+[PASS] stop_command_variations
+  Duration: 53811ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1502ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[PASS] long_sentence
+  Duration: 17369ms
+  Transcription: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Expected: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Confidence: 95.98%
+  Similarity: 100.00%
+
+[PASS] numbers
+  Duration: 24003ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: '1, 2, 3, 4, 5.'
+  Confidence: 84.49%
+  Similarity: 100.00%
+
+[PASS] special_characters
+  Duration: 18347ms
+  Transcription: 'I'm just an AI, Georgie. I don't have feelings or emotions, but I'm here to help you. How can I make your day better?'
+  Expected: 'I'm just an AI, Georgi. I don't have feelings or emotions. But I'm here to help you! How can I assist you today?'
+  Confidence: 91.66%
+  Similarity: 89.96%
+
+[PASS] latency_test
+  Duration: 15866ms
+  Transcription: 'Hello Georgie. How may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 86.44%
+  Similarity: 96.20%
+
+[PASS] multiple_turns
+  Duration: 48792ms
+  Transcription: 'All 3 turns passed'
+
+[PASS] clear_speech
+  Duration: 17326ms
+  Transcription: 'That's a sentence, Jorgi, it's called a pangram and it contains all the letters of the English alphabet.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 85.83%
+  Similarity: 97.61%
+
+[PASS] vad_split_utterance
+  Duration: 7904ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

@@ -1,0 +1,374 @@
+whisper_init_from_file_with_params_no_state: loading model from './external/whisper.cpp/models/ggml-base.en.bin'
+whisper_init_with_params_no_state: use gpu    = 1
+whisper_init_with_params_no_state: flash attn = 1
+whisper_init_with_params_no_state: gpu_device = 0
+whisper_init_with_params_no_state: dtw        = 0
+ggml_cuda_init: found 1 ROCm devices:
+  Device 0: AMD Radeon PRO W6800, gfx1030 (0x1030), VMM: no, Wave Size: 32
+whisper_init_with_params_no_state: devices    = 2
+whisper_init_with_params_no_state: backends   = 2
+whisper_model_load: loading model
+whisper_model_load: n_vocab       = 51864
+whisper_model_load: n_audio_ctx   = 1500
+whisper_model_load: n_audio_state = 512
+whisper_model_load: n_audio_head  = 8
+whisper_model_load: n_audio_layer = 6
+whisper_model_load: n_text_ctx    = 448
+whisper_model_load: n_text_state  = 512
+whisper_model_load: n_text_head   = 8
+whisper_model_load: n_text_layer  = 6
+whisper_model_load: n_mels        = 80
+whisper_model_load: ftype         = 1
+whisper_model_load: qntvr         = 0
+whisper_model_load: type          = 2 (base)
+whisper_model_load: adding 1607 extra tokens
+whisper_model_load: n_langs       = 99
+whisper_model_load:        ROCm0 total size =   147.37 MB
+whisper_model_load: model size    =  147.37 MB
+whisper_backend_init_gpu: device 0: ROCm0 (type: 1)
+whisper_backend_init_gpu: found GPU device 0: ROCm0 (type: 1, cnt: 0)
+whisper_backend_init_gpu: using ROCm0 backend
+whisper_init_state: kv self size  =    6.29 MB
+whisper_init_state: kv cross size =   18.87 MB
+whisper_init_state: kv pad  size  =    3.15 MB
+whisper_init_state: compute buffer (conv)   =   17.24 MB
+whisper_init_state: compute buffer (encode) =   23.09 MB
+whisper_init_state: compute buffer (cross)  =    4.66 MB
+whisper_init_state: compute buffer (decode) =   97.29 MB
+
+  Connecting to llama-server at http://localhost:8080 ...
+  Attempt 1/3 failed, retrying in 2s...
+  Attempt 2/3 failed, retrying in 2s...
+  Attempt 3/3 failed, retrying in 2s...
+  WARNING: llama-server not responding at http://localhost:8080
+  The assistant will start but LLM requests will fail until the server is available.
+
+init: found 1 capture devices:
+init:    - Capture device #0: 'Realtek USB Audio Front Mic'
+init: attempt to open capture device 0 : 'Realtek USB Audio Front Mic' ...
+init: obtained spec for input device (SDL Id = 2):
+init:     - sample rate:       16000
+init:     - format:            33056 (required: 33056)
+init:     - channels:          1 (required: 1)
+init:     - samples per frame: 1024
+[Tool System] Loaded 13 tools from src/tools/tools.json
+[Tool System] Loaded 13 tools from src/tools/tools.json
+[Wyoming Client] Initialized for localhost:10200
+[Tool System] Injected 13 tools into system prompt
+Llama stop words: 'Driver:', 'Driver :', 
+Voice commands: Stop (say 'stop' or type it)
+
+=========================================
+Testing Wyoming-Piper TTS Connection...
+=========================================
+TTS URL: http://localhost:10200/
+TTS Voice: en_US-lessac-medium
+LLM URL: http://localhost:8080
+[1m[32mconnect failed.
+: Connection refused
+TTS test sent. If you heard audio, TTS is working.
+=========================================
+
+Warming up llama-server KV cache...
+KV cache warmed.
+
+Warming up Whisper GPU...
+Whisper GPU warmed.
+
+
+=========================================
+Tool Calling System Status
+=========================================
+Tool system initialized with 13 tools
+  - stop_speaking (fast path)
+  - pause_speaking (fast path)
+  - resume_speaking (fast path)
+  - get_temperature
+  - set_temperature
+  - set_fan_speed
+  - enable_defrost
+  - navigate_to
+  - find_nearby
+  - get_eta
+  - check_tire_pressure
+  - get_fuel_range
+  - check_vehicle_status
+=========================================
+
+Start speaking or typing:
+
+
+Driver: [VAD-DEBUG] t=1779225464.347 is_speech=1 prev=2 buf_samples=1024 (0.06s)
+[VAD-DEBUG] t=1779225464.426 is_speech=1 prev=1 buf_samples=2048 (0.13s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000015
+[VAD-DEBUG] t=1779225464.476 is_speech=1 prev=1 buf_samples=3072 (0.19s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000015
+[VAD-DEBUG] t=1779225464.526 is_speech=1 prev=1 buf_samples=4096 (0.26s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000016
+[VAD-DEBUG] t=1779225464.576 is_speech=1 prev=1 buf_samples=5120 (0.32s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000016
+[VAD-DEBUG] t=1779225464.626 is_speech=1 prev=1 buf_samples=6144 (0.38s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000017
+[VAD-DEBUG] t=1779225464.676 is_speech=1 prev=1 buf_samples=6144 (0.38s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000017
+[VAD-DEBUG] t=1779225464.726 is_speech=1 prev=1 buf_samples=7168 (0.45s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000017
+[VAD-DEBUG] t=1779225464.776 is_speech=1 prev=1 buf_samples=8192 (0.51s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000017
+[VAD-DEBUG] t=1779225464.826 is_speech=1 prev=1 buf_samples=9216 (0.58s)
+[EARLY-STOP] Not triggered: dur=0ms, energy=0.000017
+[VAD-DEBUG] t=1779225464.877 is_speech=1 prev=1 buf_samples=10240 (0.64s)
+[EARLY-STOP] Not triggered: dur=1ms, energy=0.000016
+[VAD-DEBUG] t=1779225464.927 is_speech=1 prev=1 buf_samples=10240 (0.64s)
+[EARLY-STOP] Not triggered: dur=1ms, energy=0.000016
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225464.977 is_speech=0 prev=1 buf_samples=11264 (0.70s)
+
+=== VAD TRIGGERED END-OF-SPEECH ===
+[SPLIT-DEBUG] Timestamp: 1779225464.977
+[SPLIT-DEBUG] vad_result: 1 -> 2 (END)
+[SPLIT-DEBUG] Speech duration: 630ms
+[SPLIT-DEBUG] Buffer size: 11264 samples (0.70s)
+===================================
+
+[SPLIT-DEBUG] Saved audio to tests/audio/debug/split_000_dur630ms.wav
+[Wyoming Client] Failed to connect to localhost:10200: Connection refused
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.056 is_speech=0 prev=2 buf_samples=12288 (0.77s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.106 is_speech=0 prev=2 buf_samples=13312 (0.83s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.156 is_speech=0 prev=2 buf_samples=14336 (0.90s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.206 is_speech=0 prev=2 buf_samples=15360 (0.96s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.256 is_speech=0 prev=2 buf_samples=15360 (0.96s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.306 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.356 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.407 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.457 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.507 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.557 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.607 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.657 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.708 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.758 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.808 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.858 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.908 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225465.958 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.008 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.059 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.109 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.159 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.209 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.259 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.309 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.360 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.410 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.460 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.510 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.560 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.610 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.661 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.711 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.761 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.811 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.861 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.911 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225466.962 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.012 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.062 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.112 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.162 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.212 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.262 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.313 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.363 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.413 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.463 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.513 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.563 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.613 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.664 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.714 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.764 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.814 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.864 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.914 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225467.965 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.015 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.065 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.115 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.165 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.215 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.265 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.315 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.366 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.416 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.466 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.516 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.566 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.616 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.666 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.716 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.767 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.817 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.867 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.917 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225468.967 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.017 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.067 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.118 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.168 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.218 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.268 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.318 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.368 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.418 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.468 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.519 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.569 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.619 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.669 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.719 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.769 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.819 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.869 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.920 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225469.970 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.020 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.070 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.120 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.170 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.220 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.271 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.321 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.371 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.421 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.471 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.521 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.571 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+
+
+Caught signal 15 (Ctrl+C), shutting down gracefully...
+Press Ctrl+C again to force quit.
+vad_simple: energy_all: 0.000001, energy_last: 0.000001, vad_thold: 1.200000, freq_thold: 100.000000
+[VAD-DEBUG] t=1779225470.622 is_speech=0 prev=2 buf_samples=16000 (1.00s)
+Signal received, exiting main loop...
+
+whisper_print_timings:     load time =   110.84 ms
+whisper_print_timings:     fallbacks =   0 p /   0 h
+whisper_print_timings:      mel time =     6.00 ms
+whisper_print_timings:   sample time =     2.22 ms /     1 runs (     2.22 ms per run)
+whisper_print_timings:   encode time =   155.12 ms /     3 runs (    51.71 ms per run)
+whisper_print_timings:   decode time =    11.43 ms /     3 runs (     3.81 ms per run)
+whisper_print_timings:   batchd time =    21.57 ms /     6 runs (     3.60 ms per run)
+whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)
+whisper_print_timings:    total time = 15609.16 ms
