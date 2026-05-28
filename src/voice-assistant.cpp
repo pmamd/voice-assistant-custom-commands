@@ -515,7 +515,7 @@ std::string transcribe(
 
 	std::vector<whisper_token> prompt_tokens;
 
-	whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+	whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);
 
 	prompt_tokens.resize(1024);
 	prompt_tokens.resize(whisper_tokenize(ctx, prompt_text.c_str(), prompt_tokens.data(), prompt_tokens.size()));
