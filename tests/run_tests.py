@@ -6,6 +6,7 @@ import asyncio
 import logging
 import time
 import json
+import os
 import subprocess
 import signal
 from pathlib import Path
@@ -86,8 +87,8 @@ class TestHarness:
 
         # Wyoming-Piper configuration
         wyoming_config = self.config.get('config', {}).get('wyoming_piper', {})
-        self.wyoming_cmd = wyoming_config.get('command', 'wyoming-piper')
-        self.wyoming_args = wyoming_config.get('args', ['--voice', 'en_US-lessac-medium', '--port', '10200'])
+        self.wyoming_cmd = os.path.expanduser(wyoming_config.get('command', 'wyoming-piper'))
+        self.wyoming_args = [os.path.expanduser(arg) for arg in wyoming_config.get('args', ['--voice', 'en_US-lessac-medium', '--port', '10200'])]
         self.wyoming_port = wyoming_config.get('port', 10200)
         self.wyoming_process: Optional[subprocess.Popen] = None
         self.wyoming_started_by_us = False

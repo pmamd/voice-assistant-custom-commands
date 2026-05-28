@@ -4,6 +4,7 @@
 import subprocess
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -24,9 +25,9 @@ class AudioGenerator:
             model_dir: Directory containing Piper voice models
             output_dir: Directory to save generated audio files
         """
-        self.piper_bin = Path(piper_bin)
-        self.model_dir = Path(model_dir)
-        self.output_dir = Path(output_dir)
+        self.piper_bin = Path(os.path.expanduser(piper_bin))
+        self.model_dir = Path(os.path.expanduser(model_dir))
+        self.output_dir = Path(os.path.expanduser(output_dir))
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.piper_bin.exists():
