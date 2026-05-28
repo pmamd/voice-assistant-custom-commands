@@ -2256,9 +2256,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 					std::regex re("\\(.*?\\)");
 					text_heard = std::regex_replace(text_heard, re, "");
 				}
-				// remove all characters, except for letters, numbers, punctuation and ':', '\'', '-', ' '
+				// remove all characters, except for letters, numbers, punctuation and ':', '\'', '-', '+', ' '
 				if (params.language == "en" && !user_typed_this)
-					text_heard = std::regex_replace(text_heard, std::regex("[^a-zA-Z0-9\\.,\\?!\\s\\:\\'\\-]"), "");
+					text_heard = std::regex_replace(text_heard, std::regex("[^a-zA-Z0-9\\.,\\?!\\s\\:\\'\\-\\+]"), "");
 				// take first line
 				text_heard = text_heard.substr(0, text_heard.find_first_of('\n'));
 
