@@ -76,7 +76,7 @@ def run_end_to_end_test(use_npu=False):
     print()
 
     # Build command
-    model = "./whisper.cpp/models/ggml-base.bin" if use_npu else "./whisper.cpp/models/ggml-base.en.bin"
+    model = "./external/whisper.cpp/models/ggml-base.bin" if use_npu else "./external/whisper.cpp/models/ggml-base.en.bin"
     whisper_args = ["--no-gpu"] if use_npu else []
 
     cmd = [

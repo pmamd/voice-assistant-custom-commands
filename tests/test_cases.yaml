@@ -171,7 +171,7 @@ test_cases:
 config:
   # Audio generation settings
   audio_generator:
-    piper_bin: "/home/paul/.local/bin/piper"
+    piper_bin: "~/.local/bin/piper"
     model_dir: "./piper-data"
     default_voice: "en_US-lessac-medium"
     output_dir: "./tests/audio/inputs"
@@ -192,10 +192,10 @@ config:
 
   # Wyoming-Piper TTS server settings
   wyoming_piper:
-    command: "/home/paul/.local/bin/wyoming-piper-custom"
+    command: "~/.local/bin/wyoming-piper-custom"
     args:
       - "--piper"
-      - "/home/paul/.local/bin/piper"
+      - "~/.local/bin/piper"
       - "--voice"
       - "en_US-lessac-medium"
       - "--data-dir"

@@ -23,8 +23,8 @@ class WhisperModelComparer:
         self.whisper_bin = project_root / "build/bin/main"
 
         # Model paths
-        self.tiny_model = project_root / "whisper.cpp/models/ggml-tiny.en.bin"
-        self.base_model = project_root / "talk-llama-fast/whisper.cpp/models/ggml-base.en.bin"
+        self.tiny_model = project_root / "external/whisper.cpp/models/ggml-tiny.en.bin"
+        self.base_model = project_root / "talk-llama-fast/external/whisper.cpp/models/ggml-base.en.bin"
 
         # Test audio directory
         self.test_audio_dir = project_root / "tests/audio/inputs"
