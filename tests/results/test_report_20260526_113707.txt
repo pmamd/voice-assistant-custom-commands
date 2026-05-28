@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:37:07
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_question
+  Duration: 16144ms
+  Transcription: 'I'm always here to help.'
+  Expected: 'How can I assist you?'
+  Confidence: 94.91%
+  Similarity: 26.67%
+
+================================================================================

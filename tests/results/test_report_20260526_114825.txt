@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:48:25
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] clear_speech
+  Duration: 17269ms
+  Transcription: 'is called a pangram and it contains all the letters of the English alphabet.'
+  Expected: 'The quick brown fox jumps over the lazy dog'
+  Confidence: 90.72%
+  Similarity: 18.49%
+
+================================================================================

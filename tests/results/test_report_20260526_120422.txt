@@ -1,0 +1,33 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 12:04:22
+Total Tests: 3
+Passed: 2
+Failed: 1
+Success Rate: 66.7%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 16406ms
+  Transcription: 'How may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 94.17%
+  Similarity: 78.12%
+
+[PASS] question_response
+  Duration: 15852ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 93.99%
+  Similarity: 100.00%
+
+[PASS] stop_command_basic
+  Duration: 13630ms
+  Transcription: 'or get\fuel\range.'
+  Expected: 'None'
+  Confidence: 78.70%
+
+================================================================================

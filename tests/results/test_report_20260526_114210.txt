@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:42:10
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] long_sentence
+  Duration: 16519ms
+  Transcription: 'I'm unable to provide real-time weather information.'
+  Expected: 'The weather today includes temperature and humidity information'
+  Confidence: 94.93%
+  Similarity: 38.26%
+
+================================================================================

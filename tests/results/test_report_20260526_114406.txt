@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:44:06
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 16046ms
+  Transcription: 'How may I help you today?'
+  Expected: 'How can I assist you today?'
+  Confidence: 93.92%
+  Similarity: 73.08%
+
+================================================================================

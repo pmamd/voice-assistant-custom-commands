@@ -1998,12 +1998,12 @@ int run(int argc, const char **argv)
 				// AMD whisper.cpp fork removed min_energy parameter from vad_simple
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, true);
 
-				// DEBUG: Log VAD state every cycle (disabled)
-				// if (params.debug) {
-				// 	fprintf(stderr, "[VAD-DEBUG] t=%.3f is_speech=%d prev=%d buf_samples=%zu (%.2fs)\n",
-				// 			get_current_time_ms(), is_speech, vad_result_prev,
-				// 			pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
-				// }
+				// DEBUG: Log VAD state every cycle
+				if (params.debug) {
+					fprintf(stderr, "[VAD-DEBUG] t=%.3f is_speech=%d prev=%d buf_samples=%zu (%.2fs)\n",
+							get_current_time_ms(), is_speech, vad_result_prev,
+							pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
+				}
 
 				// SMART EARLY STOP DETECTION - DISABLED
 				// This was causing false triggers on natural speech pauses in longer phrases.
@@ -2073,12 +2073,12 @@ int run(int argc, const char **argv)
 			// Runs Whisper transcription then dispatches the result to the command/LLM pipeline.
 if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
-				// DEBUG: Log when VAD triggers end-of-speech (disabled)
-				// if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
-				// 	fprintf(stderr, "\n=== VAD TRIGGERED END-OF-SPEECH ===\n");
-				// 	fprintf(stderr, "[SPLIT-DEBUG] Timestamp: %.3f\n", get_current_time_ms());
-				// 	fprintf(stderr, "[SPLIT-DEBUG] vad_result: %d -> 2 (END)\n", vad_result_prev);
-				// }
+				// DEBUG: Log when VAD triggers end-of-speech
+				if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
+					fprintf(stderr, "\n=== VAD TRIGGERED END-OF-SPEECH ===\n");
+					fprintf(stderr, "[SPLIT-DEBUG] Timestamp: %.3f\n", get_current_time_ms());
+					fprintf(stderr, "[SPLIT-DEBUG] vad_result: %d -> 2 (END)\n", vad_result_prev);
+				}
 
 				speech_end_ms = get_current_time_ms();
 				latency_vad_end = speech_end_ms;
@@ -2089,13 +2089,13 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 					speech_len = pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE;
 				}
 
-				// DEBUG: Log speech details (disabled)
-				// if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
-				// 	fprintf(stderr, "[SPLIT-DEBUG] Speech duration: %.0fms\n", speech_len * 1000.0);
-				// 	fprintf(stderr, "[SPLIT-DEBUG] Buffer size: %zu samples (%.2fs)\n",
-				// 			pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
-				// 	fprintf(stderr, "===================================\n\n");
-				// }
+				// DEBUG: Log speech details
+				if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
+					fprintf(stderr, "[SPLIT-DEBUG] Speech duration: %.0fms\n", speech_len * 1000.0);
+					fprintf(stderr, "[SPLIT-DEBUG] Buffer size: %zu samples (%.2fs)\n",
+							pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
+					fprintf(stderr, "===================================\n\n");
+				}
 				// Log VAD duration for latency measurement
 				if (speech_start_ms > 0) {
 					if (params.debug) {
@@ -2155,9 +2155,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 							fwrite(&s, 2, 1, f);
 						}
 						fclose(f);
-						// if (params.debug) {
-						// 	fprintf(stderr, "[SPLIT-DEBUG] Saved audio to %s\n", wav_filename);
-						// }
+						if (params.debug) {
+							fprintf(stderr, "[SPLIT-DEBUG] Saved audio to %s\n", wav_filename);
+						}
 					}
 				}
 

@@ -1,0 +1,98 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 10:57:47
+Total Tests: 14
+Passed: 4
+Failed: 10
+Success Rate: 28.6%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 7949ms
+  Transcription: 'How may I help you today?'
+  Expected: 'How can I assist you today?'
+  Confidence: 96.83%
+  Similarity: 73.08%
+
+[FAIL] question_response
+  Duration: 7541ms
+  Transcription: 'The answer to the mathematical expression 2 plus 2 is 4.'
+  Expected: 'The answer is 4'
+  Confidence: 90.38%
+  Similarity: 42.25%
+
+[FAIL] simple_question
+  Duration: 8128ms
+  Transcription: 'How may I help you today?'
+  Expected: 'How can I assist you?'
+  Confidence: 96.55%
+  Similarity: 56.52%
+
+[FAIL] long_response
+  Duration: 9275ms
+  Transcription: 'and even play with their children.'
+  Expected: 'A story about a robot who learns and helps people'
+  Confidence: 96.98%
+  Similarity: 19.28%
+
+[PASS] stop_command_basic
+  Duration: 7123ms
+  Transcription: 'Could you please clarify or use one of the provided tools?'
+  Expected: 'None'
+  Confidence: 96.94%
+
+[PASS] stop_command_variations
+  Duration: 21952ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1502ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[FAIL] long_sentence
+  Duration: 9494ms
+  Transcription: 'The average temperature for the state in your location is 72 degrees Fahrenheit with partly cloudy skies and a 10% chance of precipitation.'
+  Expected: 'The weather today includes temperature and humidity information'
+  Confidence: 94.71%
+  Similarity: 33.66%
+
+[FAIL] numbers
+  Duration: 8109ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: 'The numbers are one, two, three, four, five'
+  Confidence: 88.17%
+  Similarity: 28.07%
+
+[FAIL] special_characters
+  Duration: 8539ms
+  Transcription: 'How can I assist you today?'
+  Expected: 'Hello, I'm doing well. How are you today?'
+  Confidence: 97.75%
+  Similarity: 47.06%
+
+[FAIL] latency_test
+  Duration: 8743ms
+  Transcription: 'How may I help you today?'
+  Expected: 'Hi, how can I help you?'
+  Confidence: 96.50%
+  Similarity: 70.83%
+
+[FAIL] multiple_turns
+  Duration: 24405ms
+  Error: 1 turn(s) failed: Turn 2 failed verification
+
+[FAIL] clear_speech
+  Duration: 8352ms
+  Transcription: 'It doesn't require any action from me.'
+  Expected: 'The quick brown fox jumps over the lazy dog'
+  Confidence: 96.25%
+  Similarity: 37.04%
+
+[PASS] vad_split_utterance
+  Duration: 5279ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

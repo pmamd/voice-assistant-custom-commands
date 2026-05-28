@@ -1,0 +1,98 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:30:55
+Total Tests: 14
+Passed: 4
+Failed: 10
+Success Rate: 28.6%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] simple_greeting
+  Duration: 16625ms
+  Transcription: 'How may I help you today?'
+  Expected: 'How can I assist you today?'
+  Confidence: 93.86%
+  Similarity: 73.08%
+
+[FAIL] question_response
+  Duration: 15977ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The answer is 4'
+  Confidence: 93.29%
+  Similarity: 56.41%
+
+[FAIL] simple_question
+  Duration: 16364ms
+  Transcription: 'I'm here to help.'
+  Expected: 'How can I assist you?'
+  Confidence: 95.04%
+  Similarity: 15.79%
+
+[FAIL] long_response
+  Duration: 17076ms
+  Transcription: 'He was programmed to learn from his experiences and adapt to new situations.'
+  Expected: 'A story about a robot who learns and helps people'
+  Confidence: 96.59%
+  Similarity: 33.60%
+
+[PASS] stop_command_basic
+  Duration: 13175ms
+  Transcription: 'or get\fuel\range.'
+  Expected: 'None'
+  Confidence: 79.10%
+
+[PASS] stop_command_variations
+  Duration: 39437ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1503ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[FAIL] long_sentence
+  Duration: 16707ms
+  Transcription: 'However, I can check the current climate control settings for UIF. That would be helpful.'
+  Expected: 'The weather today includes temperature and humidity information'
+  Confidence: 88.22%
+  Similarity: 27.63%
+
+[FAIL] numbers
+  Duration: 15594ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: 'The numbers are one, two, three, four, five'
+  Confidence: 83.62%
+  Similarity: 28.07%
+
+[FAIL] special_characters
+  Duration: 16838ms
+  Transcription: 'How can I make your day better?'
+  Expected: 'Hello, I'm doing well. How are you today?'
+  Confidence: 95.95%
+  Similarity: 41.67%
+
+[FAIL] latency_test
+  Duration: 15465ms
+  Transcription: 'How may I help you today?'
+  Expected: 'Hi, how can I help you?'
+  Confidence: 94.90%
+  Similarity: 70.83%
+
+[FAIL] multiple_turns
+  Duration: 47080ms
+  Error: 1 turn(s) failed: Turn 2 failed verification
+
+[FAIL] clear_speech
+  Duration: 16595ms
+  Transcription: 'It is called a pangram, which contains every letter of the alphabet at least once.'
+  Expected: 'The quick brown fox jumps over the lazy dog'
+  Confidence: 94.70%
+  Similarity: 33.60%
+
+[PASS] vad_split_utterance
+  Duration: 7804ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

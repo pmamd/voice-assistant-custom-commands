@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:47:40
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] special_characters
+  Duration: 16939ms
+  Transcription: 'How can I assist you today?'
+  Expected: 'Hello, I'm doing well. How are you today?'
+  Confidence: 93.89%
+  Similarity: 47.06%
+
+================================================================================

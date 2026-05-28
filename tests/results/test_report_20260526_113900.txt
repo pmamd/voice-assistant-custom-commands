@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:39:00
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] latency_test
+  Duration: 16111ms
+  Transcription: 'How may I help you today?'
+  Expected: 'Hi, how can I help you?'
+  Confidence: 94.89%
+  Similarity: 70.83%
+
+================================================================================

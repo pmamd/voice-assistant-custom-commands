@@ -1,0 +1,41 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 12:13:54
+Total Tests: 4
+Passed: 4
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 15716ms
+  Transcription: 'Hello Georgie, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 88.48%
+  Similarity: 96.20%
+
+[PASS] question_response
+  Duration: 16442ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 93.52%
+  Similarity: 100.00%
+
+[PASS] simple_question
+  Duration: 15758ms
+  Transcription: 'Yes, Georgie, I'm here to help.'
+  Expected: 'Yes, Georgi. I'm always here to help.'
+  Confidence: 88.56%
+  Similarity: 85.29%
+
+[PASS] long_sentence
+  Duration: 17201ms
+  Transcription: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Expected: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Confidence: 95.53%
+  Similarity: 100.00%
+
+================================================================================

@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-26 11:41:48
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] long_response
+  Duration: 16817ms
+  Transcription: 'just like LMA.'
+  Expected: 'A story about a robot who learns and helps people'
+  Confidence: 82.31%
+  Similarity: 19.05%
+
+================================================================================
