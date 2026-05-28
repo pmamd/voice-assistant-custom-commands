@@ -175,7 +175,7 @@ class ToolSystemTestRunner:
         print("-" * 60)
 
         # For this test, we check the tools.json configuration
-        tools_json = self.project_root / "custom/talk-llama/tools/tools.json"
+        tools_json = self.project_root / "src/tools/tools.json"
 
         if not tools_json.exists():
             return False, "tools.json not found"
@@ -221,7 +221,7 @@ class ToolSystemTestRunner:
         print("-" * 60)
 
         # This is a simple check - we verify the getText() function clears the buffer
-        tool_parser_h = self.project_root / "custom/talk-llama/tool-parser.h"
+        tool_parser_h = self.project_root / "src/tool-parser.h"
 
         if not tool_parser_h.exists():
             return False, "tool-parser.h not found"
@@ -246,7 +246,7 @@ class ToolSystemTestRunner:
         print("\nTEST: tools.json Structure")
         print("-" * 60)
 
-        tools_json = self.project_root / "custom/talk-llama/tools/tools.json"
+        tools_json = self.project_root / "src/tools/tools.json"
 
         try:
             with open(tools_json) as f:
@@ -313,10 +313,10 @@ class ToolSystemTestRunner:
         print("\nTEST: No Old Stop Code (Regression)")
         print("-" * 60)
 
-        talk_llama_cpp = self.project_root / "custom/talk-llama/talk-llama.cpp"
+        talk_llama_cpp = self.project_root / "src/voice-assistant.cpp"
 
         if not talk_llama_cpp.exists():
-            return False, "talk-llama.cpp not found"
+            return False, "voice-assistant.cpp not found"
 
         try:
             with open(talk_llama_cpp) as f:
