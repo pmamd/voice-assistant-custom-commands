@@ -1999,9 +1999,11 @@ int run(int argc, const char **argv)
 				bool is_speech = !::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, params.vad_last_ms, params.vad_thold, params.freq_thold, true);
 
 				// DEBUG: Log VAD state every cycle
-				fprintf(stderr, "[VAD-DEBUG] t=%.3f is_speech=%d prev=%d buf_samples=%zu (%.2fs)\n",
-						get_current_time_ms(), is_speech, vad_result_prev,
-						pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
+				if (params.debug) {
+					fprintf(stderr, "[VAD-DEBUG] t=%.3f is_speech=%d prev=%d buf_samples=%zu (%.2fs)\n",
+							get_current_time_ms(), is_speech, vad_result_prev,
+							pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
+				}
 
 				// SMART EARLY STOP DETECTION - DISABLED
 				// This was causing false triggers on natural speech pauses in longer phrases.
@@ -2072,7 +2074,7 @@ int run(int argc, const char **argv)
 if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size()) // speech ended or user typed
 			{
 				// DEBUG: Log when VAD triggers end-of-speech
-				if (vad_result >= 2 && vad_result_prev == 1) {
+				if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
 					fprintf(stderr, "\n=== VAD TRIGGERED END-OF-SPEECH ===\n");
 					fprintf(stderr, "[SPLIT-DEBUG] Timestamp: %.3f\n", get_current_time_ms());
 					fprintf(stderr, "[SPLIT-DEBUG] vad_result: %d -> 2 (END)\n", vad_result_prev);
@@ -2088,7 +2090,7 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 				}
 
 				// DEBUG: Log speech details
-				if (vad_result >= 2 && vad_result_prev == 1) {
+				if (params.debug && vad_result >= 2 && vad_result_prev == 1) {
 					fprintf(stderr, "[SPLIT-DEBUG] Speech duration: %.0fms\n", speech_len * 1000.0);
 					fprintf(stderr, "[SPLIT-DEBUG] Buffer size: %zu samples (%.2fs)\n",
 							pcmf32_cur.size(), pcmf32_cur.size() / (float)WHISPER_SAMPLE_RATE);
@@ -2153,7 +2155,9 @@ if (vad_result >= 2 && vad_result_prev == 1 || force_speak || user_typed.size())
 							fwrite(&s, 2, 1, f);
 						}
 						fclose(f);
-						fprintf(stderr, "[SPLIT-DEBUG] Saved audio to %s\n", wav_filename);
+						if (params.debug) {
+							fprintf(stderr, "[SPLIT-DEBUG] Saved audio to %s\n", wav_filename);
+						}
 					}
 				}
 
