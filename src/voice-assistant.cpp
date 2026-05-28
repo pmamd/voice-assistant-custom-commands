@@ -1781,20 +1781,18 @@ int run(int argc, const char **argv)
 	printf("TTS Voice: %s\n", params.xtts_voice.c_str());
 	printf("LLM URL: %s\n", params.llama_url.c_str());
 
-	// Send a simple test message to Wyoming-Piper (skip in test mode).
+	// Send a simple test message to Wyoming-Piper.
 	// Microphone stays running — keeping PipeWire capture active through all
 	// warmups lets it stabilize over ~6s so no extra wait is needed at the end.
 	// Any TTS feedback captured during startup is discarded by audio.clear().
-	if (!test_mode) {
-		std::thread tts_test_thread([&params]() {
-			send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
-		});
-		tts_test_thread.detach();
+	std::thread tts_test_thread([&params]() {
+		send_tts_async("Voice assistant initialized", params.xtts_voice, params.language, params.xtts_url, 0, params.debug);
+	});
+	tts_test_thread.detach();
 
-		// Wait for TTS test audio to finish playing
-		std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-		printf("TTS test sent. If you heard audio, TTS is working.\n");
-	}
+	// Wait for TTS test audio to finish playing
+	std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+	printf("TTS test sent. If you heard audio, TTS is working.\n");
 	printf("=========================================\n\n");
 
 	// -- KV cache warmup ---------------------------------------------------------
