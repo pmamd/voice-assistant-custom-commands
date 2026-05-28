@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-27 23:14:12
+Total Tests: 1
+Passed: 0
+Failed: 1
+Success Rate: 0.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[FAIL] long_response
+  Duration: 21207ms
+  Transcription: 'He was programmed to learn from his environment and interact with humans.'
+  Expected: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robby was created. Robby was designed to be helpful and kind, just like me! He was programmed to learn from his environment and interact with humans.'
+  Confidence: 94.83%
+  Similarity: 43.58%
+
+================================================================================

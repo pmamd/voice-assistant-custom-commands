@@ -128,7 +128,7 @@ class AudioVerifier:
             result = subprocess.run(
                 cmd,
                 capture_output=True,
-                timeout=60,
+                timeout=120,  # Increased for long audio files (e.g., multi-variation tests)
                 text=True
             )
 

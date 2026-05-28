@@ -1,0 +1,98 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-27 23:22:28
+Total Tests: 14
+Passed: 12
+Failed: 2
+Success Rate: 85.7%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 17451ms
+  Transcription: 'Hello Georgie, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 87.67%
+  Similarity: 96.20%
+
+[PASS] question_response
+  Duration: 17084ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 95.21%
+  Similarity: 100.00%
+
+[PASS] simple_question
+  Duration: 17625ms
+  Transcription: 'Yes, Georgie, I'm always here to help.'
+  Expected: 'Yes, Georgi. I'm always here to help.'
+  Confidence: 89.33%
+  Similarity: 96.00%
+
+[FAIL] long_response
+  Duration: 20892ms
+  Transcription: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robo was built. Robo was designed to be helpful and kind. Just like LMA, he was programmed to learn from his experiences and to interact with humans.'
+  Expected: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robby was created. Robby was designed to be helpful and kind, just like me! He was programmed to learn from his environment and interact with humans.'
+  Confidence: 97.87%
+  Similarity: 76.72%
+
+[PASS] stop_command_basic
+  Duration: 16662ms
+  Transcription: 'I'm sorry, Georgie. I didn't understand your request. Could you please specify which tool or action you would like me to perform? Here are some options. Stop backslash speaking, pause backslash speaking, resume backslash speaking, get backslash temperature, set backslash fan backslash speed, enable backslash defrost, navigate backslash to, find backslash nearby, get backslash eta, check backslash tire backslash pressure, or get backslash fuel backslash range.'
+  Expected: 'None'
+  Confidence: 94.11%
+
+[FAIL] stop_command_variations
+  Duration: 101629ms
+  Error: Whisper timed out transcribing: tests/audio/outputs/stop_command_variations_output.wav
+
+[PASS] stop_interrupt_long_response
+  Duration: 1506ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[PASS] long_sentence
+  Duration: 24843ms
+  Transcription: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for Uof. That would be helpful.'
+  Expected: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Confidence: 91.12%
+  Similarity: 97.90%
+
+[PASS] numbers
+  Duration: 25568ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: '1, 2, 3, 4, 5.'
+  Confidence: 84.07%
+  Similarity: 100.00%
+
+[PASS] special_characters
+  Duration: 18316ms
+  Transcription: 'I'm just an AI. Georgie, I don't have feelings or emotions, but I'm here to help you. How can I assist you today?'
+  Expected: 'I'm just an AI, Georgi. I don't have feelings or emotions. But I'm here to help you! How can I assist you today?'
+  Confidence: 91.91%
+  Similarity: 96.00%
+
+[PASS] latency_test
+  Duration: 16114ms
+  Transcription: 'Hello Georgie. How may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 87.33%
+  Similarity: 96.20%
+
+[PASS] multiple_turns
+  Duration: 49885ms
+  Transcription: 'All 3 turns passed'
+
+[PASS] clear_speech
+  Duration: 18979ms
+  Transcription: 'That's a sentence. Georgie, it's called a pangram and it contains all the letters of the English alphabet.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 86.59%
+  Similarity: 97.63%
+
+[PASS] vad_split_utterance
+  Duration: 8479ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

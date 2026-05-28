@@ -32,6 +32,8 @@ STOP_CMD = False
 ACTIVE_APLAY_PROCESSES = []
 # Counter for test output files (persists across handler instances)
 TEST_OUTPUT_COUNTER = 0
+# Session timestamp for test output files (shared across all chunks in one response)
+TEST_SESSION_TIMESTAMP = 0
 
 class PiperEventHandler(AsyncEventHandler):
     def __init__(
@@ -49,7 +51,7 @@ class PiperEventHandler(AsyncEventHandler):
         self.process_manager = process_manager
 
     async def handle_event(self, event: Event) -> bool:
-        global STOP_CMD, ACTIVE_APLAY_PROCESSES, TEST_OUTPUT_COUNTER
+        global STOP_CMD, ACTIVE_APLAY_PROCESSES, TEST_OUTPUT_COUNTER, TEST_SESSION_TIMESTAMP
 
         # Handle service discovery
         if Describe.is_type(event.type):
@@ -60,9 +62,10 @@ class PiperEventHandler(AsyncEventHandler):
         # Handle new-response event: talk-llama signals start of a new user response.
         # This is the only place STOP_CMD is reset to False.
         if event.type == "new-response":
-            _LOGGER.debug("Received new-response event - resetting STOP_CMD and TEST_OUTPUT_COUNTER")
+            _LOGGER.debug("Received new-response event - resetting STOP_CMD, TEST_OUTPUT_COUNTER, and TEST_SESSION_TIMESTAMP")
             STOP_CMD = False
             TEST_OUTPUT_COUNTER = 0  # Reset counter for new response
+            TEST_SESSION_TIMESTAMP = int(time.time())  # Set session timestamp for this response
             return True
 
         # Handle AudioStop event (standard Wyoming protocol)
@@ -211,15 +214,16 @@ class PiperEventHandler(AsyncEventHandler):
         test_output_dir = getattr(self.cli_args, 'test_output_dir', None)
 
         if test_mode and test_output_dir:
-            global TEST_OUTPUT_COUNTER
+            global TEST_OUTPUT_COUNTER, TEST_SESSION_TIMESTAMP
             # Test mode: copy file to test output directory instead of playing
             test_output_dir_path = Path(test_output_dir)
             test_output_dir_path.mkdir(parents=True, exist_ok=True)
 
-            # Generate output filename with timestamp and counter
-            timestamp = int(time.time())
+            # Use session timestamp (set when new-response event received) for all chunks
+            # If not set yet (shouldn't happen), fall back to current time
+            timestamp = TEST_SESSION_TIMESTAMP if TEST_SESSION_TIMESTAMP > 0 else int(time.time())
             TEST_OUTPUT_COUNTER += 1
-            _LOGGER.debug(f"Test output counter after increment: {TEST_OUTPUT_COUNTER}")
+            _LOGGER.debug(f"Test output counter after increment: {TEST_OUTPUT_COUNTER} (timestamp: {timestamp})")
             test_output_path = test_output_dir_path / f"output_{timestamp}_{TEST_OUTPUT_COUNTER}.wav"
 
             shutil.copy(output_path, test_output_path)

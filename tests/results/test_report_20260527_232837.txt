@@ -1,0 +1,97 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-27 23:28:37
+Total Tests: 14
+Passed: 13
+Failed: 1
+Success Rate: 92.9%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 17268ms
+  Transcription: 'Hello Georgie, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 88.02%
+  Similarity: 96.20%
+
+[PASS] question_response
+  Duration: 16049ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 96.05%
+  Similarity: 100.00%
+
+[PASS] simple_question
+  Duration: 17517ms
+  Transcription: 'Yes, Georgie, I'm always here to help.'
+  Expected: 'Yes, Georgi. I'm always here to help.'
+  Confidence: 91.12%
+  Similarity: 96.00%
+
+[PASS] long_response
+  Duration: 15345ms
+  Transcription: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robbie was created. Robbie was designed to be helpful and kind. Just like LMA, he was programmed to learn from his experiences and adapt to new situations.'
+  Expected: 'Once upon a time, in a bustling city, there was a small factory that produced robots. One day, a new robot named Robby was created. Robby was designed to be helpful and kind, just like me! He was programmed to learn from his environment and interact with humans.'
+  Confidence: 96.84%
+
+[PASS] stop_command_basic
+  Duration: 19279ms
+  Transcription: 'I'm sorry, Georgie. I didn't understand your request. Could you please specify which tool or action you would like me to perform? Here are some options.'
+  Expected: 'None'
+  Confidence: 90.75%
+
+[PASS] stop_command_variations
+  Duration: 59606ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1502ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[PASS] long_sentence
+  Duration: 19180ms
+  Transcription: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Expected: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Confidence: 93.40%
+  Similarity: 100.00%
+
+[PASS] numbers
+  Duration: 24224ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: '1, 2, 3, 4, 5.'
+  Confidence: 85.50%
+  Similarity: 100.00%
+
+[PASS] special_characters
+  Duration: 18345ms
+  Transcription: 'I'm just an AI, Georgie. I don't have feelings or emotions, but I'm here to help you. How can I assist you today?'
+  Expected: 'I'm just an AI, Georgi. I don't have feelings or emotions. But I'm here to help you! How can I assist you today?'
+  Confidence: 89.01%
+  Similarity: 97.78%
+
+[PASS] latency_test
+  Duration: 17257ms
+  Transcription: 'Hello Georgie. How may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 85.57%
+  Similarity: 96.20%
+
+[PASS] multiple_turns
+  Duration: 49067ms
+  Transcription: 'All 3 turns passed'
+
+[FAIL] clear_speech
+  Duration: 19359ms
+  Transcription: 'That's a sentence "Jorgi". It's called a "Pangram" and is used to test typewriters or keyboards for completeness.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 87.83%
+  Similarity: 62.39%
+
+[PASS] vad_split_utterance
+  Duration: 8513ms
+  Transcription: 'VAD correctly handled utterance: 1 user prompt(s)'
+
+================================================================================

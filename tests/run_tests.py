@@ -932,6 +932,7 @@ class TestHarness:
         whisper_model = talk_llama_config.get('whisper_model', './models/ggml-base.en.bin')
         llama_url = talk_llama_config.get('llama_url', 'http://127.0.0.1:8083')
         temperature = talk_llama_config.get('temperature', None)
+        max_tokens = talk_llama_config.get('max_tokens', None)
 
         # Build command
         cmd = [
@@ -945,6 +946,10 @@ class TestHarness:
         # Add temperature if specified
         if temperature is not None:
             cmd.extend(['--temp', str(temperature)])
+
+        # Add max_tokens if specified
+        if max_tokens is not None:
+            cmd.extend(['-n', str(max_tokens)])
 
         # Add any extra arguments
         if extra_args:
