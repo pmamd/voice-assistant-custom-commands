@@ -250,21 +250,32 @@ _llama_start() {
 }
 
 # Check/start llama-server — mirrors Wyoming-Piper logic
-if _http_ok "${LLAMA_SERVER_URL}/health"; then
-    echo -e "${YELLOW}⚠ llama-server already running at ${LLAMA_SERVER_URL}${NC}"
-    read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Stopping llama-server..."
+_llama_port_listening() {
+    ss -tlnp | grep -q ":$LLAMA_SERVER_PORT "
+}
+
+if pgrep -f "llama-server.*${LLAMA_SERVER_PORT}" > /dev/null; then
+    if ! _llama_port_listening; then
+        # Process exists but port not listening — zombie or crashed, restart silently
+        echo -e "${YELLOW}⚠ llama-server process found but port $LLAMA_SERVER_PORT not listening (zombie/crashed) — restarting${NC}"
         pkill -f "llama-server.*${LLAMA_SERVER_PORT}" || true
         sleep 2
-        if _http_ok "${LLAMA_SERVER_URL}/health"; then
-            echo -e "${RED}✗ llama-server still running — kill it manually${NC}"
-            exit 1
-        fi
-        _llama_start
     else
-        echo "Continuing with existing llama-server..."
+        echo -e "${YELLOW}⚠ llama-server is already running${NC}"
+        read -p "Stop it and restart? (y/N) [default: N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Stopping llama-server..."
+            pkill -f "llama-server.*${LLAMA_SERVER_PORT}" || true
+            sleep 2
+            if _llama_port_listening; then
+                echo -e "${RED}✗ Port $LLAMA_SERVER_PORT still in use — kill it manually${NC}"
+                exit 1
+            fi
+            _llama_start
+        else
+            echo "Continuing with existing llama-server..."
+        fi
     fi
 else
     _llama_start
