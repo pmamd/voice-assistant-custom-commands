@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-28 11:39:47
+Total Tests: 1
+Passed: 1
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] clear_speech
+  Duration: 15473ms
+  Transcription: 'That's a sentence "Jorgi". It's called a "Pangram" and is used to test typewriters or keyboards for completeness.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 87.43%
+  Similarity: 62.39%
+
+================================================================================

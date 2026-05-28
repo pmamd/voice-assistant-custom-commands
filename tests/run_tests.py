@@ -784,8 +784,11 @@ class TestHarness:
         user_lines = []
         for i, line in enumerate(lines):
             # Match lines that start with "Georgi: " followed by actual content
-            # Exclude lines that are part of status/config output
-            if line.strip().startswith("Georgi: ") and not line.strip().startswith("Georgi: ["):
+            # Exclude lines that are part of status/config output (Wyoming Client, etc.)
+            if line.strip().startswith("Georgi: "):
+                # Filter out status messages (Wyoming Client has ANSI codes, so check the content)
+                if "[Wyoming Client]" in line or "Llama stop words:" in line:
+                    continue
                 # Only count if it looks like a transcription (has actual words after "Georgi: ")
                 content = line.strip()[8:]  # Remove "Georgi: " prefix
                 if content and not content.startswith("'") and content != "":

@@ -1,0 +1,20 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-28 11:16:32
+Total Tests: 1
+Passed: 1
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] clear_speech
+  Duration: 15977ms
+  Transcription: 'That's a sentence. Georgie, it's called a pangram and it contains all the letters of the English alphabet.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 87.43%
+  Similarity: 97.63%
+
+================================================================================

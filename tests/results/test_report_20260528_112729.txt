@@ -1,0 +1,91 @@
+================================================================================
+AUDIO PIPELINE TEST REPORT
+================================================================================
+Generated: 2026-05-28 11:27:29
+Total Tests: 13
+Passed: 11
+Failed: 2
+Success Rate: 84.6%
+
+DETAILED RESULTS
+--------------------------------------------------------------------------------
+
+[PASS] simple_greeting
+  Duration: 14599ms
+  Transcription: 'Hello Jordy, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 86.94%
+  Similarity: 88.31%
+
+[PASS] question_response
+  Duration: 13527ms
+  Transcription: 'The sum of 2 and 2 is 4.'
+  Expected: 'The sum of 2 and 2 is 4.'
+  Confidence: 93.93%
+  Similarity: 100.00%
+
+[PASS] simple_question
+  Duration: 14188ms
+  Transcription: 'Yes, Georgie, I'm always here to help.'
+  Expected: 'Yes, Georgi. I'm always here to help.'
+  Confidence: 90.16%
+  Similarity: 96.00%
+
+[PASS] stop_command_basic
+  Duration: 13110ms
+  Transcription: 'I'm sorry, Georgie. I didn't understand your request. Could you please specify which tool or action you would like me to perform? Here are some options. Stop backslash speaking, pause backslash speaking, resume backslash speaking, get backslash temperature, set backslash temperature, set backslash fan backslash speed, enable backslash defrost, navigate backslash to, find backslash nearby, get backslash eta, check backslash tire backslash pressure, or get backslash fuel backslash range.'
+  Expected: 'None'
+  Confidence: 94.27%
+
+[PASS] stop_command_variations
+  Duration: 42299ms
+  Transcription: 'All 3 variations passed'
+
+[PASS] stop_interrupt_long_response
+  Duration: 1502ms
+  Transcription: 'Stop interrupted audio at 1.50s (full audio ~30s)'
+
+[PASS] long_sentence
+  Duration: 14598ms
+  Transcription: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if needed.'
+  Expected: 'I'm unable to provide real-time weather information. However, I can check the current climate control settings for you if that would be helpful.'
+  Confidence: 94.91%
+  Similarity: 91.58%
+
+[PASS] numbers
+  Duration: 21766ms
+  Transcription: '1, 2, 3, 4, 5.'
+  Expected: '1, 2, 3, 4, 5.'
+  Confidence: 83.15%
+  Similarity: 100.00%
+
+[PASS] special_characters
+  Duration: 14811ms
+  Transcription: 'I am just an AI, Georgie. I don't have feelings or emotions, but I'm here to help you. How can I make your day better?'
+  Expected: 'I'm just an AI, Georgi. I don't have feelings or emotions. But I'm here to help you! How can I assist you today?'
+  Confidence: 89.99%
+  Similarity: 88.70%
+
+[PASS] latency_test
+  Duration: 13723ms
+  Transcription: 'Hello Georgie, how may I help you today?'
+  Expected: 'Hello Georgi! How may I help you today?'
+  Confidence: 90.21%
+  Similarity: 96.20%
+
+[PASS] multiple_turns
+  Duration: 39487ms
+  Transcription: 'All 3 turns passed'
+
+[FAIL] clear_speech
+  Duration: 25202ms
+  Transcription: 'That's a sentence from the pangram, which is a phrase used to test typewriters and fonts. It contains every letter of the English alphabet at least once.'
+  Expected: 'That's a sentence, Georgi. It's called a pangram and it contains all the letters of the English alphabet.'
+  Confidence: 95.93%
+  Similarity: 59.69%
+
+[FAIL] vad_split_utterance
+  Duration: 5807ms
+  Error: VAD split-utterance bug detected: 2 user prompts (expected ≤1)
+
+================================================================================
