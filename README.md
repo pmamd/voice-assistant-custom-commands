@@ -72,7 +72,7 @@ cd ../..
 ```
 voice-assistant-custom-commands/
 ├── src/                      # Application code
-│   ├── talk-llama.cpp        # Main voice assistant application
+│   ├── voice-assistant.cpp   # Main voice assistant application
 │   ├── tool-system.h/.cpp    # Tool registry and executors
 │   ├── tool-parser.h/.cpp    # Streaming Mistral tool call parser
 │   ├── wyoming-client.h/.cpp # Wyoming protocol TCP client
