@@ -88,20 +88,36 @@ Main test runner that coordinates all components.
 
 **Usage**:
 ```bash
-# Run all tests
-python3 tests/run_tests.py
+# Run all tests (recommended - uses venv if available)
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group all
 
 # Run specific test group
-python3 tests/run_tests.py --group smoke
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group smoke
 
 # Run with verbose output
-python3 tests/run_tests.py --verbose
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group all -v
 
 # Run single test
-python3 tests/run_tests.py --test simple_greeting
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --test simple_greeting
+
+# NPU configuration (for AMD RDNA3 iGPU builds)
+bash tests/run_tests_venv.sh --config tests/test_cases_npu.yaml --group all
 ```
 
-#### 4. Test Configuration (`test_cases.yaml`)
+#### 4. Test Wrapper (`run_tests_venv.sh`)
+Wrapper script that activates Python venv if available for semantic similarity support.
+
+**Usage**:
+```bash
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group all
+```
+
+**Features**:
+- Auto-activates venv if present
+- Falls back to system Python if venv not found
+- Enables semantic similarity matching with sentence-transformers
+
+#### 5. Test Configuration (`test_cases.yaml`)
 Defines all test cases and configuration.
 
 **Test Case Structure**:
@@ -110,18 +126,21 @@ test_cases:
   - name: "test_name"
     description: "What this test does"
     input: "Text to speak"
-    expected_contains: ["keyword1", "keyword2"]
-    min_confidence: 0.85
+    verification_method: "semantic"  # or "fuzzy"
+    expected_response: "Expected LLM response"
+    semantic_threshold: 0.55  # Similarity threshold for semantic matching
+    min_confidence: 0.70      # Whisper confidence threshold
     test_type: "functional"
 ```
 
 **Test Types**:
 - `functional`: Basic speech-to-response pipeline
-- `command`: Custom command routing (stop, exit)
+- `command`: Custom command routing (stop, pause, resume)
 - `interrupt`: Multi-step tests (stop during TTS)
 - `quality`: Transcription accuracy
 - `performance`: Latency and throughput
 - `multi_turn`: Conversation flows
+- `vad_validation`: VAD split-utterance detection
 
 ## Setup
 
@@ -134,13 +153,16 @@ test_cases:
 
 **Python Dependencies**:
 ```bash
-pip install pyyaml
+# Create virtualenv for semantic similarity support
+python3 -m venv venv
+source venv/bin/activate
+pip install pyyaml sentence-transformers scikit-learn
 ```
 
 **Models Required**:
-- Whisper model: `./models/ggml-base.en.bin` (or ggml-tiny.en.bin for faster tests)
-- LLaMA model: `./models/llama-2-7b-chat.Q5_K_M.gguf`
-- Piper voice: `./piper-voices/en_US-lessac-medium.onnx`
+- Whisper model: `./external/whisper.cpp/models/ggml-small.en.bin` (GPU) or `ggml-small.bin` (NPU with --language en)
+- LLM: Mistral recommended via llama-server on port 8080
+- Piper voice: Installed via `pipx install piper-tts==1.4.1` and downloaded to `./piper-data/`
 
 ### Directory Structure
 
@@ -179,7 +201,7 @@ pip install -e .
 
 ## Test Mode Features
 
-### talk-llama Test Mode
+### voice-assistant Test Mode
 
 The `voice-assistant` binary supports test mode for automated testing:
 
@@ -194,10 +216,11 @@ The `voice-assistant` binary supports test mode for automated testing:
 **Example**:
 ```bash
 ./build/bin/voice-assistant \
-    --model models/llama-2-7b-chat.Q5_K_M.gguf \
-    --model-whisper models/ggml-base.en.bin \
     --test-input tests/audio/inputs/hello.wav \
-    --voice-url tcp://localhost:10200
+    -mw ./external/whisper.cpp/models/ggml-small.en.bin \
+    --llama-url http://localhost:8080 \
+    --temp 0.0 \
+    -n 500
 ```
 
 ### Wyoming-Piper Test Mode
@@ -216,10 +239,10 @@ The Wyoming-Piper TTS server supports test mode:
 
 **Example**:
 ```bash
-wyoming-piper \
-    --piper ./piper/piper \
+wyoming-piper-custom \
+    --piper ~/.local/bin/piper \
     --voice en_US-lessac-medium \
-    --data-dir ./piper-voices \
+    --data-dir ./piper-data \
     --uri tcp://0.0.0.0:10200 \
     --test-mode \
     --test-output-dir ./tests/audio/outputs
@@ -230,16 +253,14 @@ wyoming-piper \
 ### Quick Start
 
 ```bash
-# 1. Start Wyoming-Piper in test mode (or let run_tests.py auto-start)
-wyoming-piper --piper ./piper/piper --voice en_US-lessac-medium \
-    --data-dir ./piper-voices --uri tcp://0.0.0.0:10200 \
-    --test-mode --test-output-dir ./tests/audio/outputs &
+# 1. Ensure llama-server is running
+# (start-assistant.sh does this, or start manually on port 8080)
 
-# 2. Run tests
-python3 tests/run_tests.py
+# 2. Run tests (auto-starts Wyoming-Piper in test mode)
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group smoke
 
 # 3. View results
-cat tests/results/test_report.txt
+ls -lt tests/results/*.txt | head -1 | awk '{print $NF}' | xargs cat
 ```
 
 ### Test Groups
@@ -248,29 +269,35 @@ Run specific test groups:
 
 ```bash
 # Smoke tests (quick validation)
-python3 tests/run_tests.py --group smoke
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group smoke
 
 # Functional tests (basic pipeline)
-python3 tests/run_tests.py --group functional
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group functional
 
 # Command tests (stop, exit commands)
-python3 tests/run_tests.py --group command
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group command
 
 # Quality tests (transcription accuracy)
-python3 tests/run_tests.py --group quality
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group quality
+
+# VAD validation tests
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group vad
 
 # All tests
-python3 tests/run_tests.py --group all
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group all
 ```
 
 ### Individual Tests
 
 ```bash
 # Run single test
-python3 tests/run_tests.py --test simple_greeting
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --test simple_greeting
 
 # Run with verbose logging
-python3 tests/run_tests.py --test simple_greeting --verbose
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --test simple_greeting -v
+
+# Run multiple specific tests
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --test simple_greeting question_response
 ```
 
 ### Configuration Options
@@ -289,20 +316,33 @@ config:
   # System under test
   talk_llama:
     binary: "./build/bin/voice-assistant"
-    whisper_model: "./models/ggml-base.en.bin"
-    llama_model: "./models/llama-2-7b-chat.Q5_K_M.gguf"
+    whisper_model: "./external/whisper.cpp/models/ggml-small.en.bin"
+    llama_url: "http://localhost:8080"
+    temperature: 0.0  # Deterministic for repeatable tests
+    max_tokens: 500   # Allow longer responses
     test_mode: true
 
   # Audio verification
   audio_verifier:
-    whisper_bin: "./build/bin/main"
-    whisper_model: "./models/ggml-base.en.bin"
+    whisper_bin: "./build/bin/whisper-cli"
+    whisper_model: "./external/whisper.cpp/models/ggml-small.en.bin"
     output_dir: "./tests/audio/outputs"
 
   # Wyoming-Piper TTS server
   wyoming_piper:
-    command: "wyoming-piper"
-    args: [--voice, en_US-lessac-medium, --uri, tcp://0.0.0.0:10200]
+    command: "~/.local/bin/wyoming-piper-custom"
+    args:
+      - "--piper"
+      - "~/.local/bin/piper"
+      - "--voice"
+      - "en_US-lessac-medium"
+      - "--data-dir"
+      - "./piper-data"
+      - "--uri"
+      - "tcp://0.0.0.0:10200"
+      - "--test-mode"
+      - "--test-output-dir"
+      - "./tests/audio/outputs"
     port: 10200
     auto_start: true
 
@@ -315,9 +355,9 @@ config:
 
   # Pass/fail criteria
   criteria:
-    default_min_confidence: 0.80
+    default_min_confidence: 0.65
     default_fuzzy_threshold: 0.85
-    default_keyword_match_ratio: 0.80
+    default_keyword_match_ratio: 0.30  # 30% of keywords must match
 ```
 
 ## Test Cases
@@ -401,11 +441,23 @@ if len(matched) >= min_matches:
     return PASS
 ```
 
-### 4. Confidence Score
+### 4. Semantic Similarity
+Uses sentence-transformers (all-MiniLM-L6-v2) for meaning-based comparison:
+```python
+from sentence_transformers import SentenceTransformer
+embeddings = model.encode([expected, actual])
+similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+if similarity >= threshold:  # default: 0.70
+    return PASS
+```
+
+**Note**: Requires venv with sentence-transformers installed. Falls back to fuzzy matching if not available.
+
+### 5. Confidence Score
 Uses Whisper token probabilities:
 ```python
 avg_confidence = sum(token_probs) / len(tokens)
-if avg_confidence >= min_confidence:  # default: 0.80
+if avg_confidence >= min_confidence:  # default: 0.65
     return PASS
 ```
 
@@ -490,10 +542,10 @@ wyoming-piper --piper ./piper/piper --voice en_US-lessac-medium \
 **Whisper transcription errors**:
 ```bash
 # Check model path
-ls -lh models/ggml-base.en.bin
+ls -lh external/whisper.cpp/models/ggml-small.en.bin
 
 # Test Whisper directly
-./build/bin/main -m models/ggml-base.en.bin -f test.wav
+./build/bin/whisper-cli -m external/whisper.cpp/models/ggml-small.en.bin -f test.wav
 ```
 
 **Audio resampling failures**:
