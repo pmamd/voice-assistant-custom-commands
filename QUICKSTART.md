@@ -226,12 +226,17 @@ arecord -d 3 test.wav && aplay test.wav           # record and play back
 ## Running Tests
 
 ```bash
-# Wyoming stop mechanics
+# Set up venv for semantic similarity support (recommended)
+python3 -m venv venv
+source venv/bin/activate
+pip install pyyaml sentence-transformers scikit-learn
+
+# Smoke tests (quick validation)
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group smoke
+
+# Full test suite (requires llama-server running on port 8080)
+bash tests/run_tests_venv.sh --config tests/test_cases.yaml --group all
+
+# Unit tests (Wyoming protocol mechanics)
 python3 -m unittest tests.test_real_interrupt.TestWyomingStopMechanics -v
-
-# LLM output quality (requires models and Wyoming-Piper running)
-python3 tests/test_wyoming_piper_unit.py
-
-# Full test suite
-python3 tests/run_tests.py --config tests/test_cases.yaml --group all
 ```
